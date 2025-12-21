@@ -140,6 +140,16 @@ export class YahooMarketDataProvider {
     const period1 = new Date(period2.getTime() - lookbackDaysFor(interval) * 24 * 60 * 60 * 1000);
 
     const res = await this.#yf.chart(symbol, { interval: yahooInterval, period1, period2 });
+    if (!Array.isArray(res.quotes) || res.quotes.length === 0) {
+      return {
+        symbol,
+        interval,
+        provider: "yahoo-finance",
+        fetchedAt,
+        bars: []
+      };
+    }
+
     const bars = toMarketBars(res.quotes as Array<Record<string, unknown>>);
 
     const finalBars = interval === "4h" ? resampleTo4h(bars) : bars;

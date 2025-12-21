@@ -37,4 +37,4 @@ None. This playbook writes local artifacts under `content/data/<DATE>/` for down
 
 ## Rollback
 
-- Close the PR.
+- Delete the `content/data/<DATE>/` folder if you want to discard the fetched snapshots.

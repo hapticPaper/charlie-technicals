@@ -36,4 +36,4 @@ None. This playbook writes local artifacts under `content/analysis/<DATE>/`.
 
 ## Rollback
 
-- Close the PR.
+- Delete the `content/analysis/<DATE>/` folder if you want to discard the computed indicators/signals.

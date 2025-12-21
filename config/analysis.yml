@@ -1,3 +1,13 @@
+## Human-editable analysis rules.
+##
+## Supported indicator types:
+## - sma, ema, rsi: { id, type, period, source: close }
+## - macd: { id, type, fastPeriod, slowPeriod, signalPeriod, source: close }
+##
+## Supported signal ops:
+## - lt / gt: { indicator, op, value }
+## - crossAbove / crossBelow (MACD-only): { indicator, op, left, right }
+
 intervals:
   - 1m
   - 5m

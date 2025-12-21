@@ -76,6 +76,7 @@ export async function listReportDates(): Promise<string[]> {
   return entries
     .filter((e) => e.endsWith(".mdx"))
     .map((e) => e.replace(/\.mdx$/, ""))
+    .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
     .sort();
 }
 

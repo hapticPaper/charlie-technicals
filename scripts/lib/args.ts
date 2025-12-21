@@ -7,9 +7,11 @@ export function getArg(argv: string[], name: string): string | undefined {
 
     if (a === `--${name}`) {
       const next = argv[i + 1];
-      if (typeof next === "string" && !next.startsWith("--")) {
-        return next;
+      if (typeof next !== "string" || next.startsWith("--")) {
+        throw new Error(`Expected value after --${name}`);
       }
+
+      return next;
     }
 
     if (a.startsWith(prefix)) {

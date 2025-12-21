@@ -118,6 +118,7 @@ function buildSummaries(
   return {
     veryShort,
     mainIdea: mainIdeaParts.join(" ").trim(),
+    // 500-word cap per requirements.
     summary: capWords(rawSummary, 500)
   };
 }
