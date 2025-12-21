@@ -1,50 +1,50 @@
 import type {
   AnalyzedSeries,
-  MacdSeries,
   MarketInterval,
   MarketReport,
-  ReportIntervalSeries,
-  ReportPoint
+  ReportIntervalSeries
 } from "./types";
 
 function activeSignals(series: ReportIntervalSeries): string[] {
   return series.signals.filter((s) => s.active).map((s) => s.label);
 }
 
-function toNumber(value: number | null | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+function toNullableNumber(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportIntervalSeries {
   const sma20 = Array.isArray(analyzed.indicators.sma20) ? analyzed.indicators.sma20 : undefined;
   const ema20 = Array.isArray(analyzed.indicators.ema20) ? analyzed.indicators.ema20 : undefined;
   const rsi14 = Array.isArray(analyzed.indicators.rsi14) ? analyzed.indicators.rsi14 : undefined;
-  const macd =
-    analyzed.indicators.macd && !Array.isArray(analyzed.indicators.macd)
-      ? (analyzed.indicators.macd as MacdSeries)
-      : undefined;
 
   const bars = analyzed.bars;
   const startIndex = Math.max(0, bars.length - maxPoints);
-  const points: ReportPoint[] = bars.slice(startIndex).map((b, idx) => {
+  const slicedBars = bars.slice(startIndex);
+
+  const t = slicedBars.map((b) => Math.floor(new Date(b.t).getTime() / 1000));
+  const close = slicedBars.map((b) => b.c);
+  const sma = slicedBars.map((_, idx) => {
     const i = startIndex + idx;
-    return {
-      t: b.t,
-      close: b.c,
-      volume: b.v,
-      sma20: sma20 ? toNumber(sma20[i]) : undefined,
-      ema20: ema20 ? toNumber(ema20[i]) : undefined,
-      rsi14: rsi14 ? toNumber(rsi14[i]) : undefined,
-      macd: macd ? toNumber(macd.macd[i]) : undefined,
-      macdSignal: macd ? toNumber(macd.signal[i]) : undefined,
-      macdHistogram: macd ? toNumber(macd.histogram[i]) : undefined
-    };
+    return sma20 ? toNullableNumber(sma20[i]) : null;
+  });
+  const ema = slicedBars.map((_, idx) => {
+    const i = startIndex + idx;
+    return ema20 ? toNullableNumber(ema20[i]) : null;
+  });
+  const rsi = slicedBars.map((_, idx) => {
+    const i = startIndex + idx;
+    return rsi14 ? toNullableNumber(rsi14[i]) : null;
   });
 
   return {
     symbol: analyzed.symbol,
     interval: analyzed.interval,
-    points,
+    t,
+    close,
+    sma20: sma,
+    ema20: ema,
+    rsi14: rsi,
     signals: analyzed.signals
   };
 }
@@ -54,6 +54,15 @@ function buildSummaries(
   seriesBySymbol: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>,
   missingSymbols: string[]
 ): MarketReport["summaries"] {
+  function capWords(text: string, maxWords: number): string {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length <= maxWords) {
+      return text;
+    }
+
+    return `${words.slice(0, maxWords).join(" ")} …`;
+  }
+
   const lines: string[] = [];
 
   for (const symbol of Object.keys(seriesBySymbol).sort()) {
@@ -104,10 +113,12 @@ function buildSummaries(
     summaryParts.push(`Symbols skipped due to missing data: ${missingSymbols.join(", ")}.`);
   }
 
+  const rawSummary = summaryParts.join("\n");
+
   return {
     veryShort,
     mainIdea: mainIdeaParts.join(" ").trim(),
-    summary: summaryParts.join("\n")
+    summary: capWords(rawSummary, 500)
   };
 }
 

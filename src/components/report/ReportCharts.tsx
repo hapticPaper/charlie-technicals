@@ -21,7 +21,13 @@ export function ReportCharts(props: { symbol: string; interval: MarketInterval }
     return <p>{isMissingSymbol ? "No data from provider for this symbol." : "Missing series."}</p>;
   }
 
-  const data = series.points;
+  const data = series.t.map((t, i) => ({
+    t,
+    close: series.close[i],
+    sma20: series.sma20[i] ?? undefined,
+    ema20: series.ema20[i] ?? undefined,
+    rsi14: series.rsi14[i] ?? undefined
+  }));
   const active = series.signals.filter((s) => s.active).map((s) => s.label);
 
   if (process.env.NODE_ENV !== "production") {

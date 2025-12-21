@@ -163,9 +163,18 @@ export async function loadAnalysisConfig(rootDir = process.cwd()): Promise<Analy
     throw new Error("analysis.yml must define signals");
   }
 
+  const indicators = cfg.indicators.map(validateIndicator);
+  const indicatorIds = new Set(indicators.map((i) => i.id));
+
+  for (const required of ["sma20", "ema20", "rsi14"] as const) {
+    if (!indicatorIds.has(required)) {
+      throw new Error(`analysis.yml must define indicator id: ${required}`);
+    }
+  }
+
   return {
     intervals: cfg.intervals.map(assertInterval),
-    indicators: cfg.indicators.map(validateIndicator),
+    indicators,
     signals: cfg.signals.map(validateSignal)
   };
 }

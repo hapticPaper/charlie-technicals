@@ -33,6 +33,7 @@ Generate a daily MDX report (plus supporting JSON artifacts) for the configured 
 2. Run:
 
    ```bash
+   bun --version
    bun install
    bun run market:run --date=<DATE>
    ```

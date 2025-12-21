@@ -47,22 +47,14 @@ export type AnalyzedSeries = {
   signals: SignalHit[];
 };
 
-export type ReportPoint = {
-  t: string;
-  close: number;
-  volume: number;
-  sma20?: number;
-  ema20?: number;
-  rsi14?: number;
-  macd?: number;
-  macdSignal?: number;
-  macdHistogram?: number;
-};
-
 export type ReportIntervalSeries = {
   symbol: string;
   interval: MarketInterval;
-  points: ReportPoint[];
+  t: number[];
+  close: number[];
+  sma20: Array<number | null>;
+  ema20: Array<number | null>;
+  rsi14: Array<number | null>;
   signals: SignalHit[];
 };
 

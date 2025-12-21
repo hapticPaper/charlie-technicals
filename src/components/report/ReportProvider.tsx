@@ -14,7 +14,7 @@ export function ReportProvider(props: { report: MarketReport; children: ReactNod
 export function useReport(): MarketReport {
   const report = useContext(ReportContext);
   if (!report) {
-    throw new Error("ReportProvider missing");
+    throw new Error("ReportProvider context is missing. Wrap the MDX render tree in <ReportProvider>.");
   }
   return report;
 }
