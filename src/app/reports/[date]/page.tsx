@@ -7,8 +7,6 @@ import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
 
-export const dynamicParams = false;
-
 export async function generateStaticParams() {
   const dates = await listReportDates();
   return dates.map((date) => ({ date }));

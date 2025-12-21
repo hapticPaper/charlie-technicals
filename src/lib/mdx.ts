@@ -15,12 +15,15 @@ export interface RenderedMdx<TFrontmatter extends Record<string, unknown> = Reco
   frontmatter: TFrontmatter;
 }
 
+type ComponentOverrides = Parameters<typeof compileMDX<Record<string, unknown>>>[0]["components"];
+
 export async function renderMdx<TFrontmatter extends Record<string, unknown> = Record<string, unknown>>(
-  source: string
+  source: string,
+  overrides?: ComponentOverrides
 ): Promise<RenderedMdx<TFrontmatter>> {
   return compileMDX<TFrontmatter>({
     source,
-    components: mdxComponents,
+    components: overrides ? { ...mdxComponents, ...overrides } : mdxComponents,
     options: {
       parseFrontmatter: true,
       mdxOptions: {
