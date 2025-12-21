@@ -69,8 +69,17 @@ export async function listReportDates(): Promise<string[]> {
   let entries: string[] = [];
   try {
     entries = await readdir(dir);
-  } catch {
-    return [];
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
   }
 
   return entries
