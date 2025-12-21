@@ -24,6 +24,8 @@ async function mapWithConcurrency<TIn, TOut>(
   opts: ConcurrencyOptions,
   fn: (item: TIn) => Promise<TOut>
 ): Promise<TOut[]> {
+  // NOTE: If you want best-effort behavior (partial progress), ensure `fn` handles
+  // per-item errors internally. Unhandled rejections will fail the whole run.
   const concurrency = Math.max(1, opts.concurrency ?? 4);
   const results: TOut[] = new Array(items.length);
   let nextIndex = 0;
@@ -70,7 +72,9 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
       }
       await writeRawSeries(date, series);
       written += 1;
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[market:data] failed for ${symbol} ${interval} (${date}): ${message}`);
       missing.add(symbol);
     }
   });
@@ -114,16 +118,21 @@ export async function runMarketReport(args: {
   date: string;
   symbols: string[];
   intervals: MarketInterval[];
-  missingSymbols: string[];
+  missingSymbols?: string[];
 }): Promise<{ wrote: boolean }> {
   await ensureDirs(args.date);
   const analyzed = await loadAnalyzedSeries(args.date);
+
+  const missingSymbols =
+    args.missingSymbols ??
+    args.symbols.filter((s) => !analyzed.some((a) => a.symbol === s));
+
   const report = buildMarketReport({
     date: args.date,
     symbols: args.symbols,
     intervals: args.intervals,
     analyzed,
-    missingSymbols: args.missingSymbols
+    missingSymbols
   });
   const mdx = buildReportMdx(report);
   await writeReport(args.date, report, mdx);

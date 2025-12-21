@@ -17,11 +17,21 @@ export function ReportCharts(props: { symbol: string; interval: MarketInterval }
   const report = useReport();
   const series = report.series[props.symbol]?.[props.interval];
   if (!series) {
-    return <p>Missing series.</p>;
+    const isMissingSymbol = report.missingSymbols.includes(props.symbol);
+    return <p>{isMissingSymbol ? "No data from provider for this symbol." : "Missing series."}</p>;
   }
 
   const data = series.points;
   const active = series.signals.filter((s) => s.active).map((s) => s.label);
+
+  if (process.env.NODE_ENV !== "production") {
+    for (let i = 1; i < data.length; i += 1) {
+      if (data[i].t < data[i - 1].t) {
+        console.warn(`[ReportCharts] points out of order for ${props.symbol} ${props.interval}`);
+        break;
+      }
+    }
+  }
 
   return (
     <section>

@@ -73,35 +73,39 @@ function toMarketBars(quotes: Array<Record<string, unknown>>): MarketBar[] {
 }
 
 function resampleTo4h(bars1h: MarketBar[]): MarketBar[] {
-  const out: MarketBar[] = [];
-  for (let i = 0; i < bars1h.length; i += 4) {
-    const chunk = bars1h.slice(i, i + 4);
-    if (chunk.length < 4) {
-      break;
+  const buckets = new Map<
+    string,
+    {
+      t: string;
+      o: number;
+      h: number;
+      l: number;
+      c: number;
+      v: number;
+    }
+  >();
+
+  for (const bar of bars1h) {
+    const d = new Date(bar.t);
+    const bucketHour = Math.floor(d.getUTCHours() / 4) * 4;
+    const bucketStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), bucketHour));
+    const key = bucketStart.toISOString();
+
+    const existing = buckets.get(key);
+    if (!existing) {
+      buckets.set(key, { t: key, o: bar.o, h: bar.h, l: bar.l, c: bar.c, v: bar.v });
+      continue;
     }
 
-    const open = chunk[0].o;
-    const close = chunk[chunk.length - 1].c;
-    let high = -Infinity;
-    let low = Infinity;
-    let volume = 0;
-    for (const bar of chunk) {
-      high = Math.max(high, bar.h);
-      low = Math.min(low, bar.l);
-      volume += bar.v;
-    }
-
-    out.push({
-      t: chunk[0].t,
-      o: open,
-      h: high,
-      l: low,
-      c: close,
-      v: volume
-    });
+    existing.h = Math.max(existing.h, bar.h);
+    existing.l = Math.min(existing.l, bar.l);
+    existing.c = bar.c;
+    existing.v += bar.v;
   }
 
-  return out;
+  return Array.from(buckets.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([, bar]) => bar);
 }
 
 function maxBarsFor(interval: MarketInterval): number {

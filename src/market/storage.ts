@@ -47,9 +47,16 @@ export async function ensureDirs(date: string): Promise<void> {
   await mkdir(getReportsDir(), { recursive: true });
 }
 
-export async function writeJson(filePath: string, value: unknown): Promise<void> {
+export async function writeJson(
+  filePath: string,
+  value: unknown,
+  opts: {
+    pretty?: boolean;
+  } = {}
+): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  const json = opts.pretty ? JSON.stringify(value, null, 2) : JSON.stringify(value);
+  await writeFile(filePath, `${json}\n`, "utf8");
 }
 
 export async function readJson<T>(filePath: string): Promise<T> {

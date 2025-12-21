@@ -37,6 +37,101 @@ export type AnalysisConfig = {
   signals: SignalDefinition[];
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertString(value: unknown, name: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${name} must be a non-empty string`);
+  }
+  return value;
+}
+
+function assertNumber(value: unknown, name: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a finite number`);
+  }
+  return value;
+}
+
+function validateIndicator(raw: unknown): IndicatorDefinition {
+  if (!isRecord(raw)) {
+    throw new Error("indicator must be an object");
+  }
+
+  const id = assertString(raw.id, "indicator.id");
+  const type = assertString(raw.type, "indicator.type");
+  const source = assertString(raw.source, "indicator.source");
+  if (source !== "close") {
+    throw new Error(`Unsupported indicator.source: ${source}`);
+  }
+
+  if (type === "sma" || type === "ema" || type === "rsi") {
+    return {
+      id,
+      type,
+      source: "close",
+      period: assertNumber(raw.period, `indicator.${id}.period`)
+    };
+  }
+
+  if (type === "macd") {
+    return {
+      id,
+      type,
+      source: "close",
+      fastPeriod: assertNumber(raw.fastPeriod, `indicator.${id}.fastPeriod`),
+      slowPeriod: assertNumber(raw.slowPeriod, `indicator.${id}.slowPeriod`),
+      signalPeriod: assertNumber(raw.signalPeriod, `indicator.${id}.signalPeriod`)
+    };
+  }
+
+  throw new Error(`Unsupported indicator.type: ${type}`);
+}
+
+function validateSignal(raw: unknown): SignalDefinition {
+  if (!isRecord(raw)) {
+    throw new Error("signal must be an object");
+  }
+
+  const id = assertString(raw.id, "signal.id");
+  const label = assertString(raw.label, "signal.label");
+  if (!isRecord(raw.when)) {
+    throw new Error(`signal.${id}.when must be an object`);
+  }
+
+  const indicator = assertString(raw.when.indicator, `signal.${id}.when.indicator`);
+  const op = assertString(raw.when.op, `signal.${id}.when.op`);
+
+  if (op === "lt" || op === "gt") {
+    return {
+      id,
+      label,
+      when: {
+        indicator,
+        op,
+        value: assertNumber(raw.when.value, `signal.${id}.when.value`)
+      }
+    };
+  }
+
+  if (op === "crossAbove" || op === "crossBelow") {
+    return {
+      id,
+      label,
+      when: {
+        indicator,
+        op,
+        left: assertString(raw.when.left, `signal.${id}.when.left`),
+        right: assertString(raw.when.right, `signal.${id}.when.right`)
+      }
+    };
+  }
+
+  throw new Error(`Unsupported signal op: ${op}`);
+}
+
 function assertInterval(value: string): MarketInterval {
   if ((MARKET_INTERVALS as readonly string[]).includes(value)) {
     return value as MarketInterval;
@@ -70,7 +165,7 @@ export async function loadAnalysisConfig(rootDir = process.cwd()): Promise<Analy
 
   return {
     intervals: cfg.intervals.map(assertInterval),
-    indicators: cfg.indicators as IndicatorDefinition[],
-    signals: cfg.signals as SignalDefinition[]
+    indicators: cfg.indicators.map(validateIndicator),
+    signals: cfg.signals.map(validateSignal)
   };
 }

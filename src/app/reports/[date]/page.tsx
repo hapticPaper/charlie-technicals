@@ -23,8 +23,17 @@ export default async function ReportPage(props: { params: { date: string } }) {
   try {
     report = await readJson<MarketReport>(getReportJsonPath(date));
     mdxRaw = await readFile(getReportMdxPath(date), "utf8");
-  } catch {
-    notFound();
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      notFound();
+    }
+
+    throw error;
   }
 
   const { content } = matter(mdxRaw);

@@ -1,4 +1,5 @@
 export function formatDateYYYYMMDD(date: Date, timeZone = "America/New_York"): string {
+  // We use `formatToParts()` so we don't depend on locale-specific separators/order.
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
