@@ -1,14 +1,13 @@
 import { readFile } from "node:fs/promises";
 
-import matter from "gray-matter";
-import { MDXRemote } from "next-mdx-remote/rsc";
 import { notFound } from "next/navigation";
 
-import { ReportCharts } from "../../../components/report/ReportCharts";
 import { ReportProvider } from "../../../components/report/ReportProvider";
-import { ReportSummary } from "../../../components/report/ReportSummary";
+import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
+
+export const dynamicParams = false;
 
 export async function generateStaticParams() {
   const dates = await listReportDates();
@@ -36,17 +35,11 @@ export default async function ReportPage(props: { params: { date: string } }) {
     throw error;
   }
 
-  const { content } = matter(mdxRaw);
+  const { content } = await renderMdx(mdxRaw);
 
   return (
     <ReportProvider report={report}>
-      <MDXRemote
-        source={content}
-        components={{
-          ReportSummary,
-          ReportCharts
-        }}
-      />
+      {content}
     </ReportProvider>
   );
 }
