@@ -103,7 +103,21 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
 
 export async function loadAnalyzedSeries(date: string): Promise<AnalyzedSeries[]> {
   const dir = getAnalysisDir(date);
-  const entries = await readdir(dir);
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      throw new Error(`No analysis data found for ${date}. Run "market:analyze --date=${date}" first.`);
+    }
+
+    throw error;
+  }
   const files = entries.filter((e) => e.endsWith(".json"));
   const out: AnalyzedSeries[] = [];
 

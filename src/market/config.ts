@@ -55,6 +55,14 @@ function assertNumber(value: unknown, name: string): number {
   return value;
 }
 
+function assertPositiveInteger(value: unknown, name: string): number {
+  const n = assertNumber(value, name);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new Error(`${name} must be a positive integer, got ${n}`);
+  }
+  return n;
+}
+
 function validateIndicator(raw: unknown): IndicatorDefinition {
   if (!isRecord(raw)) {
     throw new Error("indicator must be an object");
@@ -72,18 +80,25 @@ function validateIndicator(raw: unknown): IndicatorDefinition {
       id,
       type,
       source: "close",
-      period: assertNumber(raw.period, `indicator.${id}.period`)
+      period: assertPositiveInteger(raw.period, `indicator.${id}.period`)
     };
   }
 
   if (type === "macd") {
+    const fastPeriod = assertPositiveInteger(raw.fastPeriod, `indicator.${id}.fastPeriod`);
+    const slowPeriod = assertPositiveInteger(raw.slowPeriod, `indicator.${id}.slowPeriod`);
+    const signalPeriod = assertPositiveInteger(raw.signalPeriod, `indicator.${id}.signalPeriod`);
+    if (fastPeriod >= slowPeriod) {
+      throw new Error(`indicator.${id}.fastPeriod must be < slowPeriod`);
+    }
+
     return {
       id,
       type,
       source: "close",
-      fastPeriod: assertNumber(raw.fastPeriod, `indicator.${id}.fastPeriod`),
-      slowPeriod: assertNumber(raw.slowPeriod, `indicator.${id}.slowPeriod`),
-      signalPeriod: assertNumber(raw.signalPeriod, `indicator.${id}.signalPeriod`)
+      fastPeriod,
+      slowPeriod,
+      signalPeriod
     };
   }
 
@@ -164,17 +179,46 @@ export async function loadAnalysisConfig(rootDir = process.cwd()): Promise<Analy
   }
 
   const indicators = cfg.indicators.map(validateIndicator);
-  const indicatorIds = new Set(indicators.map((i) => i.id));
+  const indicatorById = new Map<string, IndicatorDefinition>();
+  for (const ind of indicators) {
+    if (indicatorById.has(ind.id)) {
+      throw new Error(`Duplicate indicator id in analysis.yml: ${ind.id}`);
+    }
+    indicatorById.set(ind.id, ind);
+  }
 
   for (const required of ["sma20", "ema20", "rsi14"] as const) {
-    if (!indicatorIds.has(required)) {
+    if (!indicatorById.has(required)) {
       throw new Error(`analysis.yml must define indicator id: ${required}`);
     }
+  }
+
+  const signals: SignalDefinition[] = [];
+  const signalIds = new Set<string>();
+  for (const rawSignal of cfg.signals) {
+    const signal = validateSignal(rawSignal);
+    if (signalIds.has(signal.id)) {
+      throw new Error(`Duplicate signal id in analysis.yml: ${signal.id}`);
+    }
+    signalIds.add(signal.id);
+
+    const indicator = indicatorById.get(signal.when.indicator);
+    if (!indicator) {
+      throw new Error(
+        `signal.${signal.id}.when.indicator references unknown indicator: ${signal.when.indicator}`
+      );
+    }
+
+    if ((signal.when.op === "crossAbove" || signal.when.op === "crossBelow") && indicator.type !== "macd") {
+      throw new Error(`signal.${signal.id} uses ${signal.when.op} but indicator ${indicator.id} is not macd`);
+    }
+
+    signals.push(signal);
   }
 
   return {
     intervals: cfg.intervals.map(assertInterval),
     indicators,
-    signals: cfg.signals.map(validateSignal)
+    signals
   };
 }

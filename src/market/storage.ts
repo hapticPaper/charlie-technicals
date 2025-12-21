@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { AnalyzedSeries, MarketInterval, MarketReport, RawSeries } from "./types";
@@ -89,6 +89,14 @@ export async function writeAnalyzedSeries(date: string, series: AnalyzedSeries):
 }
 
 export async function writeReport(date: string, report: MarketReport, mdx: string): Promise<void> {
-  await writeJson(getReportJsonPath(date), report);
-  await writeFile(getReportMdxPath(date), mdx, "utf8");
+  const jsonPath = getReportJsonPath(date);
+  const mdxPath = getReportMdxPath(date);
+  const jsonTmp = `${jsonPath}.tmp`;
+  const mdxTmp = `${mdxPath}.tmp`;
+
+  await writeJson(jsonTmp, report);
+  await writeFile(mdxTmp, mdx, "utf8");
+
+  await rename(jsonTmp, jsonPath);
+  await rename(mdxTmp, mdxPath);
 }

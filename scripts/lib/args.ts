@@ -24,5 +24,11 @@ export function getArg(argv: string[], name: string): string | undefined {
 export function getDateArg(argv: string[]): string {
   const date = getArg(argv, "date") ?? getTodayNYDateString();
   assertYYYYMMDD(date);
+
+  const today = getTodayNYDateString();
+  if (date > today) {
+    throw new Error(`Date cannot be in the future (NY). Got ${date}, today is ${today}`);
+  }
+
   return date;
 }
