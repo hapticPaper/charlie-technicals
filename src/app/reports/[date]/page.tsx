@@ -35,11 +35,16 @@ export default async function ReportPage(props: { params: { date: string } }) {
     throw error;
   }
 
-  const { content } = await renderMdx(mdxRaw);
+  const { content, frontmatter } = await renderMdx<{ title?: string }>(mdxRaw);
+  const title =
+    typeof frontmatter.title === "string" ? frontmatter.title : `Market Report: ${date}`;
 
   return (
     <ReportProvider report={report}>
-      {content}
+      <>
+        <h1>{title}</h1>
+        {content}
+      </>
     </ReportProvider>
   );
 }

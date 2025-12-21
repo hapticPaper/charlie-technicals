@@ -12,16 +12,16 @@ export const mdxComponents = {
 };
 
 function MdxLink(props: ComponentPropsWithoutRef<"a">) {
-  const href = props.href;
+  const { href, ...rest } = props;
   if (!href) {
-    return <a {...props} />;
+    return <a {...rest} />;
   }
 
   if (href.startsWith("/")) {
-    return <Link href={href} {...props} />;
+    return <Link href={href} {...rest} />;
   }
 
-  return <a target="_blank" rel="noreferrer" {...props} />;
+  return <a href={href} target="_blank" rel="noopener noreferrer" {...rest} />;
 }
 
 function MdxImage(props: ComponentPropsWithoutRef<"img">) {
