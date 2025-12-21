@@ -8,3 +8,4 @@ tsconfig.tsbuildinfo
 # Intermediate artifacts (daily reports commit only `content/reports/`)
 content/data/
 content/analysis/
+!content/reports/

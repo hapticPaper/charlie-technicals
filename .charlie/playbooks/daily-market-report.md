@@ -35,6 +35,7 @@ Generate a daily MDX report (plus supporting JSON artifacts) for the configured 
    ```bash
    bun --version
    bun install
+   # Runs data → analysis → report for the given date
    bun run market:run --date=<DATE>
    ```
 
