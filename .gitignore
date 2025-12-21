@@ -1,5 +1,10 @@
 node_modules/
 .next/
 dist/
+tsconfig.tsbuildinfo
 
 .DS_Store
+
+# Intermediate artifacts (daily reports commit only `content/reports/`)
+content/data/
+content/analysis/

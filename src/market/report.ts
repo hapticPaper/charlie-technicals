@@ -1,0 +1,178 @@
+import type {
+  AnalyzedSeries,
+  MacdSeries,
+  MarketInterval,
+  MarketReport,
+  ReportIntervalSeries,
+  ReportPoint
+} from "./types";
+
+function activeSignals(series: ReportIntervalSeries): string[] {
+  return series.signals.filter((s) => s.active).map((s) => s.label);
+}
+
+function toNumber(value: number | null | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportIntervalSeries {
+  const sma20 = Array.isArray(analyzed.indicators.sma20) ? analyzed.indicators.sma20 : undefined;
+  const ema20 = Array.isArray(analyzed.indicators.ema20) ? analyzed.indicators.ema20 : undefined;
+  const rsi14 = Array.isArray(analyzed.indicators.rsi14) ? analyzed.indicators.rsi14 : undefined;
+  const macd =
+    analyzed.indicators.macd && !Array.isArray(analyzed.indicators.macd)
+      ? (analyzed.indicators.macd as MacdSeries)
+      : undefined;
+
+  const bars = analyzed.bars;
+  const startIndex = Math.max(0, bars.length - maxPoints);
+  const points: ReportPoint[] = bars.slice(startIndex).map((b, idx) => {
+    const i = startIndex + idx;
+    return {
+      t: b.t,
+      close: b.c,
+      volume: b.v,
+      sma20: sma20 ? toNumber(sma20[i]) : undefined,
+      ema20: ema20 ? toNumber(ema20[i]) : undefined,
+      rsi14: rsi14 ? toNumber(rsi14[i]) : undefined,
+      macd: macd ? toNumber(macd.macd[i]) : undefined,
+      macdSignal: macd ? toNumber(macd.signal[i]) : undefined,
+      macdHistogram: macd ? toNumber(macd.histogram[i]) : undefined
+    };
+  });
+
+  return {
+    symbol: analyzed.symbol,
+    interval: analyzed.interval,
+    points,
+    signals: analyzed.signals
+  };
+}
+
+function buildSummaries(
+  date: string,
+  seriesBySymbol: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>,
+  missingSymbols: string[]
+): MarketReport["summaries"] {
+  const lines: string[] = [];
+
+  for (const symbol of Object.keys(seriesBySymbol).sort()) {
+    const intervals = seriesBySymbol[symbol];
+    const hits: string[] = [];
+    for (const maybeSeries of Object.values(intervals)) {
+      if (maybeSeries) {
+        hits.push(...activeSignals(maybeSeries));
+      }
+    }
+    const unique = Array.from(new Set(hits));
+    if (unique.length > 0) {
+      lines.push(`${symbol}: ${unique.slice(0, 2).join("; ")}`);
+    }
+  }
+
+  const veryShort =
+    lines.length === 0
+      ? "No major technical signals triggered in the configured rules." +
+        (missingSymbols.length > 0 ? " (Some symbols missing.)" : "")
+      : lines.slice(0, 3).join(" | ") + (lines.length > 3 ? " | …" : "");
+
+  const mainIdeaParts: string[] = [];
+  if (lines.length === 0) {
+    mainIdeaParts.push(
+      "Across the configured universe, the ruleset did not flag an overbought/oversold RSI or a MACD cross on the latest bar."
+    );
+  } else {
+    mainIdeaParts.push(
+      `The ruleset flagged actionable signals in ${lines.length} symbol${lines.length === 1 ? "" : "s"} on the latest bar.`
+    );
+  }
+  if (missingSymbols.length > 0) {
+    mainIdeaParts.push(`Missing symbols from provider: ${missingSymbols.join(", ")}.`);
+  }
+
+  const summaryParts: string[] = [];
+  summaryParts.push(`Report date: ${date}.`);
+  if (lines.length > 0) {
+    summaryParts.push("Top hits:");
+    for (const l of lines.slice(0, 8)) {
+      summaryParts.push(`- ${l}`);
+    }
+  } else {
+    summaryParts.push("No active signals were detected on the latest bar. Use the charts below to sanity-check the context.");
+  }
+  if (missingSymbols.length > 0) {
+    summaryParts.push(`Symbols skipped due to missing data: ${missingSymbols.join(", ")}.`);
+  }
+
+  return {
+    veryShort,
+    mainIdea: mainIdeaParts.join(" ").trim(),
+    summary: summaryParts.join("\n")
+  };
+}
+
+export function buildMarketReport(args: {
+  date: string;
+  symbols: string[];
+  intervals: MarketInterval[];
+  analyzed: AnalyzedSeries[];
+  missingSymbols: string[];
+}): MarketReport {
+  const seriesBySymbol: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>> = {};
+  for (const s of args.analyzed) {
+    seriesBySymbol[s.symbol] ||= {};
+    seriesBySymbol[s.symbol][s.interval] = toReportSeries(s, 220);
+  }
+
+  const summaries = buildSummaries(args.date, seriesBySymbol, args.missingSymbols);
+
+  return {
+    date: args.date,
+    generatedAt: new Date().toISOString(),
+    symbols: args.symbols,
+    intervals: args.intervals,
+    missingSymbols: args.missingSymbols,
+    series: seriesBySymbol,
+    summaries
+  };
+}
+
+export function buildReportMdx(report: MarketReport): string {
+  const symbols = Object.keys(report.series).sort();
+  const intervals = report.intervals;
+
+  const lines: string[] = [];
+  lines.push("---");
+  lines.push(`title: Market Report: ${report.date}`);
+  lines.push(`date: ${report.date}`);
+  lines.push(`generatedAt: ${report.generatedAt}`);
+  lines.push("---");
+  lines.push("");
+  lines.push("<ReportSummary />");
+  lines.push("");
+  lines.push("## Universe");
+  lines.push("");
+  lines.push(`Symbols: ${report.symbols.join(", ")}`);
+  lines.push("");
+  lines.push(`Intervals: ${intervals.join(", ")}`);
+  lines.push("");
+
+  if (report.missingSymbols.length > 0) {
+    lines.push(`Missing symbols: ${report.missingSymbols.join(", ")}`);
+    lines.push("");
+  }
+
+  for (const symbol of symbols) {
+    lines.push(`## ${symbol}`);
+    lines.push("");
+
+    for (const interval of intervals) {
+      lines.push(`### ${interval}`);
+      lines.push("");
+      lines.push(`<ReportCharts symbol="${symbol}" interval="${interval}" />`);
+      lines.push("");
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}

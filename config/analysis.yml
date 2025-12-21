@@ -1,0 +1,61 @@
+intervals:
+  - 1m
+  - 5m
+  - 15m
+  - 1h
+  - 4h
+  - 1d
+
+indicators:
+  - id: sma20
+    type: sma
+    period: 20
+    source: close
+
+  - id: ema20
+    type: ema
+    period: 20
+    source: close
+
+  - id: rsi14
+    type: rsi
+    period: 14
+    source: close
+
+  - id: macd
+    type: macd
+    fastPeriod: 12
+    slowPeriod: 26
+    signalPeriod: 9
+    source: close
+
+signals:
+  - id: rsi-oversold
+    label: RSI oversold (< 30)
+    when:
+      indicator: rsi14
+      op: lt
+      value: 30
+
+  - id: rsi-overbought
+    label: RSI overbought (> 70)
+    when:
+      indicator: rsi14
+      op: gt
+      value: 70
+
+  - id: macd-bull-cross
+    label: MACD bullish cross
+    when:
+      indicator: macd
+      op: crossAbove
+      left: macd
+      right: signal
+
+  - id: macd-bear-cross
+    label: MACD bearish cross
+    when:
+      indicator: macd
+      op: crossBelow
+      left: macd
+      right: signal
