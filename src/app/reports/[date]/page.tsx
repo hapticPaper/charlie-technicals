@@ -52,8 +52,12 @@ export default async function ReportPage(props: { params: { date: string } }) {
     const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts });
     content = res.content;
   } catch (error) {
-    if (error && typeof error === "object") {
-      (error as { reportDate?: string }).reportDate = date;
+    try {
+      if (error && typeof error === "object") {
+        (error as { reportDate?: string }).reportDate = date;
+      }
+    } catch {
+      // Ignore if we can't mutate the thrown value.
     }
 
     throw error;
