@@ -90,6 +90,10 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   const entries = await readdir(dir);
   const files = entries.filter((e) => e.endsWith(".json"));
 
+  if (files.length === 0) {
+    throw new Error(`No data found for ${date}. Run "market:data --date=${date}" first.`);
+  }
+
   let analyzed = 0;
   for (const file of files) {
     try {

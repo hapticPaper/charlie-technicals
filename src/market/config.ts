@@ -132,14 +132,24 @@ function validateSignal(raw: unknown): SignalDefinition {
   }
 
   if (op === "crossAbove" || op === "crossBelow") {
+    const left = assertString(raw.when.left, `signal.${id}.when.left`);
+    const right = assertString(raw.when.right, `signal.${id}.when.right`);
+    const allowed = new Set(["macd", "signal", "histogram"]);
+    if (!allowed.has(left)) {
+      throw new Error(`signal.${id}.when.left must be one of macd|signal|histogram`);
+    }
+    if (!allowed.has(right)) {
+      throw new Error(`signal.${id}.when.right must be one of macd|signal|histogram`);
+    }
+
     return {
       id,
       label,
       when: {
         indicator,
         op,
-        left: assertString(raw.when.left, `signal.${id}.when.left`),
-        right: assertString(raw.when.right, `signal.${id}.when.right`)
+        left,
+        right
       }
     };
   }

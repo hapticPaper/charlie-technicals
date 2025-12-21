@@ -79,11 +79,13 @@ function buildSummaries(
     }
   }
 
-  const veryShort =
+  const veryShort = capWords(
     lines.length === 0
       ? "No major technical signals triggered in the configured rules." +
-        (missingSymbols.length > 0 ? " (Some symbols missing.)" : "")
-      : lines.slice(0, 3).join(" | ") + (lines.length > 3 ? " | …" : "");
+          (missingSymbols.length > 0 ? " (Some symbols missing.)" : "")
+      : lines.slice(0, 3).join(" | ") + (lines.length > 3 ? " | …" : ""),
+    30
+  );
 
   const mainIdeaParts: string[] = [];
   if (lines.length === 0) {
@@ -117,7 +119,7 @@ function buildSummaries(
 
   return {
     veryShort,
-    mainIdea: mainIdeaParts.join(" ").trim(),
+    mainIdea: capWords(mainIdeaParts.join(" ").trim(), 80),
     // 500-word cap per requirements.
     summary: capWords(rawSummary, 500)
   };
