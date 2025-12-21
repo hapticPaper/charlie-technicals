@@ -92,10 +92,15 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
 
   let analyzed = 0;
   for (const file of files) {
-    const raw = await readJson<RawSeries>(`${dir}/${file}`);
-    const analyzedSeries = analyzeSeries(raw)(cfg);
-    await writeAnalyzedSeries(date, analyzedSeries);
-    analyzed += 1;
+    try {
+      const raw = await readJson<RawSeries>(`${dir}/${file}`);
+      const analyzedSeries = analyzeSeries(raw)(cfg);
+      await writeAnalyzedSeries(date, analyzedSeries);
+      analyzed += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`[market:analyze] Failed processing ${file}: ${message}`);
+    }
   }
 
   return { analyzed };
