@@ -1,15 +1,29 @@
 import { readFile } from "node:fs/promises";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
+import { ReportCharts } from "../../../components/report/ReportCharts";
 import { ReportProvider } from "../../../components/report/ReportProvider";
+import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
 
+function getReportTitle(date: string): string {
+  return `Market Report: ${date}`;
+}
+
 export async function generateStaticParams() {
   const dates = await listReportDates();
   return dates.map((date) => ({ date }));
+}
+
+export async function generateMetadata(props: { params: { date: string } }): Promise<Metadata> {
+  const { date } = props.params;
+
+  return { title: getReportTitle(date) };
 }
 
 export default async function ReportPage(props: { params: { date: string } }) {
@@ -33,9 +47,19 @@ export default async function ReportPage(props: { params: { date: string } }) {
     throw error;
   }
 
-  const { content, frontmatter } = await renderMdx<{ title?: string }>(mdxRaw);
-  const title =
-    typeof frontmatter.title === "string" ? frontmatter.title : `Market Report: ${date}`;
+  let content: ReactNode;
+  try {
+    const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts });
+    content = res.content;
+  } catch (error) {
+    if (error && typeof error === "object") {
+      (error as { reportDate?: string }).reportDate = date;
+    }
+
+    throw error;
+  }
+
+  const title = getReportTitle(date);
 
   return (
     <ReportProvider report={report}>

@@ -1,14 +1,9 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef } from "react";
 
-import { ReportCharts } from "../components/report/ReportCharts";
-import { ReportSummary } from "../components/report/ReportSummary";
-
-export const mdxComponents = {
+export const baseMdxComponents = {
   a: MdxLink,
-  img: MdxImage,
-  ReportSummary,
-  ReportCharts
+  img: MdxImage
 };
 
 function MdxLink(props: ComponentPropsWithoutRef<"a">) {
@@ -17,28 +12,31 @@ function MdxLink(props: ComponentPropsWithoutRef<"a">) {
     return <a {...rest}>{children}</a>;
   }
 
+  if (href.startsWith("#")) {
+    return <a {...rest} href={href}>{children}</a>;
+  }
+
   if (href.startsWith("/")) {
+    const linkSafeRest = { ...rest };
+    delete (linkSafeRest as { target?: unknown }).target;
+    delete (linkSafeRest as { rel?: unknown }).rel;
     return (
-      <Link href={href} {...rest}>
+      <Link href={href} {...linkSafeRest}>
         {children}
       </Link>
     );
   }
 
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+    <a {...rest} href={href} target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   );
 }
 
 function MdxImage(props: ComponentPropsWithoutRef<"img">) {
-  const alt = props.alt ?? "";
-
-  if (process.env.NODE_ENV !== "production" && !props.alt) {
-    console.warn("MDX image is missing alt text", props.src);
-  }
+  const { alt = "", loading, ...rest } = props;
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img {...props} alt={alt} />;
+  return <img alt={alt} loading={loading ?? "lazy"} {...rest} />;
 }

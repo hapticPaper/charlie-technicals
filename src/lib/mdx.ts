@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import type { ReactNode } from "react";
 import type { PluggableList } from "unified";
 
-import { mdxComponents } from "../mdx/components";
+import { baseMdxComponents } from "../mdx/components";
 
 const remarkPlugins: PluggableList = [remarkGfm];
 const rehypePlugins: PluggableList = [rehypeSlug, [rehypeAutolinkHeadings, { behavior: "wrap" }]];
@@ -17,13 +17,21 @@ export interface RenderedMdx<TFrontmatter extends Record<string, unknown> = Reco
 
 type ComponentOverrides = Parameters<typeof compileMDX<Record<string, unknown>>>[0]["components"];
 
+function ensureObjectFrontmatter(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  throw new Error("MDX frontmatter must be an object");
+}
+
 export async function renderMdx<TFrontmatter extends Record<string, unknown> = Record<string, unknown>>(
   source: string,
   overrides?: ComponentOverrides
 ): Promise<RenderedMdx<TFrontmatter>> {
-  return compileMDX<TFrontmatter>({
+  const result = await compileMDX<TFrontmatter>({
     source,
-    components: overrides ? { ...mdxComponents, ...overrides } : mdxComponents,
+    components: overrides ? { ...baseMdxComponents, ...overrides } : baseMdxComponents,
     options: {
       parseFrontmatter: true,
       mdxOptions: {
@@ -32,4 +40,9 @@ export async function renderMdx<TFrontmatter extends Record<string, unknown> = R
       }
     }
   });
+
+  return {
+    content: result.content,
+    frontmatter: ensureObjectFrontmatter(result.frontmatter) as TFrontmatter
+  };
 }

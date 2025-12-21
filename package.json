@@ -14,7 +14,6 @@
     "market:run": "bun scripts/market-run.ts"
   },
   "dependencies": {
-    "gray-matter": "^4.0.3",
     "next": "^16.1.0",
     "next-mdx-remote": "^5.0.0",
     "react": "^19.2.3",
