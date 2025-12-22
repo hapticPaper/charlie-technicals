@@ -25,6 +25,25 @@ export type RawSeries = {
   bars: MarketBar[];
 };
 
+export type MarketNewsArticle = {
+  id: string;
+  title: string;
+  url: string;
+  publisher: string;
+  publishedAt: string;
+  relatedTickers: string[];
+  mainIdea: string;
+  summary: string;
+};
+
+export type MarketNewsSnapshot = {
+  symbol: string;
+  provider: string;
+  fetchedAt: string;
+  asOfDate: string;
+  articles: MarketNewsArticle[];
+};
+
 export type SignalHit = {
   id: string;
   label: string;

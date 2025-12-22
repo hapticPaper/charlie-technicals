@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import path from "node:path";
 
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
-import type { AnalyzedSeries, MarketInterval, MarketReport, RawSeries } from "./types";
+import type { AnalyzedSeries, MarketInterval, MarketNewsSnapshot, MarketReport, RawSeries } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
@@ -30,9 +30,18 @@ export function getRawSeriesDir(symbol: string, interval: MarketInterval): strin
   return path.join(getDataDir(), safeSymbol(symbol), interval);
 }
 
+export function getNewsDir(symbol: string): string {
+  return path.join(getDataDir(), safeSymbol(symbol), "news");
+}
+
 export function getRawSeriesPath(date: string, symbol: string, interval: MarketInterval): string {
   const fileDate = formatRawDataFileDate(date);
   return path.join(getRawSeriesDir(symbol, interval), `${fileDate}.json`);
+}
+
+export function getNewsPath(date: string, symbol: string): string {
+  const fileDate = formatRawDataFileDate(date);
+  return path.join(getNewsDir(symbol), `${fileDate}.json`);
 }
 
 async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
@@ -243,6 +252,10 @@ export async function rawSeriesSnapshotExists(
   return fileExists(getRawSeriesPath(date, symbol, interval));
 }
 
+export async function newsSnapshotExists(date: string, symbol: string): Promise<boolean> {
+  return fileExists(getNewsPath(date, symbol));
+}
+
 export type WriteRawSeriesResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
@@ -265,6 +278,38 @@ export async function writeRawSeries(date: string, series: RawSeries): Promise<W
     }
 
     await writeJson(tmpPath, series);
+    await rename(tmpPath, filePath);
+    return { status: "written" as const, path: filePath };
+  });
+
+  return res;
+}
+
+export type WriteNewsSnapshotResult =
+  | { status: "written"; path: string }
+  | { status: "skipped_existing"; path: string };
+
+/**
+* Writes a news snapshot for a given symbol/date.
+*
+* News snapshots are immutable: if the target file already exists, the write is
+* skipped and the existing snapshot is left untouched.
+*/
+export async function writeNewsSnapshot(
+  date: string,
+  snapshot: MarketNewsSnapshot
+): Promise<WriteNewsSnapshotResult> {
+  const filePath = getNewsPath(date, snapshot.symbol);
+  const tmpPath = `${filePath}.tmp`;
+
+  await mkdir(path.dirname(filePath), { recursive: true });
+
+  const res = await withFileLock(filePath, async () => {
+    if (await fileExists(filePath)) {
+      return { status: "skipped_existing" as const, path: filePath };
+    }
+
+    await writeJson(tmpPath, snapshot);
     await rename(tmpPath, filePath);
     return { status: "written" as const, path: filePath };
   });

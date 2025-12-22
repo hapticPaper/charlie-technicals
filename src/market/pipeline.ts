@@ -14,6 +14,7 @@ import {
   readJson,
   writeReport,
   writeAnalyzedSeries,
+  writeNewsSnapshot,
   writeRawSeries
 } from "./storage";
 import type { AnalyzedSeries, MarketInterval } from "./types";
@@ -55,6 +56,8 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   missingSymbols: string[];
   written: number;
   skippedExisting: number;
+  newsWritten: number;
+  newsSkippedExisting: number;
 }> {
   await ensureDataDir();
 
@@ -66,6 +69,8 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   const tasks = symbols.flatMap((symbol) => intervals.map((interval) => ({ symbol, interval })));
   let written = 0;
   let skippedExisting = 0;
+  let newsWritten = 0;
+  let newsSkippedExisting = 0;
   const missing = new Set<string>();
 
   await mapWithConcurrency(tasks, opts, async ({ symbol, interval }) => {
@@ -89,7 +94,30 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
     }
   });
 
-  return { symbols, intervals, missingSymbols: Array.from(missing).sort(), written, skippedExisting };
+  await mapWithConcurrency(symbols, opts, async (symbol) => {
+    try {
+      const snapshot = await provider.fetchNews(symbol, date);
+      const res = await writeNewsSnapshot(date, snapshot);
+      if (res.status === "written") {
+        newsWritten += 1;
+      } else {
+        newsSkippedExisting += 1;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[market:news] failed for ${symbol} (${date}): ${message}`);
+    }
+  });
+
+  return {
+    symbols,
+    intervals,
+    missingSymbols: Array.from(missing).sort(),
+    written,
+    skippedExisting,
+    newsWritten,
+    newsSkippedExisting
+  };
 }
 
 export async function runMarketAnalyze(date: string): Promise<{ analyzed: number }> {
