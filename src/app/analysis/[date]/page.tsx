@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { AnalysisSeries } from "../../../components/analysis/AnalysisSeries";
 import { AnalysisProvider } from "../../../components/analysis/AnalysisProvider";
 import { AnalysisSummary } from "../../../components/analysis/AnalysisSummary";
+import { isEnoent } from "../../../lib/fsErrors";
 import { renderMdx } from "../../../lib/mdx";
 import {
   getAnalysisMdxPath,
@@ -18,15 +19,6 @@ import type { MarketAnalysisSummary } from "../../../market/types";
 
 function getAnalysisTitle(date: string): string {
   return `Market Analysis: ${date}`;
-}
-
-function isEnoent(error: unknown): boolean {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? (error as { code?: unknown }).code
-      : undefined;
-
-  return code === "ENOENT";
 }
 
 export async function generateStaticParams() {
@@ -42,23 +34,28 @@ export async function generateMetadata(props: { params: { date: string } }): Pro
 export default async function AnalysisPage(props: { params: { date: string } }) {
   const { date } = await Promise.resolve(props.params);
 
-  let analysis: MarketAnalysisSummary | undefined;
-  try {
-    analysis = await readJson<MarketAnalysisSummary>(getAnalysisSummaryJsonPath(date));
-  } catch (error) {
-    if (!isEnoent(error)) {
-      throw error;
-    }
-  }
-
-  let mdxRaw: string | undefined;
-  try {
-    mdxRaw = await readFile(getAnalysisMdxPath(date), "utf8");
-  } catch (error) {
-    if (!isEnoent(error)) {
-      throw error;
-    }
-  }
+  const [analysis, mdxRaw] = await Promise.all([
+    (async () => {
+      try {
+        return await readJson<MarketAnalysisSummary>(getAnalysisSummaryJsonPath(date));
+      } catch (error) {
+        if (!isEnoent(error)) {
+          throw error;
+        }
+        return undefined;
+      }
+    })(),
+    (async () => {
+      try {
+        return await readFile(getAnalysisMdxPath(date), "utf8");
+      } catch (error) {
+        if (!isEnoent(error)) {
+          throw error;
+        }
+        return undefined;
+      }
+    })()
+  ]);
 
   if (!analysis && !mdxRaw) {
     notFound();

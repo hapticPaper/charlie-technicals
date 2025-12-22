@@ -7,21 +7,13 @@ import type { ReactNode } from "react";
 import { ReportCharts } from "../../../components/report/ReportCharts";
 import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
+import { isEnoent } from "../../../lib/fsErrors";
 import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
 
 function getReportTitle(date: string): string {
   return `Market Report: ${date}`;
-}
-
-function isEnoent(error: unknown): boolean {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? (error as { code?: unknown }).code
-      : undefined;
-
-  return code === "ENOENT";
 }
 
 export async function generateStaticParams() {
@@ -38,23 +30,28 @@ export async function generateMetadata(props: { params: { date: string } }): Pro
 export default async function ReportPage(props: { params: { date: string } }) {
   const { date } = await Promise.resolve(props.params);
 
-  let report: MarketReport | undefined;
-  try {
-    report = await readJson<MarketReport>(getReportJsonPath(date));
-  } catch (error) {
-    if (!isEnoent(error)) {
-      throw error;
-    }
-  }
-
-  let mdxRaw: string | undefined;
-  try {
-    mdxRaw = await readFile(getReportMdxPath(date), "utf8");
-  } catch (error) {
-    if (!isEnoent(error)) {
-      throw error;
-    }
-  }
+  const [report, mdxRaw] = await Promise.all([
+    (async () => {
+      try {
+        return await readJson<MarketReport>(getReportJsonPath(date));
+      } catch (error) {
+        if (!isEnoent(error)) {
+          throw error;
+        }
+        return undefined;
+      }
+    })(),
+    (async () => {
+      try {
+        return await readFile(getReportMdxPath(date), "utf8");
+      } catch (error) {
+        if (!isEnoent(error)) {
+          throw error;
+        }
+        return undefined;
+      }
+    })()
+  ]);
 
   if (!report && !mdxRaw) {
     notFound();
