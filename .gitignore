@@ -8,7 +8,7 @@ tsconfig.tsbuildinfo
 # Intermediate artifacts (stage 1 data is not committed)
 content/data/
 
-# Stage 2 artifacts: keep MDX + a small summary, ignore per-series JSON.
+# Stage 2 artifacts: keep MDX + a small summary, ignore all other JSON.
 content/analysis/**/*.json
 !content/analysis/**/summary.json
 !content/analysis/**/index.mdx

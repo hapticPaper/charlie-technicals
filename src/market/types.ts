@@ -72,6 +72,10 @@ export type MarketAnalysisSummary = {
   generatedAt: string;
   symbols: string[];
   intervals: MarketInterval[];
+
+  /**
+   * Symbols that had zero non-empty analyzed series across all configured intervals.
+   */
   missingSymbols: string[];
   series: Record<string, Partial<Record<MarketInterval, AnalysisIntervalSummary>>>;
 };
