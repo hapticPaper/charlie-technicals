@@ -2,8 +2,14 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import path from "node:path";
 
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
-import type { AnalyzedSeries, MarketInterval, MarketReport, MarketReportHighlights, RawSeries } from "./types";
-import type { AnalyzedSeries, MarketInterval, MarketNewsSnapshot, MarketReport, RawSeries } from "./types";
+import type {
+  AnalyzedSeries,
+  MarketInterval,
+  MarketNewsSnapshot,
+  MarketReport,
+  MarketReportHighlights,
+  RawSeries
+} from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
@@ -475,9 +481,12 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
       try {
         await rename(highlightsTmp, highlightsPath);
       } catch (error) {
-        await rm(highlightsTmp, { force: true });
+        await Promise.allSettled([
+          rm(highlightsTmp, { force: true }),
+          rm(highlightsPath, { force: true })
+        ]);
         const message = error instanceof Error ? error.message : String(error);
-        console.error(`[market:storage] Failed persisting highlights for ${date}: ${message}`);
+        console.warn(`[market:storage] Highlights cache not updated for ${date}: ${message}`);
       }
     }
   } catch (error) {
