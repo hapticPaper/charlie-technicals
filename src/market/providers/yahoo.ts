@@ -11,6 +11,33 @@ import {
 import type { MarketBar, MarketInterval, MarketNewsArticle, MarketNewsSnapshot, RawSeries } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const NEWS_SEARCH_MIN_INTERVAL_MS = 350;
+const NEWS_SEARCH_MAX_RETRIES = 5;
+const NEWS_SEARCH_BASE_BACKOFF_MS = 750;
+const NEWS_SEARCH_MAX_BACKOFF_MS = 5_000;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isYahooRateLimitError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const status = "status" in error ? (error as { status?: unknown }).status : undefined;
+    const statusCode =
+      "statusCode" in error ? (error as { statusCode?: unknown }).statusCode : undefined;
+    const responseStatus =
+      "response" in error &&
+      typeof (error as { response?: unknown }).response === "object" &&
+      (error as { response?: { status?: unknown } }).response?.status;
+
+    if (status === 429 || statusCode === 429 || responseStatus === 429) {
+      return true;
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(too many requests|http\s*429|status\s*code\s*429)\b/i.test(message);
+}
 
 function lookbackDaysFor(interval: MarketInterval): number {
   switch (interval) {
@@ -107,9 +134,33 @@ function maxBarsFor(interval: MarketInterval): number {
 
 export class YahooMarketDataProvider {
   readonly #yf: InstanceType<typeof YahooFinance>;
+  #newsSearchQueue: Promise<void> = Promise.resolve();
+  #lastNewsSearchAtMs = 0;
 
   constructor() {
     this.#yf = new YahooFinance();
+  }
+
+  async #withNewsSearchRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.#newsSearchQueue;
+    let release: (() => void) | undefined;
+    this.#newsSearchQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await prev;
+
+    const waitMs = this.#lastNewsSearchAtMs + NEWS_SEARCH_MIN_INTERVAL_MS - Date.now();
+    if (waitMs > 0) {
+      await sleepMs(waitMs);
+    }
+    this.#lastNewsSearchAtMs = Date.now();
+
+    try {
+      return await fn();
+    } finally {
+      release?.();
+    }
   }
 
   async fetchSeries(symbol: string, interval: MarketInterval, asOfDate?: string): Promise<RawSeries> {
@@ -206,11 +257,29 @@ export class YahooMarketDataProvider {
   async fetchNews(symbol: string, asOfDate: string): Promise<MarketNewsSnapshot> {
     const fetchedAt = new Date().toISOString();
 
-    const res = await this.#yf.search(symbol, {
-      quotesCount: 0,
-      newsCount: 10,
-      region: "US",
-      lang: "en-US"
+    const res = await this.#withNewsSearchRateLimit(async () => {
+      for (let attempt = 0; attempt < NEWS_SEARCH_MAX_RETRIES; attempt += 1) {
+        try {
+          return await this.#yf.search(symbol, {
+            quotesCount: 0,
+            newsCount: 10,
+            region: "US",
+            lang: "en-US"
+          });
+        } catch (error) {
+          if (!isYahooRateLimitError(error) || attempt === NEWS_SEARCH_MAX_RETRIES - 1) {
+            throw error;
+          }
+
+          const backoffMs = Math.min(
+            NEWS_SEARCH_BASE_BACKOFF_MS * 2 ** attempt,
+            NEWS_SEARCH_MAX_BACKOFF_MS
+          );
+          await sleepMs(backoffMs);
+        }
+      }
+
+      throw new Error("Unreachable: retry loop exhausted without returning or throwing");
     });
 
     const items = Array.isArray(res.news) ? res.news : [];
