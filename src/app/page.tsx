@@ -126,7 +126,7 @@ export default async function HomePage() {
               {highlights && highlights.picks.length > 0 ? (
                 <ul className={styles.picks}>
                   {highlights.picks.map((p) => (
-                    <li key={p.symbol} className={styles.pickRow}>
+                    <li key={`${p.symbol}-${p.trade.side}`} className={styles.pickRow}>
                       <span className={badgeClassForSide(p.trade.side)}>{labelForSide(p.trade.side)}</span>
                       <span className={styles.pickText}>
                         <strong>{p.symbol}</strong>{" "}
