@@ -10,6 +10,7 @@ export default async function HomePage() {
       <h1>Charlie technicals</h1>
       <p>
         Stage 3 reports live in <code>content/reports</code>. Stage 2 analysis pages live in <code>content/analysis</code>.
+        Run <code>bun run market:run</code> to generate both.
       </p>
 
       {reportDates.length === 0 ? (

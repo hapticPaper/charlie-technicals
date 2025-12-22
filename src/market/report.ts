@@ -159,7 +159,7 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push("---");
   lines.push(`title: "Market Report: ${report.date}"`);
   lines.push(`date: ${report.date}`);
-  lines.push(`generatedAt: ${report.generatedAt}`);
+  lines.push(`generatedAt: "${report.generatedAt}"`);
   lines.push("---");
   lines.push("");
   lines.push("<ReportSummary />");
