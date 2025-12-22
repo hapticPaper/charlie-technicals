@@ -29,3 +29,13 @@ Generated artifacts are written under `content/`:
 - Symbol universe: `config/symbols.json`
 - Human-readable analysis rules: `config/analysis.yml`
 
+## Deployment (GitHub Pages)
+
+The site is deployed to GitHub Pages as a fully static export (see `.github/workflows/nextjs.yml`), so server-side rendering and API routes are not supported.
+
+To test the GitHub Pages base path locally:
+
+```bash
+NEXT_PUBLIC_BASE_PATH=/charlie-technicals bun run build
+```
+
