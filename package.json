@@ -14,12 +14,14 @@
     "market:run": "bun scripts/market-run.ts"
   },
   "dependencies": {
-    "gray-matter": "^4.0.3",
     "next": "^16.1.0",
     "next-mdx-remote": "^5.0.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-slug": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "yahoo-finance2": "^3.10.2",
     "yaml": "^2.8.2"
   },
