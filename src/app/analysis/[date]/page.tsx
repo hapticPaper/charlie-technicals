@@ -26,12 +26,12 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(props: { params: { date: string } }): Promise<Metadata> {
-  const { date } = props.params;
+  const { date } = await Promise.resolve(props.params);
   return { title: getAnalysisTitle(date) };
 }
 
 export default async function AnalysisPage(props: { params: { date: string } }) {
-  const { date } = props.params;
+  const { date } = await Promise.resolve(props.params);
 
   let analysis: MarketAnalysisSummary;
   let mdxRaw: string;

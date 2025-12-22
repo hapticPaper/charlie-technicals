@@ -21,13 +21,13 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(props: { params: { date: string } }): Promise<Metadata> {
-  const { date } = props.params;
+  const { date } = await Promise.resolve(props.params);
 
   return { title: getReportTitle(date) };
 }
 
 export default async function ReportPage(props: { params: { date: string } }) {
-  const { date } = props.params;
+  const { date } = await Promise.resolve(props.params);
 
   let report: MarketReport;
   let mdxRaw: string;
