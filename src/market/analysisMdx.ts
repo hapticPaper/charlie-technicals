@@ -3,7 +3,7 @@ import type { MarketAnalysisSummary } from "./types";
 export function buildAnalysisMdx(summary: MarketAnalysisSummary): string {
   const lines: string[] = [];
   lines.push("---");
-  lines.push(`title: Market Analysis: ${summary.date}`);
+  lines.push(`title: "Market Analysis: ${summary.date}"`);
   lines.push(`date: ${summary.date}`);
   lines.push(`generatedAt: ${summary.generatedAt}`);
   lines.push("---");
