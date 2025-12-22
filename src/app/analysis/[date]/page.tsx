@@ -57,16 +57,8 @@ export default async function AnalysisPage(props: { params: { date: string } }) 
     })()
   ]);
 
-  if (!analysis && !mdxRaw) {
+  if (!analysis || !mdxRaw) {
     notFound();
-  }
-
-  if (!analysis) {
-    throw new Error(`Missing analysis summary.json for ${date}.`);
-  }
-
-  if (!mdxRaw) {
-    throw new Error(`Missing analysis index.mdx for ${date}.`);
   }
 
   let content: ReactNode;

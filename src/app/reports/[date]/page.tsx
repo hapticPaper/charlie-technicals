@@ -53,16 +53,8 @@ export default async function ReportPage(props: { params: { date: string } }) {
     })()
   ]);
 
-  if (!report && !mdxRaw) {
+  if (!report || !mdxRaw) {
     notFound();
-  }
-
-  if (!report) {
-    throw new Error(`Missing report JSON for ${date}.`);
-  }
-
-  if (!mdxRaw) {
-    throw new Error(`Missing report MDX for ${date}.`);
   }
 
   let content: ReactNode;

@@ -104,6 +104,11 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
     try {
       const raw = await readJson<RawSeries>(`${dir}/${file}`);
       const analyzedSeries = analyzeSeries(raw)(cfg);
+
+      if (analyzedSeries.bars.length === 0) {
+        throw new Error(`[market:analyze] Empty series for ${analyzedSeries.symbol} ${analyzedSeries.interval}`);
+      }
+
       await writeAnalyzedSeries(date, analyzedSeries);
       const lastBar = analyzedSeries.bars[analyzedSeries.bars.length - 1];
       const summary: AnalysisIntervalSummary = {
@@ -120,6 +125,10 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`[market:analyze] Failed processing ${file}: ${message}`);
     }
+  }
+
+  if (Object.keys(series).length === 0) {
+    throw new Error(`[market:analyze] No series analyzed for ${date}`);
   }
 
   const summary: MarketAnalysisSummary = {
