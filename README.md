@@ -33,6 +33,8 @@ Generated artifacts are written under `content/`:
 
 The site is deployed to GitHub Pages as a fully static export (see `.github/workflows/nextjs.yml`), so server-side rendering and API routes are not supported.
 
+If you need to override the base path (custom domain, rename, etc), set a repository variable `PAGES_BASE_PATH` (example: `/charlie-technicals`).
+
 To test the GitHub Pages base path locally:
 
 ```bash

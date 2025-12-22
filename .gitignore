@@ -1,6 +1,6 @@
 node_modules/
 .next/
-# Next.js static export output directory (GitHub Pages artifact)
+# Next.js static export output directory (GitHub Pages artifact; never committed)
 out/
 dist/
 tsconfig.tsbuildinfo
