@@ -1,7 +1,14 @@
 import YahooFinance from "yahoo-finance2";
 
 import { parseIsoDateYmd } from "../date";
-import type { MarketBar, MarketInterval, RawSeries } from "../types";
+import {
+  buildNewsMainIdea,
+  buildNewsSummary,
+  clampRelatedTickers,
+  fetchArticleMeta,
+  isRecentNews
+} from "../news";
+import type { MarketBar, MarketInterval, MarketNewsArticle, MarketNewsSnapshot, RawSeries } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -193,6 +200,104 @@ export class YahooMarketDataProvider {
       provider: "yahoo-finance",
       fetchedAt,
       bars: cappedBars
+    };
+  }
+
+  async fetchNews(symbol: string, asOfDate: string): Promise<MarketNewsSnapshot> {
+    const fetchedAt = new Date().toISOString();
+
+    const res = await this.#yf.search(symbol, {
+      quotesCount: 0,
+      newsCount: 10,
+      region: "US",
+      lang: "en-US"
+    });
+
+    const items = Array.isArray(res.news) ? res.news : [];
+    const recent = items
+      .map((n) => {
+        const publishTime = n.providerPublishTime as unknown;
+        const publishedAt =
+          publishTime instanceof Date
+            ? publishTime
+            : typeof publishTime === "number"
+              ? new Date(publishTime * 1000)
+              : undefined;
+
+        if (!publishedAt || !Number.isFinite(publishedAt.getTime())) {
+          return null;
+        }
+
+        return { ...n, providerPublishTime: publishedAt };
+      })
+      .filter((n): n is (typeof items)[number] => n !== null)
+      .filter((n) => isRecentNews({ asOfDate, publishedAt: n.providerPublishTime, maxAgeDays: 14 }));
+
+    if (recent.length === 0) {
+      return {
+        symbol,
+        provider: "yahoo-finance",
+        fetchedAt,
+        asOfDate,
+        articles: []
+      };
+    }
+
+    recent.sort((a, b) => b.providerPublishTime.getTime() - a.providerPublishTime.getTime());
+
+    const deduped: typeof recent = [];
+    const seen = new Set<string>();
+    for (const n of recent) {
+      const key = `${n.link}::${n.title}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push(n);
+
+      if (deduped.length >= 3) {
+        break;
+      }
+    }
+
+    const articles: MarketNewsArticle[] = await Promise.all(
+      deduped.map(async (n) => {
+        const url = n.link;
+        const title = n.title;
+        const publisher = n.publisher;
+        const publishedAt = n.providerPublishTime.toISOString();
+        const relatedTickers = clampRelatedTickers(n.relatedTickers, symbol);
+
+        let description: string | undefined;
+        try {
+          const meta = await fetchArticleMeta(url);
+          description = meta.description;
+        } catch {
+          description = undefined;
+        }
+
+        const mainIdea = buildNewsMainIdea(title);
+        const summary = buildNewsSummary({ title, publisher, description, relatedTickers });
+
+        return {
+          id: n.uuid,
+          title,
+          url,
+          publisher,
+          publishedAt,
+          relatedTickers,
+          mainIdea,
+          summary
+        };
+      })
+    );
+
+    return {
+      symbol,
+      provider: "yahoo-finance",
+      fetchedAt,
+      asOfDate,
+      articles
     };
   }
 }
