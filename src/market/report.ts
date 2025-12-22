@@ -431,6 +431,8 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push("");
   lines.push("<ReportSummary />");
   lines.push("");
+  lines.push(`<CnbcVideoWidget date="${report.date}" />`);
+  lines.push("");
 
   lines.push("## Today's top setups");
   lines.push("");

@@ -35,6 +35,8 @@ export type MarketNewsArticle = {
   publisher: string;
   publishedAt: string;
   relatedTickers: string[];
+  topic?: string;
+  hype?: number;
   mainIdea: string;
   summary: string;
 };
