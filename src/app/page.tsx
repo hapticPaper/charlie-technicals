@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { rm } from "node:fs/promises";
 
 import styles from "./home.module.css";
 import {
@@ -16,7 +17,7 @@ async function readReportHighlights(date: string): Promise<MarketReportHighlight
 
   try {
     const highlights = await readJson<MarketReportHighlights>(highlightsPath);
-    if (highlights.version === "v2-highlights") {
+    if (highlights.version === "v2-highlights" && highlights.date === date) {
       return highlights;
     }
   } catch (error) {
@@ -26,8 +27,13 @@ async function readReportHighlights(date: string): Promise<MarketReportHighlight
         : undefined;
 
     if (code !== "ENOENT") {
+      try {
+        await rm(highlightsPath, { force: true });
+      } catch {
+        // Best-effort cleanup.
+      }
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[home] Failed reading highlights for ${date}: ${message}`);
+      console.error(`[home] Bad highlights cache for ${date}: ${message}`);
     }
   }
 
