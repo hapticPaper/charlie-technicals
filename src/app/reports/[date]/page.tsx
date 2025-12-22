@@ -8,8 +8,30 @@ import { ReportCharts } from "../../../components/report/ReportCharts";
 import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
+import { parseIsoDateYmd } from "../../../market/date";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
+
+type ReportPageParams = { date: string };
+type ReportPageProps = { params: ReportPageParams | PromiseLike<ReportPageParams> };
+
+async function resolveAndValidateParams(params: ReportPageProps["params"]): Promise<ReportPageParams> {
+  // Next (Turbopack) may pass `params` as a thenable during prerendering.
+  const resolved = await params;
+
+  const date = (resolved as { date?: unknown })?.date;
+  if (typeof date !== "string") {
+    notFound();
+  }
+
+  try {
+    parseIsoDateYmd(date);
+  } catch {
+    notFound();
+  }
+
+  return { date };
+}
 
 function getReportTitle(date: string): string {
   return `Market Report: ${date}`;
@@ -20,14 +42,14 @@ export async function generateStaticParams() {
   return dates.map((date) => ({ date }));
 }
 
-export async function generateMetadata(props: { params: { date: string } }): Promise<Metadata> {
-  const { date } = props.params;
+export async function generateMetadata(props: ReportPageProps): Promise<Metadata> {
+  const { date } = await resolveAndValidateParams(props.params);
 
   return { title: getReportTitle(date) };
 }
 
-export default async function ReportPage(props: { params: { date: string } }) {
-  const { date } = props.params;
+export default async function ReportPage(props: ReportPageProps) {
+  const { date } = await resolveAndValidateParams(props.params);
 
   let report: MarketReport;
   let mdxRaw: string;
