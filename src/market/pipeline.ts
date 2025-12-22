@@ -6,7 +6,9 @@ import { loadAnalysisConfig, loadSymbols } from "./config";
 import { YahooMarketDataProvider } from "./providers/yahoo";
 import { buildMarketReport, buildReportMdx } from "./report";
 import {
-  ensureDirs,
+  ensureAnalysisDir,
+  ensureDataDir,
+  ensureReportsDir,
   getAnalysisDir,
   loadRawSeriesWindow,
   readJson,
@@ -52,8 +54,9 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   intervals: MarketInterval[];
   missingSymbols: string[];
   written: number;
+  skippedExisting: number;
 }> {
-  await ensureDirs(date);
+  await ensureDataDir();
 
   const provider = new YahooMarketDataProvider();
   const cfg = await loadAnalysisConfig();
@@ -62,6 +65,7 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
 
   const tasks = symbols.flatMap((symbol) => intervals.map((interval) => ({ symbol, interval })));
   let written = 0;
+  let skippedExisting = 0;
   const missing = new Set<string>();
 
   await mapWithConcurrency(tasks, opts, async ({ symbol, interval }) => {
@@ -71,8 +75,13 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
         missing.add(symbol);
         return;
       }
-      await writeRawSeries(date, series);
-      written += 1;
+
+      const res = await writeRawSeries(date, series);
+      if (res.status === "written") {
+        written += 1;
+      } else {
+        skippedExisting += 1;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[market:data] failed for ${symbol} ${interval} (${date}): ${message}`);
@@ -80,11 +89,11 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
     }
   });
 
-  return { symbols, intervals, missingSymbols: Array.from(missing).sort(), written };
+  return { symbols, intervals, missingSymbols: Array.from(missing).sort(), written, skippedExisting };
 }
 
 export async function runMarketAnalyze(date: string): Promise<{ analyzed: number }> {
-  await ensureDirs(date);
+  await ensureAnalysisDir(date);
 
   const cfg = await loadAnalysisConfig();
   const symbols = await loadSymbols();
@@ -202,7 +211,7 @@ export async function runMarketReport(args: {
   intervals: MarketInterval[];
   missingSymbols?: string[];
 }): Promise<{ wrote: boolean }> {
-  await ensureDirs(args.date);
+  await ensureReportsDir();
   const analyzed = await loadAnalyzedSeries(args.date);
 
   const missingSymbols =

@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
@@ -154,10 +154,25 @@ export function getReportMdxPath(date: string): string {
   return path.join(getReportsDir(), `${date}.mdx`);
 }
 
-export async function ensureDirs(date: string): Promise<void> {
+export async function ensureDataDir(): Promise<void> {
   await mkdir(getDataDir(), { recursive: true });
+}
+
+export async function ensureAnalysisDir(date: string): Promise<void> {
   await mkdir(getAnalysisDir(date), { recursive: true });
+}
+
+export async function ensureReportsDir(): Promise<void> {
   await mkdir(getReportsDir(), { recursive: true });
+}
+
+/**
+* @deprecated Use `ensureDataDir`, `ensureAnalysisDir`, and `ensureReportsDir` instead.
+*/
+export async function ensureDirs(date: string): Promise<void> {
+  await ensureDataDir();
+  await ensureAnalysisDir(date);
+  await ensureReportsDir();
 }
 
 export async function writeJson(
@@ -202,43 +217,59 @@ export async function listReportDates(): Promise<string[]> {
     .sort();
 }
 
-export async function writeRawSeries(date: string, series: RawSeries): Promise<void> {
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+export async function rawSeriesSnapshotExists(
+  date: string,
+  symbol: string,
+  interval: MarketInterval
+): Promise<boolean> {
+  return fileExists(getRawSeriesPath(date, symbol, interval));
+}
+
+export type WriteRawSeriesResult =
+  | { status: "written"; path: string }
+  | { status: "skipped_existing"; path: string };
+
+/**
+* Writes a raw OHLCV snapshot for a given symbol/interval/date.
+*
+* Raw snapshots are immutable: if the target file already exists, the write is
+* skipped and the existing snapshot is left untouched.
+*/
+export async function writeRawSeries(date: string, series: RawSeries): Promise<WriteRawSeriesResult> {
   const filePath = getRawSeriesPath(date, series.symbol, series.interval);
   const tmpPath = `${filePath}.tmp`;
 
   await mkdir(path.dirname(filePath), { recursive: true });
 
-  await withFileLock(filePath, async () => {
-    let next = series;
-
-    try {
-      const existing = await readJson<RawSeries>(filePath);
-
-      const nextFetchedAt =
-        existing.fetchedAt.localeCompare(series.fetchedAt) >= 0
-          ? existing.fetchedAt
-          : series.fetchedAt;
-      next = {
-        symbol: series.symbol,
-        interval: series.interval,
-        provider: series.provider,
-        fetchedAt: nextFetchedAt,
-        bars: mergeBars(existing.bars, series.bars)
-      };
-    } catch (error) {
-      const code =
-        typeof error === "object" && error !== null && "code" in error
-          ? (error as { code?: unknown }).code
-          : undefined;
-
-      if (code !== "ENOENT") {
-        throw error;
-      }
+  const res = await withFileLock(filePath, async () => {
+    if (await fileExists(filePath)) {
+      return { status: "skipped_existing" as const, path: filePath };
     }
 
-    await writeJson(tmpPath, next);
+    await writeJson(tmpPath, series);
     await rename(tmpPath, filePath);
+    return { status: "written" as const, path: filePath };
   });
+
+  return res;
 }
 
 export type RawSeriesWindowLoadResult =
