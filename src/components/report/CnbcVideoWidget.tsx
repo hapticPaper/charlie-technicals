@@ -4,16 +4,19 @@ import type { MarketNewsSnapshot } from "../../market/types";
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
-  const counts = new Map<string, { count: number; hypeSum: number; hypeCount: number }>();
+  const counts = new Map<string, { count: number; hypeSum: number }>();
 
-  for (const article of snapshot.articles) {
-    const topic = (article.topic ?? "other").toLowerCase();
+  const maxArticles = 2000;
+  for (const article of snapshot.articles.slice(0, maxArticles)) {
+    const topic = (article.topic ?? "other").trim().toLowerCase();
+    if (topic === "") {
+      continue;
+    }
     const hype = typeof article.hype === "number" && Number.isFinite(article.hype) ? article.hype : 0;
 
-    const existing = counts.get(topic) ?? { count: 0, hypeSum: 0, hypeCount: 0 };
+    const existing = counts.get(topic) ?? { count: 0, hypeSum: 0 };
     existing.count += 1;
     existing.hypeSum += hype;
-    existing.hypeCount += 1;
     counts.set(topic, existing);
   }
 
@@ -21,7 +24,7 @@ function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
     .map(([topic, v]) => ({
       topic,
       count: v.count,
-      avgHype: v.hypeCount > 0 ? Math.round((v.hypeSum / v.hypeCount) * 10) / 10 : 0
+      avgHype: v.count > 0 ? Math.round((v.hypeSum / v.count) * 10) / 10 : 0
     }))
     .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic))
     .slice(0, 10);

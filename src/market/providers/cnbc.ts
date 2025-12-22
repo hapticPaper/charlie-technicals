@@ -7,6 +7,7 @@ import {
   inferNewsTopic,
   scoreNewsHype
 } from "../news";
+import { mapWithConcurrency } from "../concurrency";
 
 const CNBC_LATEST_VIDEO_URL = "https://www.cnbc.com/latest-video/";
 
@@ -24,6 +25,25 @@ function parseCnbcTimestamp(value: string): Date | null {
   const fixedTz = trimmed.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
   const date = new Date(fixedTz);
   return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function buildCnbcVideoId(url: string): string {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+    // ["video", "YYYY", "MM", "DD", "slug.html"]
+    if (parts.length >= 5 && parts[0] === "video") {
+      const [, y, m, d, slug] = parts;
+      const base = slug?.replace(/\.html$/i, "");
+      if (y && m && d && base) {
+        return `cnbc:${y}${m}${d}:${base}`;
+      }
+    }
+  } catch {
+    // fall back below
+  }
+
+  return `cnbc:${url}`;
 }
 
 async function fetchText(url: string, timeoutMs: number): Promise<string> {
@@ -74,30 +94,6 @@ function uniqueInOrder(values: string[]): string[] {
   return out;
 }
 
-async function mapWithConcurrency<TIn, TOut>(
-  items: readonly TIn[],
-  concurrency: number,
-  fn: (item: TIn) => Promise<TOut>
-): Promise<TOut[]> {
-  const max = Math.max(1, Math.floor(concurrency));
-  const results: TOut[] = new Array(items.length);
-  let next = 0;
-
-  async function worker() {
-    while (true) {
-      const index = next;
-      if (index >= items.length) {
-        return;
-      }
-      next += 1;
-      results[index] = await fn(items[index] as TIn);
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(max, items.length) }, () => worker()));
-  return results;
-}
-
 export class CnbcVideoProvider {
   async fetchLatestVideoUrls(): Promise<string[]> {
     const html = await fetchText(CNBC_LATEST_VIDEO_URL, 10_000);
@@ -106,8 +102,9 @@ export class CnbcVideoProvider {
     );
 
     if (!matches || matches.length === 0) {
-      console.warn(`[market:cnbc] no video URLs found at ${CNBC_LATEST_VIDEO_URL}`);
-      return [];
+      const message = `[market:cnbc] no video URLs found at ${CNBC_LATEST_VIDEO_URL}`;
+      console.error(message);
+      throw new Error(message);
     }
 
     const urls = matches.map((u) => {
@@ -157,10 +154,11 @@ export class CnbcVideoProvider {
       }
 
       const ymd = parseCnbcVideoUrlYmd(url);
-      const fallbackDate = ymd ? new Date(`${ymd}T12:00:00Z`) : new Date();
+      const fallbackDate = ymd ? new Date(`${ymd}T12:00:00Z`) : new Date(`${args.asOfDate}T12:00:00Z`);
 
       const published = meta?.publishedTime ? parseCnbcTimestamp(meta.publishedTime) : null;
-      const publishedAtDate = published ?? (Number.isFinite(fallbackDate.getTime()) ? fallbackDate : new Date());
+      const publishedAtDate =
+        published ?? (Number.isFinite(fallbackDate.getTime()) ? fallbackDate : new Date(`${args.asOfDate}T12:00:00Z`));
       if (args.sincePublishedAt && publishedAtDate.getTime() <= args.sincePublishedAt.getTime()) {
         return null;
       }
@@ -178,7 +176,7 @@ export class CnbcVideoProvider {
       });
 
       return {
-        id: `cnbc:${url}`,
+        id: buildCnbcVideoId(url),
         title,
         url,
         publisher,

@@ -128,21 +128,33 @@ function parseHtmlMeta(html: string): HtmlMeta {
   const map = new Map<string, string>();
 
   for (const tag of metas) {
-    const nameMatch = tag.match(/\bname\s*=\s*["']([^"']+)["']/i);
-    const propertyMatch = tag.match(/\bproperty\s*=\s*["']([^"']+)["']/i);
-    const contentMatch = tag.match(/\bcontent\s*=\s*["']([^"']+)["']/i);
+    const attrs = Array.from(tag.matchAll(/(name|property|content)\s*=\s*(["'])(.*?)\2/gi));
+    if (attrs.length === 0) {
+      continue;
+    }
 
-    const content = contentMatch?.[1];
-    if (!content) {
+    let key: string | undefined;
+    let content: string | undefined;
+    for (const match of attrs) {
+      const attr = match[1];
+      const value = match[3];
+      if (typeof attr !== "string" || typeof value !== "string") {
+        continue;
+      }
+
+      const lc = attr.toLowerCase();
+      if (lc === "content") {
+        content = value;
+      } else {
+        key = value.toLowerCase();
+      }
+    }
+
+    if (!key || !content || map.has(key)) {
       continue;
     }
-    const key = (propertyMatch?.[1] ?? nameMatch?.[1])?.toLowerCase();
-    if (!key) {
-      continue;
-    }
-    if (!map.has(key)) {
-      map.set(key, content);
-    }
+
+    map.set(key, content);
   }
 
   const title =

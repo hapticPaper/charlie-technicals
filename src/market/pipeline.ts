@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { analyzeSeries } from "./analyze";
+import { mapWithConcurrency as mapWithConcurrencyLimit } from "./concurrency";
 import { loadAnalysisConfig, loadSymbols } from "./config";
 import { CnbcVideoProvider } from "./providers/cnbc";
 import { YahooMarketDataProvider } from "./providers/yahoo";
@@ -31,26 +32,8 @@ async function mapWithConcurrency<TIn, TOut>(
   opts: ConcurrencyOptions,
   fn: (item: TIn) => Promise<TOut>
 ): Promise<TOut[]> {
-  // NOTE: If you want best-effort behavior (partial progress), ensure `fn` handles
-  // per-item errors internally. Unhandled rejections will fail the whole run.
   const concurrency = Math.max(1, opts.concurrency ?? 4);
-  const results: TOut[] = new Array(items.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (true) {
-      const current = nextIndex;
-      nextIndex += 1;
-      if (current >= items.length) {
-        return;
-      }
-
-      results[current] = await fn(items[current]);
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
-  return results;
+  return mapWithConcurrencyLimit(items, concurrency, fn);
 }
 
 async function getLastNewsSnapshotInfo(symbol: string): Promise<
@@ -87,7 +70,7 @@ async function getLastNewsSnapshotInfo(symbol: string): Promise<
   const lastAsOfDate = `${last.slice(0, 4)}-${last.slice(4, 6)}-${last.slice(6, 8)}`;
 
   let lastPublishedAt: Date | null = null;
-  for (let i = files.length - 1; i >= 0 && i >= files.length - 10; i -= 1) {
+  for (let i = files.length - 1; i >= 0; i -= 1) {
     const fileDate = files[i];
     if (!fileDate) {
       continue;
@@ -128,29 +111,36 @@ export async function runMarketCnbcVideos(date: string): Promise<{
   const symbol = "cnbc";
   const provider = new CnbcVideoProvider();
 
-  try {
-    if (await newsSnapshotExists(date, symbol)) {
-      return { status: "skipped_existing", totalUrls: 0, newArticles: 0 };
-    }
+  if (await newsSnapshotExists(date, symbol)) {
+    return { status: "skipped_existing", totalUrls: 0, newArticles: 0 };
+  }
 
+  let totalUrls = 0;
+  let keptUrls = 0;
+
+  try {
     const last = await getLastNewsSnapshotInfo(symbol);
     const sincePublishedAt =
       last.status === "ok"
         ? last.lastPublishedAt ?? new Date(`${last.lastAsOfDate}T23:59:59.999Z`)
         : undefined;
 
-    const { snapshot, totalUrls, keptUrls } = await provider.fetchNews({
+    const fetched = await provider.fetchNews({
       asOfDate: date,
       sincePublishedAt,
       maxUrls: 120
     });
 
-    const res = await writeNewsSnapshot(date, snapshot);
+    totalUrls = fetched.totalUrls;
+    keptUrls = fetched.keptUrls;
+
+    const res = await writeNewsSnapshot(date, fetched.snapshot);
     return { status: res.status, totalUrls, newArticles: keptUrls };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[market:cnbc] failed (${date}): ${message}`);
-    return { status: "failed", totalUrls: 0, newArticles: 0 };
+    console.error(`[market:cnbc] failed (${date}) after urls=${totalUrls}, kept=${keptUrls}: ${message}`);
+    console.error(error);
+    return { status: "failed", totalUrls, newArticles: keptUrls };
   }
 }
 
@@ -226,6 +216,9 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
     .sort();
 
   const cnbc = await runMarketCnbcVideos(date);
+  if (cnbc.status === "failed") {
+    console.error(`[market:data] CNBC scrape failed (${date})`);
+  }
 
   return {
     symbols,
