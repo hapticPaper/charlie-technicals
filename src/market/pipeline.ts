@@ -235,6 +235,48 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   };
 }
 
+export async function runMarketNews(date: string, opts: ConcurrencyOptions = {}): Promise<{
+  symbols: string[];
+  newsWritten: number;
+  newsSkippedExisting: number;
+  newsFailedSymbols: string[];
+}> {
+  await ensureDataDir();
+
+  const provider = new YahooMarketDataProvider();
+  const symbols = await loadSymbols();
+
+  const newsResults = await mapWithConcurrency(symbols, opts, async (symbol) => {
+    try {
+      if (await newsSnapshotExists(date, symbol)) {
+        return { symbol, status: "skipped_existing" as const };
+      }
+
+      const snapshot = await provider.fetchNews(symbol, date);
+      const res = await writeNewsSnapshot(date, snapshot);
+      return { symbol, status: res.status };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[market:news] failed for ${symbol} (${date}): ${message}`);
+      return { symbol, status: "failed" as const };
+    }
+  });
+
+  const newsWritten = newsResults.filter((r) => r.status === "written").length;
+  const newsSkippedExisting = newsResults.filter((r) => r.status === "skipped_existing").length;
+  const newsFailedSymbols = newsResults
+    .filter((r) => r.status === "failed")
+    .map((r) => r.symbol)
+    .sort();
+
+  return {
+    symbols,
+    newsWritten,
+    newsSkippedExisting,
+    newsFailedSymbols
+  };
+}
+
 export async function runMarketAnalyze(date: string): Promise<{ analyzed: number }> {
   await ensureAnalysisDir(date);
 

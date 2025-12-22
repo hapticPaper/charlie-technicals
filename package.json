@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "market:data": "bun scripts/market-data.ts",
     "market:cnbc": "bun scripts/market-cnbc.ts",
+    "market:news": "bun scripts/market-news.ts",
     "market:analyze": "bun scripts/market-analyze.ts",
     "market:report": "bun scripts/market-report.ts",
     "market:run": "bun scripts/market-run.ts"
