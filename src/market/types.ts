@@ -58,6 +58,23 @@ export type ReportIntervalSeries = {
   signals: SignalHit[];
 };
 
+export type AnalysisIntervalSummary = {
+  analyzedAt: string;
+  barCount: number;
+  lastBarTime: string | null;
+  lastClose: number | null;
+  activeSignals: string[];
+};
+
+export type MarketAnalysisSummary = {
+  date: string;
+  generatedAt: string;
+  symbols: string[];
+  intervals: MarketInterval[];
+  missingSymbols: string[];
+  series: Record<string, Partial<Record<MarketInterval, AnalysisIntervalSummary>>>;
+};
+
 export type MarketReport = {
   date: string;
   generatedAt: string;

@@ -1,7 +1,9 @@
 import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { AnalyzedSeries, MarketInterval, MarketReport, RawSeries } from "./types";
+import type { Dirent } from "node:fs";
+
+import type { AnalyzedSeries, MarketAnalysisSummary, MarketInterval, MarketReport, RawSeries } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
@@ -23,6 +25,14 @@ export function getAnalysisDir(date: string): string {
 
 export function getReportsDir(): string {
   return path.join(CONTENT_DIR, "reports");
+}
+
+export function getAnalysisSummaryJsonPath(date: string): string {
+  return path.join(getAnalysisDir(date), "summary.json");
+}
+
+export function getAnalysisMdxPath(date: string): string {
+  return path.join(getAnalysisDir(date), "index.mdx");
 }
 
 export function getRawSeriesPath(date: string, symbol: string, interval: MarketInterval): string {
@@ -89,6 +99,31 @@ export async function listReportDates(): Promise<string[]> {
     .sort();
 }
 
+export async function listAnalysisDates(): Promise<string[]> {
+  const dir = path.join(CONTENT_DIR, "analysis");
+  let entries: Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return entries
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
+    .sort();
+}
+
 export async function writeRawSeries(date: string, series: RawSeries): Promise<void> {
   await writeJson(getRawSeriesPath(date, series.symbol, series.interval), series);
 }
@@ -104,6 +139,19 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
   const mdxTmp = `${mdxPath}.tmp`;
 
   await writeJson(jsonTmp, report);
+  await writeFile(mdxTmp, mdx, "utf8");
+
+  await rename(jsonTmp, jsonPath);
+  await rename(mdxTmp, mdxPath);
+}
+
+export async function writeAnalysisPage(date: string, summary: MarketAnalysisSummary, mdx: string): Promise<void> {
+  const jsonPath = getAnalysisSummaryJsonPath(date);
+  const mdxPath = getAnalysisMdxPath(date);
+  const jsonTmp = `${jsonPath}.tmp`;
+  const mdxTmp = `${mdxPath}.tmp`;
+
+  await writeJson(jsonTmp, summary);
   await writeFile(mdxTmp, mdx, "utf8");
 
   await rename(jsonTmp, jsonPath);

@@ -3,17 +3,19 @@ import { readdir } from "node:fs/promises";
 import { analyzeSeries } from "./analyze";
 import { loadAnalysisConfig, loadSymbols } from "./config";
 import { YahooMarketDataProvider } from "./providers/yahoo";
+import { buildAnalysisMdx } from "./analysisMdx";
 import { buildMarketReport, buildReportMdx } from "./report";
 import {
   ensureDirs,
   getAnalysisDir,
   getDataDir,
   readJson,
+  writeAnalysisPage,
   writeReport,
   writeAnalyzedSeries,
   writeRawSeries
 } from "./storage";
-import type { AnalyzedSeries, MarketInterval, RawSeries } from "./types";
+import type { AnalysisIntervalSummary, AnalyzedSeries, MarketAnalysisSummary, MarketInterval, RawSeries } from "./types";
 
 type ConcurrencyOptions = {
   concurrency?: number;
@@ -86,6 +88,8 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   await ensureDirs(date);
 
   const cfg = await loadAnalysisConfig();
+  const symbols = await loadSymbols();
+  const intervals = cfg.intervals;
   const dir = getDataDir(date);
   const entries = await readdir(dir);
   const files = entries.filter((e) => e.endsWith(".json"));
@@ -95,17 +99,39 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   }
 
   let analyzed = 0;
+  const series: Record<string, Partial<Record<MarketInterval, AnalysisIntervalSummary>>> = {};
   for (const file of files) {
     try {
       const raw = await readJson<RawSeries>(`${dir}/${file}`);
       const analyzedSeries = analyzeSeries(raw)(cfg);
       await writeAnalyzedSeries(date, analyzedSeries);
+      const lastBar = analyzedSeries.bars[analyzedSeries.bars.length - 1];
+      const summary: AnalysisIntervalSummary = {
+        analyzedAt: analyzedSeries.analyzedAt,
+        barCount: analyzedSeries.bars.length,
+        lastBarTime: lastBar?.t ?? null,
+        lastClose: typeof lastBar?.c === "number" && Number.isFinite(lastBar.c) ? lastBar.c : null,
+        activeSignals: analyzedSeries.signals.filter((s) => s.active).map((s) => s.label)
+      };
+      series[analyzedSeries.symbol] ||= {};
+      series[analyzedSeries.symbol][analyzedSeries.interval] = summary;
       analyzed += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`[market:analyze] Failed processing ${file}: ${message}`);
     }
   }
+
+  const summary: MarketAnalysisSummary = {
+    date,
+    generatedAt: new Date().toISOString(),
+    symbols,
+    intervals,
+    missingSymbols: symbols.filter((s) => !(s in series)),
+    series
+  };
+  const mdx = buildAnalysisMdx(summary);
+  await writeAnalysisPage(date, summary, mdx);
 
   return { analyzed };
 }

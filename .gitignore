@@ -5,7 +5,10 @@ tsconfig.tsbuildinfo
 
 .DS_Store
 
-# Intermediate artifacts (daily reports commit only `content/reports/`)
+# Intermediate artifacts (stage 1 data is not committed)
 content/data/
-content/analysis/
-!content/reports/
+
+# Stage 2 artifacts: keep MDX + a small summary, ignore per-series JSON.
+content/analysis/*/*.json
+!content/analysis/*/index.mdx
+!content/analysis/*/summary.json
