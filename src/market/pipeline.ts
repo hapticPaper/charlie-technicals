@@ -88,7 +88,7 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   await ensureDirs(date);
 
   const cfg = await loadAnalysisConfig();
-  const symbols = await loadSymbols();
+  const universeSymbols = await loadSymbols();
   const intervals = cfg.intervals;
   const dir = getDataDir(date);
   const entries = await readdir(dir);
@@ -125,9 +125,9 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   const summary: MarketAnalysisSummary = {
     date,
     generatedAt: new Date().toISOString(),
-    symbols,
+    symbols: universeSymbols,
     intervals,
-    missingSymbols: symbols.filter((s) => !(s in series)),
+    missingSymbols: universeSymbols.filter((s) => !(s in series)),
     series
   };
   const mdx = buildAnalysisMdx(summary);
