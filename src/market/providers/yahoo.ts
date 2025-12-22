@@ -2,6 +2,8 @@ import YahooFinance from "yahoo-finance2";
 
 import type { MarketBar, MarketInterval, RawSeries } from "../types";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function lookbackDaysFor(interval: MarketInterval): number {
   switch (interval) {
     case "1m":
@@ -17,6 +19,9 @@ function lookbackDaysFor(interval: MarketInterval): number {
   }
 }
 
+// Yahoo only serves intraday data back to a rolling retention window.
+// This returns the max number of days we can safely request for each interval.
+// `null` means we don't enforce a strict provider retention cap.
 function yahooRetentionDaysFor(interval: MarketInterval): number | null {
   switch (interval) {
     case "1m":
@@ -101,30 +106,31 @@ export class YahooMarketDataProvider {
     const yahooInterval = interval;
 
     const period2 = asOfDate ? new Date(`${asOfDate}T23:59:59.999Z`) : new Date();
-    const desiredPeriod1 = new Date(
-      period2.getTime() - lookbackDaysFor(interval) * 24 * 60 * 60 * 1000
-    );
+    const desiredPeriod1 = new Date(period2.getTime() - lookbackDaysFor(interval) * DAY_MS);
 
+    let period1 = desiredPeriod1;
+
+    // Yahoo's intraday retention is relative to "now" (not the requested `period2`).
+    // When backfilling recent dates, clamp `period1` into the supported window to avoid
+    // hard failures like: "The requested range must be within the last 60 days".
     const retentionDays = yahooRetentionDaysFor(interval);
-    const oldestAllowedPeriod1 =
-      retentionDays === null
-        ? null
-        : new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    if (retentionDays !== null) {
+      const oldestAllowedPeriod1 = new Date(Date.now() - retentionDays * DAY_MS);
 
-    if (oldestAllowedPeriod1 !== null && period2.getTime() < oldestAllowedPeriod1.getTime()) {
-      return {
-        symbol,
-        interval,
-        provider: "yahoo-finance",
-        fetchedAt,
-        bars: []
-      };
+      if (period2.getTime() < oldestAllowedPeriod1.getTime()) {
+        return {
+          symbol,
+          interval,
+          provider: "yahoo-finance",
+          fetchedAt,
+          bars: []
+        };
+      }
+
+      if (period1.getTime() < oldestAllowedPeriod1.getTime()) {
+        period1 = oldestAllowedPeriod1;
+      }
     }
-
-    const period1 =
-      oldestAllowedPeriod1 !== null && desiredPeriod1.getTime() < oldestAllowedPeriod1.getTime()
-        ? oldestAllowedPeriod1
-        : desiredPeriod1;
 
     const res = await this.#yf.chart(symbol, { interval: yahooInterval, period1, period2 });
     if (!Array.isArray(res.quotes) || res.quotes.length === 0) {
