@@ -1,5 +1,6 @@
 html,
 body {
+  min-height: 100%;
   padding: 0;
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
@@ -28,19 +29,54 @@ body {
 
 body {
   color: var(--rp-text);
-  background: radial-gradient(1200px 600px at 25% 0%, rgba(124, 58, 237, 0.25), transparent 60%),
-    radial-gradient(1200px 700px at 85% 10%, rgba(34, 197, 94, 0.18), transparent 55%), var(--rp-bg);
+  background-color: var(--rp-bg);
+  background-image: radial-gradient(800px 400px at 18% 0%, rgba(124, 58, 237, 0.16), transparent 70%),
+    radial-gradient(900px 480px at 86% 12%, rgba(34, 197, 94, 0.12), transparent 70%),
+    linear-gradient(180deg, #0b1020 0%, #080b17 100%);
+  background-repeat: no-repeat;
 }
 
-main {
+.rpAppShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+@supports (height: 100dvh) {
+  .rpAppShell {
+    min-height: 100dvh;
+  }
+}
+
+.rpAppMain {
+  flex: 1;
+  width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 18px;
-  margin-top: 20px;
-  margin-bottom: 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .rpAppMain {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+@media (max-width: 640px) {
+  .rpAppShell {
+    padding: 8px;
+  }
+
+  .rpAppMain {
+    padding: 16px;
+    border-radius: 14px;
+  }
 }
 
 h1,
