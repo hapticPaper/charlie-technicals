@@ -6,12 +6,72 @@ body {
     "Segoe UI Emoji";
 }
 
+:root {
+  --rp-bg: #0b1020;
+  --rp-surface: rgba(255, 255, 255, 0.06);
+  --rp-surface-2: rgba(255, 255, 255, 0.09);
+  --rp-border: rgba(255, 255, 255, 0.12);
+  --rp-text: #e5e7eb;
+  --rp-muted: #a1a1aa;
+
+  --rp-bull: #22c55e;
+  --rp-bear: #fb7185;
+  --rp-warn: #f59e0b;
+  --rp-target: #38bdf8;
+
+  --rp-price: #e5e7eb;
+  --rp-sma: #38bdf8;
+  --rp-ema: #a78bfa;
+  --rp-rsi: #34d399;
+  --rp-grid: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  color: var(--rp-text);
+  background: radial-gradient(1200px 600px at 25% 0%, rgba(124, 58, 237, 0.25), transparent 60%),
+    radial-gradient(1200px 700px at 85% 10%, rgba(34, 197, 94, 0.18), transparent 55%), var(--rp-bg);
+}
+
 main {
   max-width: 1100px;
   margin: 0 auto;
   padding: 24px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+pre {
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface);
+  border-radius: 12px;
+  padding: 12px;
 }
 
 a {
   color: inherit;
+  text-decoration-color: rgba(255, 255, 255, 0.25);
 }
+
+.report-muted {
+  color: var(--rp-muted);
+}
+
+.report-h4 {
+  margin: 0 0 6px;
+}
+

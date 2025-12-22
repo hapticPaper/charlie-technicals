@@ -1,0 +1,102 @@
+"use client";
+
+import type { MarketInterval, TradePlan } from "../../market/types";
+import { ReportChart } from "./ReportChart";
+import { useReport } from "./ReportProvider";
+import styles from "./report.module.css";
+
+function formatPrice(value: number, reference: number): string {
+  const abs = Math.abs(reference);
+  if (abs >= 100) {
+    return value.toFixed(2);
+  }
+  if (abs >= 1) {
+    return value.toFixed(3);
+  }
+  return value.toFixed(5);
+}
+
+function formatTrade(trade: TradePlan): {
+  sideLabel: string;
+  entry: string;
+  stop: string;
+  targets: string[];
+} {
+  return {
+    sideLabel: trade.side === "buy" ? "Buy" : "Sell",
+    entry: formatPrice(trade.entry, trade.entry),
+    stop: formatPrice(trade.stop, trade.entry),
+    targets: trade.targets.map((t) => formatPrice(t, trade.entry))
+  };
+}
+
+function mustGetSeries(report: ReturnType<typeof useReport>, symbol: string, interval: MarketInterval) {
+  const series = report.series[symbol]?.[interval];
+  if (!series) {
+    throw new Error(`Missing series in report for ${symbol} ${interval}`);
+  }
+
+  return series;
+}
+
+export function ReportPick(props: { symbol: string }) {
+  const report = useReport();
+  const pick = report.picks.find((p) => p.symbol === props.symbol);
+  if (!pick) {
+    return <p>Missing pick data.</p>;
+  }
+
+  const formatted = formatTrade(pick.trade);
+  const isBuy = pick.trade.side === "buy";
+
+  let series1d;
+  let series15m;
+  try {
+    series1d = mustGetSeries(report, props.symbol, "1d");
+    series15m = mustGetSeries(report, props.symbol, "15m");
+  } catch {
+    return <p>Missing series for pick.</p>;
+  }
+
+  return (
+    <section className={styles.pick}>
+      <div className={styles.pickHeader}>
+        <div className={styles.badges}>
+          <span className={isBuy ? styles.badgeBuy : styles.badgeSell}>{formatted.sideLabel}</span>
+          <span className={styles.badgeNeutral}>Score {pick.score}</span>
+        </div>
+        <div className={styles.tradeSummary}>
+          Entry {formatted.entry} | Stop {formatted.stop}
+        </div>
+      </div>
+
+      <div className={styles.tradeGrid}>
+        <div className={styles.kv}>
+          <div className={styles.kLabel}>Entry</div>
+          <div className={styles.kValue}>{formatted.entry}</div>
+        </div>
+        <div className={styles.kv}>
+          <div className={styles.kLabel}>Stop</div>
+          <div className={styles.kValue}>{formatted.stop}</div>
+        </div>
+        <div className={styles.kv}>
+          <div className={styles.kLabel}>Targets</div>
+          <div className={styles.kValue}>{formatted.targets.join(" / ")}</div>
+        </div>
+      </div>
+
+      {pick.rationale.length > 0 ? (
+        <ul className={styles.rationale}>
+          {pick.rationale.map((r, idx) => (
+            <li key={idx}>{r}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className={styles.charts}>
+        <ReportChart title="1d" series={series1d} annotations={{ trade: pick.trade }} />
+        <ReportChart title="15m" series={series15m} annotations={{ trade: pick.trade }} />
+      </div>
+    </section>
+  );
+}
