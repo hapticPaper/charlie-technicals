@@ -23,12 +23,14 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(props: ReportPageProps): Promise<Metadata> {
+  // Next (Turbopack) may pass `params` as a thenable during prerendering.
   const { date } = await props.params;
 
   return { title: getReportTitle(date) };
 }
 
 export default async function ReportPage(props: ReportPageProps) {
+  // Next (Turbopack) may pass `params` as a thenable during prerendering.
   const { date } = await props.params;
 
   let report: MarketReport;

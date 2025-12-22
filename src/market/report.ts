@@ -162,8 +162,8 @@ export function buildReportMdx(report: MarketReport): string {
   const lines: string[] = [];
   lines.push("---");
   lines.push(`title: ${formatFrontmatterString(`Market Report: ${report.date}`)}`);
-  lines.push(`date: ${report.date}`);
-  lines.push(`generatedAt: ${report.generatedAt}`);
+  lines.push(`date: ${formatFrontmatterString(report.date)}`);
+  lines.push(`generatedAt: ${formatFrontmatterString(report.generatedAt)}`);
   lines.push("---");
   lines.push("");
   lines.push("<ReportSummary />");

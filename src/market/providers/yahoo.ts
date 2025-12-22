@@ -108,6 +108,7 @@ export class YahooMarketDataProvider {
     const retentionDays = yahooRetentionDaysFor(interval);
 
     const requestedPeriod2 = asOfDate ? new Date(`${asOfDate}T23:59:59.999Z`) : new Date();
+    // For intraday requests, clamp `period2` to "now" to avoid asking Yahoo for future bars.
     const period2 =
       retentionDays !== null
         ? new Date(Math.min(requestedPeriod2.getTime(), Date.now()))
