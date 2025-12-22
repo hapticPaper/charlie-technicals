@@ -11,6 +11,9 @@ import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
 
+type ReportPageParams = { date: string };
+type ReportPageProps = { params: ReportPageParams | Promise<ReportPageParams> };
+
 function getReportTitle(date: string): string {
   return `Market Report: ${date}`;
 }
@@ -20,14 +23,14 @@ export async function generateStaticParams() {
   return dates.map((date) => ({ date }));
 }
 
-export async function generateMetadata(props: { params: { date: string } }): Promise<Metadata> {
-  const { date } = await Promise.resolve(props.params);
+export async function generateMetadata(props: ReportPageProps): Promise<Metadata> {
+  const { date } = await props.params;
 
   return { title: getReportTitle(date) };
 }
 
-export default async function ReportPage(props: { params: { date: string } }) {
-  const { date } = await Promise.resolve(props.params);
+export default async function ReportPage(props: ReportPageProps) {
+  const { date } = await props.params;
 
   let report: MarketReport;
   let mdxRaw: string;

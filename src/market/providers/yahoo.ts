@@ -137,6 +137,7 @@ export class YahooMarketDataProvider {
       }
 
       if (period1.getTime() >= period2.getTime()) {
+        // No valid window remains after applying provider retention clamping.
         return {
           symbol,
           interval,
