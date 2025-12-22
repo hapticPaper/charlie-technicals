@@ -1,4 +1,5 @@
 import { readdir } from "node:fs/promises";
+import path from "node:path";
 
 import { analyzeSeries } from "./analyze";
 import { loadAnalysisConfig, loadSymbols } from "./config";
@@ -7,13 +8,13 @@ import { buildMarketReport, buildReportMdx } from "./report";
 import {
   ensureDirs,
   getAnalysisDir,
-  getDataDir,
+  loadRawSeriesWindow,
   readJson,
   writeReport,
   writeAnalyzedSeries,
   writeRawSeries
 } from "./storage";
-import type { AnalyzedSeries, MarketInterval, RawSeries } from "./types";
+import type { AnalyzedSeries, MarketInterval } from "./types";
 
 type ConcurrencyOptions = {
   concurrency?: number;
@@ -86,25 +87,78 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   await ensureDirs(date);
 
   const cfg = await loadAnalysisConfig();
-  const dir = getDataDir(date);
-  const entries = await readdir(dir);
-  const files = entries.filter((e) => e.endsWith(".json"));
+  const symbols = await loadSymbols();
+  const intervals = cfg.intervals;
 
-  if (files.length === 0) {
+  // Raw data layout:
+  //   content/data/<SYMBOL>/<INTERVAL>/<YYYYMMDD>.json
+  // See `src/market/dataConventions.ts`.
+
+  const legacyDir = path.join(process.cwd(), "content", "data", date);
+  let legacyHasJson = false;
+  try {
+    const legacyEntries = await readdir(legacyDir);
+    legacyHasJson = legacyEntries.some((e) => e.endsWith(".json"));
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  const tasks = symbols.flatMap((symbol) => intervals.map((interval) => ({ symbol, interval })));
+  const results = await mapWithConcurrency(tasks, {}, async ({ symbol, interval }) => {
+    const res = await loadRawSeriesWindow(date, symbol, interval);
+    if (res.status !== "ok") {
+      return { ...res, symbol, interval };
+    }
+
+    try {
+      const analyzedSeries = analyzeSeries(res.series)(cfg);
+      await writeAnalyzedSeries(date, analyzedSeries);
+      return { status: "ok" as const, symbol, interval };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`[market:analyze] Failed processing ${symbol} ${interval}: ${message}`);
+    }
+  });
+
+  const insufficients = results.filter(
+    (r): r is Extract<typeof r, { status: "insufficient_window" }> => r.status === "insufficient_window"
+  );
+  const analyzed = results.filter((r) => r.status === "ok").length;
+
+  if (insufficients.length > 0) {
+    const examples = insufficients
+      .slice(0, 5)
+      .map(
+        (i) =>
+          `${i.symbol} ${i.interval} (have ${i.selectedFiles.length}, need >= ${i.requiredMinFiles})`
+      )
+      .join(", ");
+    throw new Error(
+      `[market:analyze] insufficient raw window for ${insufficients.length} symbol/interval pairs; examples: ${examples}`
+    );
+  }
+
+  if (analyzed === 0) {
+    if (legacyHasJson) {
+      throw new Error(
+        `Legacy raw data layout detected at ${legacyDir} and no new-layout data found for ${date}. Re-run "market:data --date=${date}" to regenerate raw snapshots using content/data/<SYMBOL>/<INTERVAL>/<YYYYMMDD>.json, then delete ${legacyDir}.`
+      );
+    }
+
     throw new Error(`No data found for ${date}. Run "market:data --date=${date}" first.`);
   }
 
-  let analyzed = 0;
-  for (const file of files) {
-    try {
-      const raw = await readJson<RawSeries>(`${dir}/${file}`);
-      const analyzedSeries = analyzeSeries(raw)(cfg);
-      await writeAnalyzedSeries(date, analyzedSeries);
-      analyzed += 1;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`[market:analyze] Failed processing ${file}: ${message}`);
-    }
+  if (legacyHasJson) {
+    console.error(
+      `[market:analyze] legacy raw data layout detected at ${legacyDir} (ignored); delete it to avoid confusion.`
+    );
   }
 
   return { analyzed };
@@ -131,9 +185,14 @@ export async function loadAnalyzedSeries(date: string): Promise<AnalyzedSeries[]
   const out: AnalyzedSeries[] = [];
 
   for (const file of files) {
-    out.push(await readJson<AnalyzedSeries>(`${dir}/${file}`));
+    const filePath = `${dir}/${file}`;
+    try {
+      out.push(await readJson<AnalyzedSeries>(filePath));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`[market:loadAnalyzedSeries] Failed reading ${filePath}: ${message}`);
+    }
   }
-
   return out;
 }
 

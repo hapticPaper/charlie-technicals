@@ -151,15 +151,20 @@ export function buildMarketReport(args: {
   };
 }
 
+function formatFrontmatterString(value: string): string {
+  // Centralized frontmatter escaping; currently uses JSON-style quoting.
+  return JSON.stringify(value);
+}
+
 export function buildReportMdx(report: MarketReport): string {
   const symbols = Object.keys(report.series).sort();
   const intervals = report.intervals;
 
   const lines: string[] = [];
   lines.push("---");
-  lines.push(`title: Market Report: ${report.date}`);
-  lines.push(`date: ${report.date}`);
-  lines.push(`generatedAt: ${report.generatedAt}`);
+  lines.push(`title: ${formatFrontmatterString(`Market Report: ${report.date}`)}`);
+  lines.push(`date: ${formatFrontmatterString(report.date)}`);
+  lines.push(`generatedAt: ${formatFrontmatterString(report.generatedAt)}`);
   lines.push("---");
   lines.push("");
   lines.push("<ReportSummary />");
