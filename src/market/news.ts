@@ -23,7 +23,7 @@ function truncateWords(text: string, maxWords: number): string {
   }
 
   let truncated = words.slice(0, maxWords).join(" ");
-  truncated = truncated.replace(/[\s.,;:!-]+$/u, "");
+  truncated = truncated.replace(/[\s.,;:]+$/u, "");
   return `${truncated}…`;
 }
 
@@ -69,7 +69,8 @@ type HtmlMeta = {
 
 function parseHtmlMeta(html: string): HtmlMeta {
   // Best-effort regex parser. It's OK if this fails quietly (we fall back to headline-only summaries).
-  const metas = html.match(/<meta\b[^>]*>/gi) ?? [];
+  const safeHtml = html.slice(0, 250_000);
+  const metas = safeHtml.match(/<meta\b[^>]*>/gi) ?? [];
   const map = new Map<string, string>();
 
   for (const tag of metas) {
@@ -93,7 +94,7 @@ function parseHtmlMeta(html: string): HtmlMeta {
   const title =
     map.get("og:title") ??
     map.get("twitter:title") ??
-    html.match(/<title\b[^>]*>([^<]+)<\/title>/i)?.[1];
+    safeHtml.match(/<title\b[^>]*>([^<]+)<\/title>/i)?.[1];
 
   const description =
     map.get("og:description") ?? map.get("twitter:description") ?? map.get("description");
@@ -106,14 +107,15 @@ function parseHtmlMeta(html: string): HtmlMeta {
 
 export async function fetchArticleMeta(url: string): Promise<HtmlMeta> {
   const html = await fetchText(url, 4000);
-  return parseHtmlMeta(html.slice(0, 250_000));
+  return parseHtmlMeta(html);
 }
 
 export function isRecentNews(args: { asOfDate: string; publishedAt: Date; maxAgeDays: number }): boolean {
   // Window is the last `maxAgeDays` calendar days (UTC), inclusive of `asOfDate`.
+  const maxAgeDays = Math.max(1, Math.floor(args.maxAgeDays));
   const { year, month, day } = parseIsoDateYmd(args.asOfDate);
   const asOfStartUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-  const start = new Date(asOfStartUtc.getTime() - (args.maxAgeDays - 1) * 24 * 60 * 60 * 1000);
+  const start = new Date(asOfStartUtc.getTime() - (maxAgeDays - 1) * 24 * 60 * 60 * 1000);
   const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
   const ts = args.publishedAt.getTime();
   return ts >= start.getTime() && ts <= end.getTime();
