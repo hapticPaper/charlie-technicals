@@ -24,7 +24,7 @@ Generated artifacts are written under `content/`:
 - `content/reports/<date>.json`: aggregated report object (committed)
 - `content/reports/<date>.mdx`: MDX that renders charts + summaries (committed)
 
-Note: `content/analysis/` is gitignored; `content/data/` is committed so the dataset can be reused across runs.
+Note: `content/analysis/` is gitignored; `content/data/` is committed so the dataset can be reused across runs (and the repo will grow over time).
 
 ## Configuration
 
