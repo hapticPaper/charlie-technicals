@@ -17,6 +17,20 @@ function lookbackDaysFor(interval: MarketInterval): number {
   }
 }
 
+function yahooRetentionDaysFor(interval: MarketInterval): number | null {
+  switch (interval) {
+    case "1m":
+      return 7;
+    case "5m":
+      return 59;
+    case "15m":
+      return 59;
+    case "1h":
+    case "1d":
+      return null;
+  }
+}
+
 function toMarketBars(quotes: Array<Record<string, unknown>>): MarketBar[] {
   const bars: MarketBar[] = [];
 
@@ -87,7 +101,30 @@ export class YahooMarketDataProvider {
     const yahooInterval = interval;
 
     const period2 = asOfDate ? new Date(`${asOfDate}T23:59:59.999Z`) : new Date();
-    const period1 = new Date(period2.getTime() - lookbackDaysFor(interval) * 24 * 60 * 60 * 1000);
+    const desiredPeriod1 = new Date(
+      period2.getTime() - lookbackDaysFor(interval) * 24 * 60 * 60 * 1000
+    );
+
+    const retentionDays = yahooRetentionDaysFor(interval);
+    const oldestAllowedPeriod1 =
+      retentionDays === null
+        ? null
+        : new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+
+    if (oldestAllowedPeriod1 !== null && period2.getTime() < oldestAllowedPeriod1.getTime()) {
+      return {
+        symbol,
+        interval,
+        provider: "yahoo-finance",
+        fetchedAt,
+        bars: []
+      };
+    }
+
+    const period1 =
+      oldestAllowedPeriod1 !== null && desiredPeriod1.getTime() < oldestAllowedPeriod1.getTime()
+        ? oldestAllowedPeriod1
+        : desiredPeriod1;
 
     const res = await this.#yf.chart(symbol, { interval: yahooInterval, period1, period2 });
     if (!Array.isArray(res.quotes) || res.quotes.length === 0) {
