@@ -93,7 +93,9 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   const written = seriesResults.filter((r) => r.status === "written").length;
   const skippedExisting = seriesResults.filter((r) => r.status === "skipped_existing").length;
 
-  const newsResults = await mapWithConcurrency(symbols, opts, async (symbol) => {
+  const newsConcurrency = Math.min(opts.concurrency ?? 4, 2);
+
+  const newsResults = await mapWithConcurrency(symbols, { concurrency: newsConcurrency }, async (symbol) => {
     try {
       if (await newsSnapshotExists(date, symbol)) {
         return { symbol, status: "skipped_existing" as const };

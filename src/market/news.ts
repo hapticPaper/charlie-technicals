@@ -5,7 +5,14 @@ const SUMMARY_MAX_WORDS = 500;
 const SUMMARY_TAIL_BUDGET_WORDS = 30;
 
 function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function truncateWords(text: string, maxWords: number): string {
@@ -15,7 +22,9 @@ function truncateWords(text: string, maxWords: number): string {
     return trimmed;
   }
 
-  return `${words.slice(0, maxWords).join(" ")}…`;
+  let truncated = words.slice(0, maxWords).join(" ");
+  truncated = truncated.replace(/[\s.,;:!-]+$/u, "");
+  return `${truncated}…`;
 }
 
 async function fetchText(url: string, timeoutMs: number): Promise<string> {
