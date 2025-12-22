@@ -3,11 +3,12 @@ import type { MarketNewsSnapshot } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
+const MAX_CNBC_WIDGET_ARTICLES = 500;
+
 function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
   const counts = new Map<string, { count: number; hypeSum: number }>();
 
-  const maxArticles = 2000;
-  for (const article of snapshot.articles.slice(0, maxArticles)) {
+  for (const article of snapshot.articles.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
     const topic = (article.topic ?? "other").trim().toLowerCase();
     if (topic === "") {
       continue;

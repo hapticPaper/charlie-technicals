@@ -10,6 +10,7 @@ import {
 import { mapWithConcurrency } from "../concurrency";
 
 const CNBC_LATEST_VIDEO_URL = "https://www.cnbc.com/latest-video/";
+const CNBC_ARTICLE_META_TIMEOUT_MS = 2500;
 
 function parseCnbcVideoUrlYmd(url: string): string | null {
   const match = url.match(/\/video\/(\d{4})\/(\d{2})\/(\d{2})\//);
@@ -143,7 +144,7 @@ export class CnbcVideoProvider {
     const articles = await mapWithConcurrency(prefiltered, 4, async (url): Promise<MarketNewsArticle | null> => {
       let meta: Awaited<ReturnType<typeof fetchArticleMeta>> | undefined;
       try {
-        meta = await fetchArticleMeta(url, 2500);
+        meta = await fetchArticleMeta(url, CNBC_ARTICLE_META_TIMEOUT_MS);
       } catch {
         meta = undefined;
       }

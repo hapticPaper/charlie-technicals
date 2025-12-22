@@ -22,6 +22,7 @@ export type CnbcTopicHypeDatum = {
 export function CnbcVideoWidgetClient(props: {
   data: CnbcTopicHypeDatum[];
 }) {
+  // Recharts hydration workaround: render a placeholder until client mount.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -30,6 +31,9 @@ export function CnbcVideoWidgetClient(props: {
   if (!mounted) {
     return (
       <div
+        aria-busy="true"
+        aria-label="Loading CNBC video topics chart"
+        role="status"
         style={{
           width: "100%",
           height: 260,

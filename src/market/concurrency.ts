@@ -3,6 +3,10 @@ export async function mapWithConcurrency<TIn, TOut>(
   concurrency: number,
   fn: (item: TIn) => Promise<TOut>
 ): Promise<TOut[]> {
+  if (!Number.isFinite(concurrency)) {
+    throw new Error(`Invalid concurrency: ${concurrency}`);
+  }
+
   // NOTE: If you want best-effort behavior (partial progress), ensure `fn` handles
   // per-item errors internally. Unhandled rejections will fail the whole run.
   const max = Math.max(1, Math.floor(concurrency));
