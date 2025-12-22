@@ -21,6 +21,10 @@ async function readReportHighlights(date: string): Promise<MarketReportHighlight
       return highlights;
     }
 
+    console.warn(
+      `[home] Invalid highlights cache for ${date}: expected version v2-highlights and date ${date}; found version ${highlights.version} and date ${highlights.date}. Deleting cache.`
+    );
+
     try {
       await rm(highlightsPath, { force: true });
     } catch {
@@ -138,10 +142,7 @@ export default async function HomePage() {
               {highlights && highlights.picks.length > 0 ? (
                 <ul className={styles.picks}>
                   {highlights.picks.map((p) => (
-                    <li
-                      key={`${p.symbol}-${p.trade.side}-${p.trade.entry}-${p.trade.stop}`}
-                      className={styles.pickRow}
-                    >
+                    <li key={p.symbol} className={styles.pickRow}>
                       <span className={badgeClassForSide(p.trade.side)}>{labelForSide(p.trade.side)}</span>
                       <span className={styles.pickText}>
                         <strong>{p.symbol}</strong>{" "}
