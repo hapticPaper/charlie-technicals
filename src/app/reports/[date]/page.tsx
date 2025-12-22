@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { ReportCharts } from "../../../components/report/ReportCharts";
+import { ReportPick } from "../../../components/report/ReportPick";
 import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
@@ -71,7 +72,7 @@ export default async function ReportPage(props: ReportPageProps) {
 
   let content: ReactNode;
   try {
-    const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts });
+    const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts, ReportPick });
     content = res.content;
   } catch (error) {
     try {

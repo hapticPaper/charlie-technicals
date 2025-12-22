@@ -51,10 +51,29 @@ export type ReportIntervalSeries = {
   interval: MarketInterval;
   t: number[];
   close: number[];
+  high: number[];
+  low: number[];
   sma20: Array<number | null>;
   ema20: Array<number | null>;
   rsi14: Array<number | null>;
   signals: SignalHit[];
+};
+
+export type TradeSide = "buy" | "sell";
+
+export type TradePlan = {
+  side: TradeSide;
+  entry: number;
+  stop: number;
+  targets: number[];
+};
+
+export type ReportPick = {
+  symbol: string;
+  score: number;
+  trade: TradePlan;
+  rationale: string[];
+  signals: Partial<Record<MarketInterval, string[]>>;
 };
 
 export type MarketReport = {
@@ -63,6 +82,7 @@ export type MarketReport = {
   symbols: string[];
   intervals: MarketInterval[];
   missingSymbols: string[];
+  picks: ReportPick[];
   series: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>;
   summaries: {
     veryShort: string;

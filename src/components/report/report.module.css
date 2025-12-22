@@ -1,0 +1,93 @@
+.pick {
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.pickHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.badgeBuy,
+.badgeSell,
+.badgeNeutral {
+  border: 1px solid var(--rp-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.badgeBuy {
+  background: color-mix(in srgb, var(--rp-bull) 18%, transparent);
+  border-color: color-mix(in srgb, var(--rp-bull) 36%, var(--rp-border));
+}
+
+.badgeSell {
+  background: color-mix(in srgb, var(--rp-bear) 18%, transparent);
+  border-color: color-mix(in srgb, var(--rp-bear) 36%, var(--rp-border));
+}
+
+.badgeNeutral {
+  color: var(--rp-muted);
+}
+
+.tradeSummary {
+  font-size: 12px;
+  color: var(--rp-muted);
+}
+
+.tradeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.kv {
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface-2);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.kLabel {
+  font-size: 12px;
+  color: var(--rp-muted);
+}
+
+.kValue {
+  font-size: 16px;
+  margin-top: 4px;
+}
+
+.rationale {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--rp-muted);
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (min-width: 900px) {
+  .charts {
+    grid-template-columns: 1fr 1fr;
+  }
+}
