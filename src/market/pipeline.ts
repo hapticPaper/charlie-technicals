@@ -85,13 +85,17 @@ async function getLastNewsSnapshotInfo(symbol: string): Promise<
   }
 
   const lastAsOfDate = `${last.slice(0, 4)}-${last.slice(4, 6)}-${last.slice(6, 8)}`;
-  const candidates = files.slice(-10).map((d) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`);
 
   let lastPublishedAt: Date | null = null;
-  for (const date of candidates) {
+  for (let i = files.length - 1; i >= 0 && i >= files.length - 10; i -= 1) {
+    const fileDate = files[i];
+    if (!fileDate) {
+      continue;
+    }
+
     let snapshot: MarketNewsSnapshot;
     try {
-      snapshot = await readJson<MarketNewsSnapshot>(path.join(getNewsDir(symbol), `${date.replace(/-/g, "")}.json`));
+      snapshot = await readJson<MarketNewsSnapshot>(path.join(getNewsDir(symbol), `${fileDate}.json`));
     } catch {
       continue;
     }
@@ -104,6 +108,10 @@ async function getLastNewsSnapshotInfo(symbol: string): Promise<
       if (!lastPublishedAt || t.getTime() > lastPublishedAt.getTime()) {
         lastPublishedAt = t;
       }
+    }
+
+    if (lastPublishedAt) {
+      break;
     }
   }
 

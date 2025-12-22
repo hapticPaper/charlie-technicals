@@ -58,7 +58,7 @@ export async function CnbcVideoWidget(props: { date: string }) {
       <p className="report-muted">
         <strong>Videos:</strong> {snapshot.articles.length} (as of {snapshot.asOfDate})
       </p>
-      <CnbcVideoWidgetClient date={props.date} totalVideos={snapshot.articles.length} data={data} />
+      <CnbcVideoWidgetClient data={data} />
     </section>
   );
 }

@@ -20,8 +20,6 @@ export type CnbcTopicHypeDatum = {
 };
 
 export function CnbcVideoWidgetClient(props: {
-  date: string;
-  totalVideos: number;
   data: CnbcTopicHypeDatum[];
 }) {
   const [mounted, setMounted] = useState(false);

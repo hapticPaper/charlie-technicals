@@ -102,10 +102,26 @@ export class CnbcVideoProvider {
   async fetchLatestVideoUrls(): Promise<string[]> {
     const html = await fetchText(CNBC_LATEST_VIDEO_URL, 10_000);
     const matches = html.match(
-      /https:\/\/www\.cnbc\.com\/video\/\d{4}\/\d{2}\/\d{2}\/[^"<> ]+\.html/g
+      /https:\/\/www\.cnbc\.com\/video\/\d{4}\/\d{2}\/\d{2}\/[^"<> ]+\.html(?:\?[^"<> ]*)?/g
     );
 
-    return uniqueInOrder(matches ?? []);
+    if (!matches || matches.length === 0) {
+      console.warn(`[market:cnbc] no video URLs found at ${CNBC_LATEST_VIDEO_URL}`);
+      return [];
+    }
+
+    const urls = matches.map((u) => {
+      try {
+        const parsed = new URL(u);
+        parsed.search = "";
+        parsed.hash = "";
+        return parsed.toString();
+      } catch {
+        return u.split("?")[0] ?? u;
+      }
+    });
+
+    return uniqueInOrder(urls);
   }
 
   async fetchNews(args: {
