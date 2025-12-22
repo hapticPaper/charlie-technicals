@@ -19,12 +19,12 @@ bun run dev
 
 Generated artifacts are written under `content/`:
 
-- `content/data/<SYMBOL>/<INTERVAL>/<YYYYMMDD>.json`: raw OHLCV snapshots (gitignored, append-only)
+- `content/data/<SYMBOL>/<INTERVAL>/<YYYYMMDD>.json`: raw OHLCV snapshots (committed, append-only)
 - `content/analysis/<date>/...`: indicators + signals per symbol/interval (gitignored)
 - `content/reports/<date>.json`: aggregated report object (committed)
 - `content/reports/<date>.mdx`: MDX that renders charts + summaries (committed)
 
-Note: `content/data/` + `content/analysis/` are gitignored by default; the repo only tracks empty `.gitkeep` placeholders so the directory structure is visible.
+Note: `content/analysis/` is gitignored; `content/data/` is committed so the dataset can be reused across runs (and the repo will grow over time).
 
 ## Configuration
 
