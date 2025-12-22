@@ -67,6 +67,7 @@ export type AnalysisIntervalSummary = {
 };
 
 export type MarketAnalysisSummary = {
+  schemaVersion: number;
   date: string;
   generatedAt: string;
   symbols: string[];

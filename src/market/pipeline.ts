@@ -106,7 +106,7 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
       const analyzedSeries = analyzeSeries(raw)(cfg);
 
       if (analyzedSeries.bars.length === 0) {
-        throw new Error(`[market:analyze] Empty series for ${analyzedSeries.symbol} ${analyzedSeries.interval}`);
+        continue;
       }
 
       await writeAnalyzedSeries(date, analyzedSeries);
@@ -132,6 +132,7 @@ export async function runMarketAnalyze(date: string): Promise<{ analyzed: number
   }
 
   const summary: MarketAnalysisSummary = {
+    schemaVersion: 1,
     date,
     generatedAt: new Date().toISOString(),
     symbols: universeSymbols,

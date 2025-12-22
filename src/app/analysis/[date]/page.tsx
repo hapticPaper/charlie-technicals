@@ -61,6 +61,10 @@ export default async function AnalysisPage(props: { params: { date: string } }) 
     notFound();
   }
 
+  if (analysis.schemaVersion !== 1) {
+    notFound();
+  }
+
   let content: ReactNode;
   try {
     const res = await renderMdx(mdxRaw, { AnalysisSummary, AnalysisSeries });
