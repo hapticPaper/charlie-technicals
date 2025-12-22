@@ -173,8 +173,7 @@ export async function runMarketAll(date: string): Promise<{
   const report = await runMarketReport({
     date,
     symbols: data.symbols,
-    intervals: data.intervals,
-    missingSymbols: data.missingSymbols
+    intervals: data.intervals
   });
 
   return {
