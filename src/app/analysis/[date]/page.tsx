@@ -20,6 +20,15 @@ function getAnalysisTitle(date: string): string {
   return `Market Analysis: ${date}`;
 }
 
+function isEnoent(error: unknown): boolean {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+  return code === "ENOENT";
+}
+
 export async function generateStaticParams() {
   const dates = await listAnalysisDates();
   return dates.map((date) => ({ date }));
@@ -33,22 +42,34 @@ export async function generateMetadata(props: { params: { date: string } }): Pro
 export default async function AnalysisPage(props: { params: { date: string } }) {
   const { date } = await Promise.resolve(props.params);
 
-  let analysis: MarketAnalysisSummary;
-  let mdxRaw: string;
+  let analysis: MarketAnalysisSummary | undefined;
   try {
     analysis = await readJson<MarketAnalysisSummary>(getAnalysisSummaryJsonPath(date));
+  } catch (error) {
+    if (!isEnoent(error)) {
+      throw error;
+    }
+  }
+
+  let mdxRaw: string | undefined;
+  try {
     mdxRaw = await readFile(getAnalysisMdxPath(date), "utf8");
   } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
-
-    if (code === "ENOENT") {
-      notFound();
+    if (!isEnoent(error)) {
+      throw error;
     }
+  }
 
-    throw error;
+  if (!analysis && !mdxRaw) {
+    notFound();
+  }
+
+  if (!analysis) {
+    throw new Error(`Missing analysis summary.json for ${date}.`);
+  }
+
+  if (!mdxRaw) {
+    throw new Error(`Missing analysis index.mdx for ${date}.`);
   }
 
   let content: ReactNode;

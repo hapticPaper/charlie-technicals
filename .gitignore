@@ -9,6 +9,6 @@ tsconfig.tsbuildinfo
 content/data/
 
 # Stage 2 artifacts: keep MDX + a small summary, ignore per-series JSON.
-content/analysis/*/*.json
+content/analysis/*/*.*.json
 !content/analysis/*/index.mdx
 !content/analysis/*/summary.json
