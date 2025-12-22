@@ -11,8 +11,7 @@ import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
 
-type ReportPageParams = { date: string };
-type ReportPageProps = { params: ReportPageParams | Promise<ReportPageParams> };
+type ReportPageProps = { params: { date: string } };
 
 function getReportTitle(date: string): string {
   return `Market Report: ${date}`;
