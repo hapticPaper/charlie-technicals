@@ -7,9 +7,8 @@ tsconfig.tsbuildinfo
 
 .DS_Store
 
-# Intermediate artifacts (daily reports commit only `content/reports/`)
-content/data/*
+# Raw snapshots are committed (append-only) so reports can be reproduced.
+# Scratch analysis artifacts are ignored.
 content/analysis/*
-!content/data/.gitkeep
 !content/analysis/.gitkeep
 !content/reports/
