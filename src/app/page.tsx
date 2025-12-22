@@ -20,6 +20,12 @@ async function readReportHighlights(date: string): Promise<MarketReportHighlight
     if (highlights.version === "v2-highlights" && highlights.date === date) {
       return highlights;
     }
+
+    try {
+      await rm(highlightsPath, { force: true });
+    } catch {
+      // Best-effort cleanup.
+    }
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error
