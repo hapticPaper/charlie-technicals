@@ -11,7 +11,6 @@ import {
   ensureReportsDir,
   getAnalysisDir,
   loadRawSeriesWindow,
-  rawSeriesSnapshotExists,
   readJson,
   writeReport,
   writeAnalyzedSeries,
@@ -71,11 +70,6 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
 
   await mapWithConcurrency(tasks, opts, async ({ symbol, interval }) => {
     try {
-      if (await rawSeriesSnapshotExists(date, symbol, interval)) {
-        skippedExisting += 1;
-        return;
-      }
-
       const series = await provider.fetchSeries(symbol, interval, date);
       if (series.bars.length === 0) {
         missing.add(symbol);

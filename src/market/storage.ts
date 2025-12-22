@@ -166,6 +166,9 @@ export async function ensureReportsDir(): Promise<void> {
   await mkdir(getReportsDir(), { recursive: true });
 }
 
+/**
+* @deprecated Use `ensureDataDir`, `ensureAnalysisDir`, and `ensureReportsDir` instead.
+*/
 export async function ensureDirs(date: string): Promise<void> {
   await ensureDataDir();
   await ensureAnalysisDir(date);
@@ -244,6 +247,12 @@ export type WriteRawSeriesResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
 
+/**
+* Writes a raw OHLCV snapshot for a given symbol/interval/date.
+*
+* Raw snapshots are immutable: if the target file already exists, the write is
+* skipped and the existing snapshot is left untouched.
+*/
 export async function writeRawSeries(date: string, series: RawSeries): Promise<WriteRawSeriesResult> {
   const filePath = getRawSeriesPath(date, series.symbol, series.interval);
   const tmpPath = `${filePath}.tmp`;
