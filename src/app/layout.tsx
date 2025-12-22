@@ -10,8 +10,8 @@ export const metadata = {
 export default function RootLayout(props: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <main>{props.children}</main>
+      <body className="rpAppShell">
+        <main className="rpAppMain">{props.children}</main>
       </body>
     </html>
   );
