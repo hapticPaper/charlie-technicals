@@ -105,7 +105,13 @@ export class YahooMarketDataProvider {
     const fetchedAt = new Date().toISOString();
     const yahooInterval = interval;
 
-    const period2 = asOfDate ? new Date(`${asOfDate}T23:59:59.999Z`) : new Date();
+    const retentionDays = yahooRetentionDaysFor(interval);
+
+    const requestedPeriod2 = asOfDate ? new Date(`${asOfDate}T23:59:59.999Z`) : new Date();
+    const period2 =
+      retentionDays !== null
+        ? new Date(Math.min(requestedPeriod2.getTime(), Date.now()))
+        : requestedPeriod2;
     const desiredPeriod1 = new Date(period2.getTime() - lookbackDaysFor(interval) * DAY_MS);
 
     let period1 = desiredPeriod1;
@@ -113,7 +119,6 @@ export class YahooMarketDataProvider {
     // Yahoo's intraday retention is relative to "now" (not the requested `period2`).
     // When backfilling recent dates, clamp `period1` into the supported window to avoid
     // hard failures like: "The requested range must be within the last 60 days".
-    const retentionDays = yahooRetentionDaysFor(interval);
     if (retentionDays !== null) {
       const oldestAllowedPeriod1 = new Date(Date.now() - retentionDays * DAY_MS);
 
@@ -129,6 +134,16 @@ export class YahooMarketDataProvider {
 
       if (period1.getTime() < oldestAllowedPeriod1.getTime()) {
         period1 = oldestAllowedPeriod1;
+      }
+
+      if (period1.getTime() >= period2.getTime()) {
+        return {
+          symbol,
+          interval,
+          provider: "yahoo-finance",
+          fetchedAt,
+          bars: []
+        };
       }
     }
 
