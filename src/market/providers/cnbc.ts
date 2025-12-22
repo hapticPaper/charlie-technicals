@@ -3,14 +3,31 @@ import type { MarketNewsArticle, MarketNewsSnapshot } from "../types";
 import {
   buildNewsMainIdea,
   buildNewsSummary,
-  fetchArticleMeta,
   inferNewsTopic,
   scoreNewsHype
 } from "../news";
-import { mapWithConcurrency } from "../concurrency";
 
-const CNBC_LATEST_VIDEO_URL = "https://www.cnbc.com/latest-video/";
-const CNBC_ARTICLE_META_TIMEOUT_MS = 2500;
+const CNBC_PUBLISHER = "CNBC";
+const CNBC_WEBQL_URL = "https://webql-redesign.cnbcfm.com/graphql";
+
+const CNBC_SEARCH_QUERY = `query search($tag: String, $page: Int!, $pageSize: Int!, $contentType: [assetTypeValues]!) {
+  search(tag: $tag, page: $page, pageSize: $pageSize, contentType: $contentType) {
+    assets: results {
+      id
+      type
+      url
+      datePublished
+      description
+      title
+      headline
+      contentClassification
+      section {
+        title
+        eyebrow
+      }
+    }
+  }
+}`;
 
 function parseCnbcVideoUrlYmd(url: string): string | null {
   const match = url.match(/\/video\/(\d{4})\/(\d{2})\/(\d{2})\//);
@@ -47,7 +64,7 @@ function buildCnbcVideoId(url: string): string {
   return `cnbc:${url}`;
 }
 
-async function fetchText(url: string, timeoutMs: number): Promise<string> {
+async function fetchJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
   if (timeoutMs <= 0) {
     throw new Error(`timeoutMs must be > 0, got ${timeoutMs} for ${url}`);
   }
@@ -55,17 +72,13 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "user-agent": "charlie-technicals/1.0 (+https://github.com/hapticPaper/charlie-technicals)"
-      }
-    });
+    const res = await fetch(url, { ...init, signal: controller.signal });
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} for ${url}`);
     }
-    return await res.text();
+
+    return await res.json();
   } catch (error) {
     if (
       typeof error === "object" &&
@@ -82,115 +95,150 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
   }
 }
 
-function uniqueInOrder(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const v of values) {
-    if (seen.has(v)) {
-      continue;
-    }
-    seen.add(v);
-    out.push(v);
-  }
-  return out;
-}
+type CnbcVideoAsset = {
+  id: number;
+  type: string;
+  url: string;
+  datePublished?: string | null;
+  description?: string | null;
+  title?: string | null;
+  headline?: string | null;
+  contentClassification?: string[] | null;
+  section?: {
+    title?: string | null;
+    eyebrow?: string | null;
+  } | null;
+};
+
+type CnbcSearchResponse = {
+  data?: {
+    search?: {
+      assets?: CnbcVideoAsset[] | null;
+    } | null;
+  };
+  errors?: Array<{ message?: string }>;
+};
 
 export class CnbcVideoProvider {
-  async fetchLatestVideoUrls(): Promise<string[]> {
-    const html = await fetchText(CNBC_LATEST_VIDEO_URL, 10_000);
-    const matches = html.match(
-      /https:\/\/www\.cnbc\.com\/video\/\d{4}\/\d{2}\/\d{2}\/[^"<> ]+\.html(?:\?[^"<> ]*)?/g
+  private async fetchSearchPage(page: number, pageSize: number): Promise<{ assets: CnbcVideoAsset[] }> {
+    const body = {
+      query: CNBC_SEARCH_QUERY,
+      variables: {
+        tag: null as string | null,
+        page,
+        pageSize,
+        contentType: ["cnbcvideo"] as string[]
+      }
+    };
+
+    const json = await fetchJson(
+      CNBC_WEBQL_URL,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "user-agent": "charlie-technicals/1.0 (+https://github.com/hapticPaper/charlie-technicals)"
+        },
+        body: JSON.stringify(body)
+      },
+      10_000
     );
 
-    if (!matches || matches.length === 0) {
-      const message = `[market:cnbc] no video URLs found at ${CNBC_LATEST_VIDEO_URL}`;
-      console.error(message);
-      throw new Error(message);
+    const parsed = json as CnbcSearchResponse;
+    if (parsed.errors && parsed.errors.length > 0) {
+      const message = parsed.errors.map((e) => e.message).filter(Boolean).join("; ");
+      throw new Error(message ? `[market:cnbc] GraphQL errors: ${message}` : "[market:cnbc] GraphQL errors");
     }
 
-    const urls = matches.map((u) => {
-      try {
-        const parsed = new URL(u);
-        parsed.search = "";
-        parsed.hash = "";
-        return parsed.toString();
-      } catch {
-        return u.split("?")[0] ?? u;
-      }
-    });
-
-    return uniqueInOrder(urls);
+    const assets = Array.isArray(parsed.data?.search?.assets) ? parsed.data.search.assets.filter(Boolean) : [];
+    return { assets };
   }
 
   async fetchNews(args: {
     asOfDate: string;
-    sincePublishedAt?: Date;
     maxUrls?: number;
   }): Promise<{ snapshot: MarketNewsSnapshot; totalUrls: number; keptUrls: number }> {
     const fetchedAt = new Date().toISOString();
 
-    const urls = await this.fetchLatestVideoUrls();
-    const capped = urls.slice(0, Math.max(1, args.maxUrls ?? 60));
+    const maxAssets = Math.max(200, args.maxUrls ?? 2000);
+    const pageSize = 100;
+    const maxPages = Math.max(1, Math.ceil(maxAssets / pageSize));
 
-    const sinceYmd = args.sincePublishedAt ? args.sincePublishedAt.toISOString().slice(0, 10) : null;
-
-    const prefiltered = sinceYmd
-      ? capped.filter((url) => {
-          const ymd = parseCnbcVideoUrlYmd(url);
-          return ymd === null ? true : ymd >= sinceYmd;
-        })
-      : capped;
-
-    const articles = await mapWithConcurrency(prefiltered, 4, async (url): Promise<MarketNewsArticle | null> => {
-      let meta: Awaited<ReturnType<typeof fetchArticleMeta>> | undefined;
-      try {
-        meta = await fetchArticleMeta(url, CNBC_ARTICLE_META_TIMEOUT_MS);
-      } catch {
-        meta = undefined;
+    const fetchedAssets: CnbcVideoAsset[] = [];
+    for (let page = 1; page <= maxPages; page += 1) {
+      if (fetchedAssets.length >= maxAssets) {
+        break;
       }
 
-      const title = meta?.title;
-      if (!title) {
-        return null;
+      const res = await this.fetchSearchPage(page, pageSize);
+      if (res.assets.length === 0) {
+        break;
       }
 
+      fetchedAssets.push(...res.assets);
+    }
+
+    const articles: MarketNewsArticle[] = [];
+    const seenUrls = new Set<string>();
+    for (const asset of fetchedAssets) {
+      if (asset.type !== "cnbcvideo") {
+        continue;
+      }
+
+      const url = asset.url;
+      if (seenUrls.has(url)) {
+        continue;
+      }
+      seenUrls.add(url);
       const ymd = parseCnbcVideoUrlYmd(url);
-      const fallbackDate = ymd ? new Date(`${ymd}T12:00:00Z`) : new Date(`${args.asOfDate}T12:00:00Z`);
 
-      const published = meta?.publishedTime ? parseCnbcTimestamp(meta.publishedTime) : null;
+      const published = asset.datePublished ? parseCnbcTimestamp(asset.datePublished) : null;
+      const fallbackDate = ymd ? new Date(`${ymd}T12:00:00Z`) : new Date(`${args.asOfDate}T12:00:00Z`);
       const publishedAtDate =
         published ?? (Number.isFinite(fallbackDate.getTime()) ? fallbackDate : new Date(`${args.asOfDate}T12:00:00Z`));
-      if (args.sincePublishedAt && publishedAtDate.getTime() <= args.sincePublishedAt.getTime()) {
-        return null;
+
+      const effectiveYmd = ymd ?? publishedAtDate.toISOString().slice(0, 10);
+      if (effectiveYmd !== args.asOfDate) {
+        continue;
       }
 
-      const publisher = "CNBC";
+      const title = asset.title ?? asset.headline;
+      if (!title) {
+        continue;
+      }
+
       const relatedTickers: string[] = [];
-      const topic = inferNewsTopic({ title, keywords: meta?.newsKeywords, tags: meta?.parselyTags });
+      const tags = [
+        asset.section?.title,
+        asset.section?.eyebrow,
+        ...(asset.contentClassification ?? [])
+      ].filter((tag): tag is string => typeof tag === "string" && tag.trim() !== "");
+
+      const topic = inferNewsTopic({ title, tags });
       const hype = scoreNewsHype(title);
       const mainIdea = buildNewsMainIdea(title);
       const summary = buildNewsSummary({
         title,
-        publisher,
-        description: meta?.description,
+        publisher: CNBC_PUBLISHER,
+        description: asset.description ?? undefined,
         relatedTickers
       });
 
-      return {
+      articles.push({
         id: buildCnbcVideoId(url),
         title,
         url,
-        publisher,
+        publisher: CNBC_PUBLISHER,
         publishedAt: publishedAtDate.toISOString(),
         relatedTickers,
         topic,
         hype,
         mainIdea,
         summary
-      };
-    });
+      });
+    }
 
-    const kept = articles.filter((a): a is MarketNewsArticle => a !== null);
+    const kept = articles;
     kept.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
     const snapshot: MarketNewsSnapshot = {
@@ -201,6 +249,6 @@ export class CnbcVideoProvider {
       articles: kept
     };
 
-    return { snapshot, totalUrls: capped.length, keptUrls: kept.length };
+    return { snapshot, totalUrls: fetchedAssets.length, keptUrls: kept.length };
   }
 }
