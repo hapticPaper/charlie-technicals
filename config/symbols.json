@@ -1,3 +1,3 @@
 {
-  "symbols": ["SPY", "QQQ", "IWM", "DIA", "^VIX", "VOLD", "ADD"]
+  "symbols": ["AMD", "NVDA", "SHOP", "AMZN", "IWM", "LYFT", "MSFT", "SPY", "ZM", "DDOG", "TWTR", "TSLA", "INTC", "ROKU", "NET", "CRM", "SPOT", "DIA", "GOOGL", "AAPL", "ADBE", "FSLY", "QQQ", "META", "^VIX", "$VOLD", "$ADD", "CRWD", "NFLX", "PYPL", "OKTA", "BABA", "MSTR", "ORCL", "DOCU", "PANW", "CSCO", "IBM", "SNAP", "SQ", "UBER"]
 }
