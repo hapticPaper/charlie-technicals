@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import path from "node:path";
 
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
-import type { AnalyzedSeries, MarketInterval, MarketReport, RawSeries } from "./types";
+import type { AnalyzedSeries, MarketInterval, MarketReport, MarketReportHighlights, RawSeries } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
@@ -148,6 +148,30 @@ export function getAnalyzedSeriesPath(date: string, symbol: string, interval: Ma
 
 export function getReportJsonPath(date: string): string {
   return path.join(getReportsDir(), `${date}.json`);
+}
+
+export function getReportHighlightsJsonPath(date: string): string {
+  return path.join(getReportsDir(), `${date}.highlights.json`);
+}
+
+export function toReportHighlights(report: MarketReport): MarketReportHighlights {
+  return {
+    version: "v2-highlights",
+    date: report.date,
+    generatedAt: report.generatedAt,
+    picks: report.picks.map((p) => ({
+      symbol: p.symbol,
+      trade: {
+        side: p.trade.side,
+        entry: p.trade.entry,
+        stop: p.trade.stop
+      }
+    })),
+    summaries: {
+      veryShort: report.summaries.veryShort,
+      mainIdea: report.summaries.mainIdea
+    }
+  };
 }
 
 export function getReportMdxPath(date: string): string {
@@ -366,13 +390,50 @@ export async function writeAnalyzedSeries(date: string, series: AnalyzedSeries):
 
 export async function writeReport(date: string, report: MarketReport, mdx: string): Promise<void> {
   const jsonPath = getReportJsonPath(date);
+  const highlightsPath = getReportHighlightsJsonPath(date);
   const mdxPath = getReportMdxPath(date);
   const jsonTmp = `${jsonPath}.tmp`;
+  const highlightsTmp = `${highlightsPath}.tmp`;
   const mdxTmp = `${mdxPath}.tmp`;
+
+  await Promise.allSettled([
+    rm(jsonTmp, { force: true }),
+    rm(highlightsTmp, { force: true }),
+    rm(mdxTmp, { force: true })
+  ]);
 
   await writeJson(jsonTmp, report);
   await writeFile(mdxTmp, mdx, "utf8");
 
-  await rename(jsonTmp, jsonPath);
-  await rename(mdxTmp, mdxPath);
+  let highlightsWritten = false;
+  try {
+    await writeJson(highlightsTmp, toReportHighlights(report));
+    highlightsWritten = true;
+  } catch (error) {
+    await rm(highlightsTmp, { force: true });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[market:storage] Failed writing highlights for ${date}: ${message}`);
+  }
+
+  // Each file swap is atomic, but cross-file atomicity is best-effort.
+  try {
+    await rename(jsonTmp, jsonPath);
+    await rename(mdxTmp, mdxPath);
+    if (highlightsWritten) {
+      try {
+        await rename(highlightsTmp, highlightsPath);
+      } catch (error) {
+        await rm(highlightsTmp, { force: true });
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[market:storage] Failed persisting highlights for ${date}: ${message}`);
+      }
+    }
+  } catch (error) {
+    await Promise.allSettled([
+      rm(jsonTmp, { force: true }),
+      rm(highlightsTmp, { force: true }),
+      rm(mdxTmp, { force: true })
+    ]);
+    throw error;
+  }
 }

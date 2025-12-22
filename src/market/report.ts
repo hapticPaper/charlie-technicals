@@ -411,22 +411,15 @@ function formatFrontmatterString(value: string): string {
 }
 
 export function buildReportMdx(report: MarketReport): string {
-  const symbols = Object.keys(report.series).sort();
-  const showIntervals: MarketInterval[] = ["1d", "15m"];
-
-  function formatList(values: string[], max: number): string {
-    if (values.length <= max) {
-      return values.join(", ");
-    }
-
-    return `${values.slice(0, max).join(", ")}, …`;
-  }
-
+  // Builds a lean MDX report focused on highlights and actionable picks.
+  // Picks render their own charts/indicator overlays; full universe/interval metadata and chart data are
+  // also available in the JSON report.
   const lines: string[] = [];
   lines.push("---");
   lines.push(`title: ${formatFrontmatterString(`Market Report: ${report.date}`)}`);
   lines.push(`date: ${formatFrontmatterString(report.date)}`);
   lines.push(`generatedAt: ${formatFrontmatterString(report.generatedAt)}`);
+  lines.push(`version: ${formatFrontmatterString("v2-highlights")}`);
   lines.push("---");
   lines.push("");
   lines.push("<ReportSummary />");
@@ -448,29 +441,12 @@ export function buildReportMdx(report: MarketReport): string {
 
   lines.push("## Universe");
   lines.push("");
-  lines.push(`Symbols: ${report.symbols.join(", ")}`);
+  lines.push("(Universe details live in the JSON report.)");
   lines.push("");
-  lines.push(`Intervals (shown): ${showIntervals.join(", ")}`);
-  lines.push("");
-
-  if (report.missingSymbols.length > 0) {
-    lines.push(
-      `Missing symbols (${report.missingSymbols.length}): ${formatList(report.missingSymbols, 12)}`
-    );
-    lines.push("");
-  }
-
   lines.push("## Charts");
   lines.push("");
-  for (const symbol of symbols) {
-    lines.push(`### ${symbol}`);
-    lines.push("");
-
-    for (const interval of showIntervals) {
-      lines.push(`<ReportCharts symbol="${symbol}" interval="${interval}" />`);
-      lines.push("");
-    }
-  }
+  lines.push("(Charts are rendered per-pick above; full series live in the JSON report.)");
+  lines.push("");
 
   return `${lines.join("\n")}\n`;
 }

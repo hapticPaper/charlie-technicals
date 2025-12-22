@@ -90,3 +90,16 @@ export type MarketReport = {
     summary: string;
   };
 };
+
+export type HighlightPick = {
+  symbol: string;
+  trade: Pick<TradePlan, "side" | "entry" | "stop">;
+};
+
+export type MarketReportHighlights = {
+  version: "v2-highlights";
+  date: string;
+  generatedAt: string;
+  picks: HighlightPick[];
+  summaries: Pick<MarketReport["summaries"], "veryShort" | "mainIdea">;
+};

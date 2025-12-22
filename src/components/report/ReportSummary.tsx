@@ -7,7 +7,7 @@ export function ReportSummary() {
 
   return (
     <section>
-      <h2>Summary</h2>
+      <h2>Highlights</h2>
 
       {report.picks.length > 0 ? (
         <>
@@ -26,15 +26,14 @@ export function ReportSummary() {
       ) : null}
 
       <p>
-        <strong>Very short:</strong> {report.summaries.veryShort}
-      </p>
-      <p>
         <strong>Main idea:</strong> {report.summaries.mainIdea}
       </p>
-      <div>
-        <strong>Summary:</strong>
+      <p className="report-muted">{report.summaries.veryShort}</p>
+
+      <details className="report-muted">
+        <summary>Full context</summary>
         <pre style={{ whiteSpace: "pre-wrap" }}>{report.summaries.summary}</pre>
-      </div>
+      </details>
     </section>
   );
 }
