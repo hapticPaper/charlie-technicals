@@ -229,50 +229,53 @@ export class YahooMarketDataProvider {
     }
 
     recent.sort((a, b) => b.providerPublishTime.getTime() - a.providerPublishTime.getTime());
-    const top = recent.slice(0, 3);
 
-    const deduped: typeof top = [];
+    const deduped: typeof recent = [];
     const seen = new Set<string>();
-    for (const n of top) {
+    for (const n of recent) {
       const key = `${n.link}::${n.title}`;
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
       deduped.push(n);
-    }
 
-    const articles: MarketNewsArticle[] = [];
-
-    for (const n of deduped) {
-      const url = n.link;
-      const title = n.title;
-      const publisher = n.publisher;
-      const publishedAt = n.providerPublishTime instanceof Date ? n.providerPublishTime.toISOString() : "";
-      const relatedTickers = clampRelatedTickers(n.relatedTickers, symbol);
-
-      let description: string | undefined;
-      try {
-        const meta = await fetchArticleMeta(url);
-        description = meta.description;
-      } catch {
-        description = undefined;
+      if (deduped.length >= 3) {
+        break;
       }
-
-      const mainIdea = buildNewsMainIdea(title);
-      const summary = buildNewsSummary({ title, publisher, description, relatedTickers });
-
-      articles.push({
-        id: n.uuid,
-        title,
-        url,
-        publisher,
-        publishedAt,
-        relatedTickers,
-        mainIdea,
-        summary
-      });
     }
+
+    const articles: MarketNewsArticle[] = await Promise.all(
+      deduped.map(async (n) => {
+        const url = n.link;
+        const title = n.title;
+        const publisher = n.publisher;
+        const publishedAt = n.providerPublishTime.toISOString();
+        const relatedTickers = clampRelatedTickers(n.relatedTickers, symbol);
+
+        let description: string | undefined;
+        try {
+          const meta = await fetchArticleMeta(url);
+          description = meta.description;
+        } catch {
+          description = undefined;
+        }
+
+        const mainIdea = buildNewsMainIdea(title);
+        const summary = buildNewsSummary({ title, publisher, description, relatedTickers });
+
+        return {
+          id: n.uuid,
+          title,
+          url,
+          publisher,
+          publishedAt,
+          relatedTickers,
+          mainIdea,
+          summary
+        };
+      })
+    );
 
     return {
       symbol,

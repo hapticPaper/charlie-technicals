@@ -299,6 +299,12 @@ export async function writeNewsSnapshot(
   date: string,
   snapshot: MarketNewsSnapshot
 ): Promise<WriteNewsSnapshotResult> {
+  if (snapshot.asOfDate !== date) {
+    throw new Error(
+      `[market:storage] News snapshot asOfDate mismatch for ${snapshot.symbol}: snapshot.asOfDate=${snapshot.asOfDate}, pathDate=${date}`
+    );
+  }
+
   const filePath = getNewsPath(date, snapshot.symbol);
   const tmpPath = `${filePath}.tmp`;
 

@@ -1,5 +1,9 @@
 import { parseIsoDateYmd } from "./date";
 
+const MAIN_IDEA_MAX_WORDS = 50;
+const SUMMARY_MAX_WORDS = 500;
+const SUMMARY_TAIL_BUDGET_WORDS = 30;
+
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
@@ -15,6 +19,10 @@ function truncateWords(text: string, maxWords: number): string {
 }
 
 async function fetchText(url: string, timeoutMs: number): Promise<string> {
+  if (timeoutMs <= 0) {
+    throw new Error(`timeoutMs must be > 0, got ${timeoutMs} for ${url}`);
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -26,9 +34,20 @@ async function fetchText(url: string, timeoutMs: number): Promise<string> {
     });
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+      throw new Error(`HTTP ${res.status} for ${url}`);
     }
     return await res.text();
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "name" in error &&
+      (error as { name?: unknown }).name === "AbortError"
+    ) {
+      throw new Error(`Timed out after ${timeoutMs}ms for ${url}`);
+    }
+
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
@@ -40,6 +59,7 @@ type HtmlMeta = {
 };
 
 function parseHtmlMeta(html: string): HtmlMeta {
+  // Best-effort regex parser. It's OK if this fails quietly (we fall back to headline-only summaries).
   const metas = html.match(/<meta\b[^>]*>/gi) ?? [];
   const map = new Map<string, string>();
 
@@ -81,14 +101,17 @@ export async function fetchArticleMeta(url: string): Promise<HtmlMeta> {
 }
 
 export function isRecentNews(args: { asOfDate: string; publishedAt: Date; maxAgeDays: number }): boolean {
+  // Window is the last `maxAgeDays` calendar days (UTC), inclusive of `asOfDate`.
   const { year, month, day } = parseIsoDateYmd(args.asOfDate);
-  const endOfDayUtc = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-  const start = new Date(endOfDayUtc.getTime() - args.maxAgeDays * 24 * 60 * 60 * 1000);
-  return args.publishedAt.getTime() >= start.getTime() && args.publishedAt.getTime() <= endOfDayUtc.getTime();
+  const asOfStartUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  const start = new Date(asOfStartUtc.getTime() - (args.maxAgeDays - 1) * 24 * 60 * 60 * 1000);
+  const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+  const ts = args.publishedAt.getTime();
+  return ts >= start.getTime() && ts <= end.getTime();
 }
 
 export function buildNewsMainIdea(title: string): string {
-  return truncateWords(title, 50);
+  return truncateWords(title, MAIN_IDEA_MAX_WORDS);
 }
 
 export function buildNewsSummary(args: {
@@ -97,19 +120,16 @@ export function buildNewsSummary(args: {
   description?: string;
   relatedTickers: string[];
 }): string {
-  const parts: string[] = [];
+  const base = args.description
+    ? `${args.publisher}: ${args.title}. ${args.description}`
+    : `${args.publisher}: ${args.title.replace(/\.*$/, "")}.`;
 
-  if (args.description) {
-    parts.push(`${args.publisher}: ${args.description}`);
-  } else {
-    parts.push(`${args.publisher}: ${args.title.replace(/\.*$/, "")}.`);
-  }
-
+  let summary = truncateWords(base, SUMMARY_MAX_WORDS - SUMMARY_TAIL_BUDGET_WORDS);
   if (args.relatedTickers.length > 0) {
-    parts.push(`Related tickers mentioned: ${args.relatedTickers.join(", ")}.`);
+    summary = `${summary} Related tickers mentioned: ${args.relatedTickers.join(", ")}.`;
   }
 
-  return truncateWords(parts.join(" "), 500);
+  return truncateWords(summary, SUMMARY_MAX_WORDS);
 }
 
 export function clampRelatedTickers(tickers: string[] | undefined, symbol: string): string[] {
