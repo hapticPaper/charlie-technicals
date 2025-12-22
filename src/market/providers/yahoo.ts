@@ -1,5 +1,6 @@
 import YahooFinance from "yahoo-finance2";
 
+import { parseIsoDateYmd } from "../date";
 import type { MarketBar, MarketInterval, RawSeries } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -23,6 +24,9 @@ function lookbackDaysFor(interval: MarketInterval): number {
 // This returns the max number of days we can safely request for each interval.
 // `null` means we don't enforce a strict provider retention cap.
 function yahooRetentionDaysFor(interval: MarketInterval): number | null {
+  // Observed provider errors when requesting >= 60 calendar days for 5m/15m intervals:
+  // "The requested range must be within the last 60 days".
+  // Using 59 days avoids edge/off-by-one issues around partial days.
   switch (interval) {
     case "1m":
       return 7;
@@ -105,15 +109,33 @@ export class YahooMarketDataProvider {
     const fetchedAt = new Date().toISOString();
     const yahooInterval = interval;
 
+    const now = Date.now();
+
     const retentionDays = yahooRetentionDaysFor(interval);
 
-    const requestedPeriod2 = asOfDate ? new Date(`${asOfDate}T23:59:59.999Z`) : new Date();
+    let requestedPeriod2: Date;
+    if (asOfDate) {
+      let parsed;
+      try {
+        parsed = parseIsoDateYmd(asOfDate);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`[yahoo:fetchSeries] Invalid asOfDate '${asOfDate}': ${message}`);
+      }
+
+      const { year, month, day } = parsed;
+      requestedPeriod2 = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    } else {
+      requestedPeriod2 = new Date(now);
+    }
     // For intraday requests, clamp `period2` to "now" to avoid asking Yahoo for future bars.
     const period2 =
       retentionDays !== null
-        ? new Date(Math.min(requestedPeriod2.getTime(), Date.now()))
+        ? new Date(Math.min(requestedPeriod2.getTime(), now))
         : requestedPeriod2;
-    const desiredPeriod1 = new Date(period2.getTime() - lookbackDaysFor(interval) * DAY_MS);
+    const lookbackDays =
+      retentionDays !== null ? Math.min(lookbackDaysFor(interval), retentionDays) : lookbackDaysFor(interval);
+    const desiredPeriod1 = new Date(period2.getTime() - lookbackDays * DAY_MS);
 
     let period1 = desiredPeriod1;
 
@@ -121,7 +143,7 @@ export class YahooMarketDataProvider {
     // When backfilling recent dates, clamp `period1` into the supported window to avoid
     // hard failures like: "The requested range must be within the last 60 days".
     if (retentionDays !== null) {
-      const oldestAllowedPeriod1 = new Date(Date.now() - retentionDays * DAY_MS);
+      const oldestAllowedPeriod1 = new Date(now - retentionDays * DAY_MS);
 
       if (period2.getTime() < oldestAllowedPeriod1.getTime()) {
         return {

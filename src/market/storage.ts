@@ -1,6 +1,7 @@
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
 import type { AnalyzedSeries, MarketInterval, MarketReport, RawSeries } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
@@ -13,8 +14,8 @@ export function getContentDir(): string {
   return CONTENT_DIR;
 }
 
-export function getDataDir(date: string): string {
-  return path.join(CONTENT_DIR, "data", date);
+export function getDataDir(): string {
+  return path.join(CONTENT_DIR, "data");
 }
 
 export function getAnalysisDir(date: string): string {
@@ -25,8 +26,120 @@ export function getReportsDir(): string {
   return path.join(CONTENT_DIR, "reports");
 }
 
+export function getRawSeriesDir(symbol: string, interval: MarketInterval): string {
+  return path.join(getDataDir(), safeSymbol(symbol), interval);
+}
+
 export function getRawSeriesPath(date: string, symbol: string, interval: MarketInterval): string {
-  return path.join(getDataDir(date), `${safeSymbol(symbol)}.${interval}.json`);
+  const fileDate = formatRawDataFileDate(date);
+  return path.join(getRawSeriesDir(symbol, interval), `${fileDate}.json`);
+}
+
+async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
+  const lockPath = `${filePath}.lock`;
+  const start = Date.now();
+  const timeoutMs = 5000;
+
+  for (;;) {
+    try {
+      await mkdir(lockPath);
+      break;
+    } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+
+      if (code !== "EEXIST") {
+        throw error;
+      }
+      if (Date.now() - start > timeoutMs) {
+        console.error(
+          `[market:storage] Lock timeout for ${filePath}; possible stale lock at ${lockPath}`
+        );
+        throw new Error(`Timed out acquiring lock for ${filePath}`);
+      }
+
+      await new Promise((r) => setTimeout(r, 25));
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    await rm(lockPath, { recursive: true, force: true });
+  }
+}
+
+function mergeBars(
+  existing: RawSeries["bars"],
+  incoming: RawSeries["bars"]
+): RawSeries["bars"] {
+  // `t` must be ISO-8601 so `localeCompare` keeps chronological ordering.
+  const ensureSorted = (bars: RawSeries["bars"], label: string): RawSeries["bars"] => {
+    for (let idx = 1; idx < bars.length; idx += 1) {
+      if (bars[idx - 1].t.localeCompare(bars[idx].t) > 0) {
+        console.error(
+          `[market:storage] Non-monotonic bar timestamps detected in ${label}; sorting before merge`
+        );
+        return [...bars].sort((a, b) => a.t.localeCompare(b.t));
+      }
+    }
+
+    return bars;
+  };
+
+  const left = ensureSorted(existing, "existing");
+  const right = ensureSorted(incoming, "incoming");
+
+  const out: RawSeries["bars"] = [];
+  let i = 0;
+  let j = 0;
+
+  function pushBar(bar: RawSeries["bars"][number]): void {
+    const last = out[out.length - 1];
+    if (last?.t === bar.t) {
+      out[out.length - 1] = bar;
+      return;
+    }
+
+    out.push(bar);
+  }
+
+  while (i < left.length && j < right.length) {
+    const e = left[i];
+    const n = right[j];
+    const cmp = e.t.localeCompare(n.t);
+
+    if (cmp < 0) {
+      pushBar(e);
+      i += 1;
+      continue;
+    }
+
+    if (cmp > 0) {
+      pushBar(n);
+      j += 1;
+      continue;
+    }
+
+    // Same timestamp: prefer incoming.
+    pushBar(n);
+    i += 1;
+    j += 1;
+  }
+
+  while (i < left.length) {
+    pushBar(left[i]);
+    i += 1;
+  }
+
+  while (j < right.length) {
+    pushBar(right[j]);
+    j += 1;
+  }
+
+  return out;
 }
 
 export function getAnalyzedSeriesPath(date: string, symbol: string, interval: MarketInterval): string {
@@ -42,7 +155,7 @@ export function getReportMdxPath(date: string): string {
 }
 
 export async function ensureDirs(date: string): Promise<void> {
-  await mkdir(getDataDir(date), { recursive: true });
+  await mkdir(getDataDir(), { recursive: true });
   await mkdir(getAnalysisDir(date), { recursive: true });
   await mkdir(getReportsDir(), { recursive: true });
 }
@@ -90,7 +203,130 @@ export async function listReportDates(): Promise<string[]> {
 }
 
 export async function writeRawSeries(date: string, series: RawSeries): Promise<void> {
-  await writeJson(getRawSeriesPath(date, series.symbol, series.interval), series);
+  const filePath = getRawSeriesPath(date, series.symbol, series.interval);
+  const tmpPath = `${filePath}.tmp`;
+
+  await mkdir(path.dirname(filePath), { recursive: true });
+
+  await withFileLock(filePath, async () => {
+    let next = series;
+
+    try {
+      const existing = await readJson<RawSeries>(filePath);
+
+      const nextFetchedAt =
+        existing.fetchedAt.localeCompare(series.fetchedAt) >= 0
+          ? existing.fetchedAt
+          : series.fetchedAt;
+      next = {
+        symbol: series.symbol,
+        interval: series.interval,
+        provider: series.provider,
+        fetchedAt: nextFetchedAt,
+        bars: mergeBars(existing.bars, series.bars)
+      };
+    } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+
+      if (code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    await writeJson(tmpPath, next);
+    await rename(tmpPath, filePath);
+  });
+}
+
+export type RawSeriesWindowLoadResult =
+  | { status: "ok"; selectedFiles: string[]; series: RawSeries }
+  | { status: "not_found"; selectedFiles: string[] }
+  | { status: "insufficient_window"; selectedFiles: string[]; requiredMinFiles: number };
+
+export async function loadRawSeriesWindow(
+  date: string,
+  symbol: string,
+  interval: MarketInterval
+): Promise<RawSeriesWindowLoadResult> {
+  const requirement = rawDataWindowRequirementFor(interval);
+  const dir = getRawSeriesDir(symbol, interval);
+  const target = formatRawDataFileDate(date);
+
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return { status: "not_found", selectedFiles: [] };
+    }
+
+    throw error;
+  }
+
+  const files = entries
+    .filter((e) => e.endsWith(".json"))
+    .map((e) => e.replace(/\.json$/, ""))
+    .filter((d) => /^\d{8}$/.test(d))
+    .filter((d) => d <= target)
+    .sort();
+
+  if (!files.includes(target)) {
+    return { status: "not_found", selectedFiles: [] };
+  }
+
+  const startIndex = Math.max(0, files.length - requirement.idealFiles);
+  const selected = files.slice(startIndex);
+  if (selected.length < requirement.minFiles) {
+    return {
+      status: selected.length === 0 ? "not_found" : "insufficient_window",
+      selectedFiles: selected,
+      requiredMinFiles: requirement.minFiles
+    };
+  }
+
+  let provider = "yahoo-finance";
+  let fetchedAt = "";
+  let bars: RawSeries["bars"] = [];
+  for (const fileDate of selected) {
+    const raw = await readJson<RawSeries>(path.join(dir, `${fileDate}.json`));
+
+    if (raw.symbol !== symbol || raw.interval !== interval) {
+      throw new Error(
+        `[market:loadRawSeriesWindow] Mismatched series metadata in ${symbol}/${interval} ${fileDate}: expected ${symbol}/${interval}, got ${raw.symbol}/${raw.interval}`
+      );
+    }
+
+    if (provider !== "yahoo-finance" && provider !== raw.provider) {
+      throw new Error(
+        `[market:loadRawSeriesWindow] Multiple providers for ${symbol} ${interval}: ${provider} and ${raw.provider}`
+      );
+    }
+
+    provider = raw.provider;
+    // ISO strings preserve chronological ordering under lexicographic compare.
+    fetchedAt = fetchedAt === "" ? raw.fetchedAt : fetchedAt.localeCompare(raw.fetchedAt) >= 0 ? fetchedAt : raw.fetchedAt;
+    bars = mergeBars(bars, raw.bars);
+  }
+
+  return {
+    status: "ok",
+    selectedFiles: selected,
+    series: {
+      symbol,
+      interval,
+      provider,
+      fetchedAt,
+      bars
+    }
+  };
 }
 
 export async function writeAnalyzedSeries(date: string, series: AnalyzedSeries): Promise<void> {
