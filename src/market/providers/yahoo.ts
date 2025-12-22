@@ -215,7 +215,22 @@ export class YahooMarketDataProvider {
 
     const items = Array.isArray(res.news) ? res.news : [];
     const recent = items
-      .filter((n) => n.providerPublishTime instanceof Date)
+      .map((n) => {
+        const publishTime = n.providerPublishTime as unknown;
+        const publishedAt =
+          publishTime instanceof Date
+            ? publishTime
+            : typeof publishTime === "number"
+              ? new Date(publishTime * 1000)
+              : undefined;
+
+        if (!publishedAt || !Number.isFinite(publishedAt.getTime())) {
+          return null;
+        }
+
+        return { ...n, providerPublishTime: publishedAt };
+      })
+      .filter((n): n is (typeof items)[number] => n !== null)
       .filter((n) => isRecentNews({ asOfDate, publishedAt: n.providerPublishTime, maxAgeDays: 14 }));
 
     if (recent.length === 0) {

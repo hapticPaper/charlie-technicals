@@ -93,7 +93,8 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   const written = seriesResults.filter((r) => r.status === "written").length;
   const skippedExisting = seriesResults.filter((r) => r.status === "skipped_existing").length;
 
-  const newsConcurrency = Math.min(opts.concurrency ?? 4, 2);
+  const baseConcurrency = opts.concurrency ?? 4;
+  const newsConcurrency = Math.max(1, Math.min(Math.floor(baseConcurrency / 2), 4));
 
   const newsResults = await mapWithConcurrency(symbols, { concurrency: newsConcurrency }, async (symbol) => {
     try {

@@ -3,6 +3,7 @@ import { parseIsoDateYmd } from "./date";
 const MAIN_IDEA_MAX_WORDS = 50;
 const SUMMARY_MAX_WORDS = 500;
 const SUMMARY_TAIL_BUDGET_WORDS = 30;
+const DEFAULT_ARTICLE_META_TIMEOUT_MS = 2000;
 
 function normalizeText(text: string): string {
   return text
@@ -105,8 +106,11 @@ function parseHtmlMeta(html: string): HtmlMeta {
   };
 }
 
-export async function fetchArticleMeta(url: string): Promise<HtmlMeta> {
-  const html = await fetchText(url, 4000);
+export async function fetchArticleMeta(
+  url: string,
+  timeoutMs = DEFAULT_ARTICLE_META_TIMEOUT_MS
+): Promise<HtmlMeta> {
+  const html = await fetchText(url, timeoutMs);
   return parseHtmlMeta(html);
 }
 
