@@ -1,9 +1,43 @@
 import YahooFinance from "yahoo-finance2";
 
 import { parseIsoDateYmd } from "../date";
-import type { MarketBar, MarketInterval, RawSeries } from "../types";
+import {
+  buildNewsMainIdea,
+  buildNewsSummary,
+  clampRelatedTickers,
+  fetchArticleMeta,
+  isRecentNews
+} from "../news";
+import type { MarketBar, MarketInterval, MarketNewsArticle, MarketNewsSnapshot, RawSeries } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const NEWS_SEARCH_MIN_INTERVAL_MS = 350;
+const NEWS_SEARCH_MAX_RETRIES = 5;
+const NEWS_SEARCH_BASE_BACKOFF_MS = 750;
+const NEWS_SEARCH_MAX_BACKOFF_MS = 5_000;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isYahooRateLimitError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const status = "status" in error ? (error as { status?: unknown }).status : undefined;
+    const statusCode =
+      "statusCode" in error ? (error as { statusCode?: unknown }).statusCode : undefined;
+    const responseStatus =
+      "response" in error &&
+      typeof (error as { response?: unknown }).response === "object" &&
+      (error as { response?: { status?: unknown } }).response?.status;
+
+    if (status === 429 || statusCode === 429 || responseStatus === 429) {
+      return true;
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(too many requests|http\s*429|status\s*code\s*429)\b/i.test(message);
+}
 
 function lookbackDaysFor(interval: MarketInterval): number {
   switch (interval) {
@@ -100,9 +134,33 @@ function maxBarsFor(interval: MarketInterval): number {
 
 export class YahooMarketDataProvider {
   readonly #yf: InstanceType<typeof YahooFinance>;
+  #newsSearchQueue: Promise<void> = Promise.resolve();
+  #lastNewsSearchAtMs = 0;
 
   constructor() {
     this.#yf = new YahooFinance();
+  }
+
+  async #withNewsSearchRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.#newsSearchQueue;
+    let release: (() => void) | undefined;
+    this.#newsSearchQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await prev;
+
+    const waitMs = this.#lastNewsSearchAtMs + NEWS_SEARCH_MIN_INTERVAL_MS - Date.now();
+    if (waitMs > 0) {
+      await sleepMs(waitMs);
+    }
+    this.#lastNewsSearchAtMs = Date.now();
+
+    try {
+      return await fn();
+    } finally {
+      release?.();
+    }
   }
 
   async fetchSeries(symbol: string, interval: MarketInterval, asOfDate?: string): Promise<RawSeries> {
@@ -193,6 +251,122 @@ export class YahooMarketDataProvider {
       provider: "yahoo-finance",
       fetchedAt,
       bars: cappedBars
+    };
+  }
+
+  async fetchNews(symbol: string, asOfDate: string): Promise<MarketNewsSnapshot> {
+    const fetchedAt = new Date().toISOString();
+
+    const res = await this.#withNewsSearchRateLimit(async () => {
+      for (let attempt = 0; attempt < NEWS_SEARCH_MAX_RETRIES; attempt += 1) {
+        try {
+          return await this.#yf.search(symbol, {
+            quotesCount: 0,
+            newsCount: 10,
+            region: "US",
+            lang: "en-US"
+          });
+        } catch (error) {
+          if (!isYahooRateLimitError(error) || attempt === NEWS_SEARCH_MAX_RETRIES - 1) {
+            throw error;
+          }
+
+          const backoffMs = Math.min(
+            NEWS_SEARCH_BASE_BACKOFF_MS * 2 ** attempt,
+            NEWS_SEARCH_MAX_BACKOFF_MS
+          );
+          await sleepMs(backoffMs);
+        }
+      }
+
+      throw new Error("Unreachable: retry loop exhausted without returning or throwing");
+    });
+
+    const items = Array.isArray(res.news) ? res.news : [];
+    const recent = items
+      .map((n) => {
+        const publishTime = n.providerPublishTime as unknown;
+        const publishedAt =
+          publishTime instanceof Date
+            ? publishTime
+            : typeof publishTime === "number"
+              ? new Date(publishTime * 1000)
+              : undefined;
+
+        if (!publishedAt || !Number.isFinite(publishedAt.getTime())) {
+          return null;
+        }
+
+        return { ...n, providerPublishTime: publishedAt };
+      })
+      .filter((n): n is (typeof items)[number] => n !== null)
+      .filter((n) => isRecentNews({ asOfDate, publishedAt: n.providerPublishTime, maxAgeDays: 14 }));
+
+    if (recent.length === 0) {
+      return {
+        symbol,
+        provider: "yahoo-finance",
+        fetchedAt,
+        asOfDate,
+        articles: []
+      };
+    }
+
+    recent.sort((a, b) => b.providerPublishTime.getTime() - a.providerPublishTime.getTime());
+
+    const deduped: typeof recent = [];
+    const seen = new Set<string>();
+    for (const n of recent) {
+      const key = `${n.link}::${n.title}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push(n);
+
+      if (deduped.length >= 3) {
+        break;
+      }
+    }
+
+    const articles: MarketNewsArticle[] = await Promise.all(
+      deduped.map(async (n) => {
+        const url = n.link;
+        const title = n.title;
+        const publisher = n.publisher;
+        const publishedAt = n.providerPublishTime.toISOString();
+        const relatedTickers = clampRelatedTickers(n.relatedTickers, symbol);
+
+        let description: string | undefined;
+        try {
+          const meta = await fetchArticleMeta(url);
+          description = meta.description;
+        } catch {
+          description = undefined;
+        }
+
+        const mainIdea = buildNewsMainIdea(title);
+        const summary = buildNewsSummary({ title, publisher, description, relatedTickers });
+
+        return {
+          id: n.uuid,
+          title,
+          url,
+          publisher,
+          publishedAt,
+          relatedTickers,
+          mainIdea,
+          summary
+        };
+      })
+    );
+
+    return {
+      symbol,
+      provider: "yahoo-finance",
+      fetchedAt,
+      asOfDate,
+      articles
     };
   }
 }

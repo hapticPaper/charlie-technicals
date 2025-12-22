@@ -25,6 +25,31 @@ export type RawSeries = {
   bars: MarketBar[];
 };
 
+/**
+* Persisted news article used by analysis and visualization.
+*/
+export type MarketNewsArticle = {
+  id: string;
+  title: string;
+  url: string;
+  publisher: string;
+  publishedAt: string;
+  relatedTickers: string[];
+  mainIdea: string;
+  summary: string;
+};
+
+/**
+* Daily snapshot serialized to content/data/<SYMBOL>/news/<YYYYMMDD>.json.
+*/
+export type MarketNewsSnapshot = {
+  symbol: string;
+  provider: string;
+  fetchedAt: string;
+  asOfDate: string;
+  articles: MarketNewsArticle[];
+};
+
 export type SignalHit = {
   id: string;
   label: string;
