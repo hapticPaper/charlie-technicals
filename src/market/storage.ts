@@ -481,6 +481,7 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
       try {
         await rename(highlightsTmp, highlightsPath);
       } catch (error) {
+        // Highlights are a derived cache. Prefer a missing cache over a potentially stale cache.
         await Promise.allSettled([
           rm(highlightsTmp, { force: true }),
           rm(highlightsPath, { force: true })
