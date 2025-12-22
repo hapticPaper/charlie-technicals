@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { ReportCharts } from "../../../components/report/ReportCharts";
+import { CnbcVideoWidget } from "../../../components/report/CnbcVideoWidget";
 import { ReportPick } from "../../../components/report/ReportPick";
 import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
@@ -72,7 +73,7 @@ export default async function ReportPage(props: ReportPageProps) {
 
   let content: ReactNode;
   try {
-    const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts, ReportPick });
+    const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts, ReportPick, CnbcVideoWidget });
     content = res.content;
   } catch (error) {
     try {
