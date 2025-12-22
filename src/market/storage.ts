@@ -117,37 +117,11 @@ export async function listAnalysisDates(): Promise<string[]> {
     throw error;
   }
 
-  const dates: string[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-
-    const name = entry.name;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
-      continue;
-    }
-
-    try {
-      const files = await readdir(getAnalysisDir(name));
-      if (files.includes("index.mdx") && files.includes("summary.json")) {
-        dates.push(name);
-      }
-    } catch (error) {
-      const code =
-        typeof error === "object" && error !== null && "code" in error
-          ? (error as { code?: unknown }).code
-          : undefined;
-
-      if (code === "ENOENT") {
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  return dates.sort();
+  return entries
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
+    .sort();
 }
 
 export async function writeRawSeries(date: string, series: RawSeries): Promise<void> {
@@ -176,6 +150,8 @@ export async function writeAnalysisPage(date: string, summary: MarketAnalysisSum
   const mdxPath = getAnalysisMdxPath(date);
   const jsonTmp = `${jsonPath}.tmp`;
   const mdxTmp = `${mdxPath}.tmp`;
+
+  await mkdir(path.dirname(jsonPath), { recursive: true });
 
   await writeJson(jsonTmp, summary);
   await writeFile(mdxTmp, mdx, "utf8");

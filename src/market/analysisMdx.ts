@@ -1,6 +1,7 @@
 import type { MarketAnalysisSummary } from "./types";
 
 export function buildAnalysisMdx(summary: MarketAnalysisSummary): string {
+  const symbols = [...summary.symbols].sort();
   const lines: string[] = [];
   lines.push("---");
   lines.push(`title: "Market Analysis: ${summary.date}"`);
@@ -14,7 +15,7 @@ export function buildAnalysisMdx(summary: MarketAnalysisSummary): string {
   lines.push("");
   lines.push("## Universe");
   lines.push("");
-  lines.push(`Symbols: ${summary.symbols.join(", ")}`);
+  lines.push(`Symbols: ${symbols.join(", ")}`);
   lines.push("");
   lines.push(`Intervals: ${summary.intervals.join(", ")}`);
   lines.push("");
@@ -24,7 +25,7 @@ export function buildAnalysisMdx(summary: MarketAnalysisSummary): string {
     lines.push("");
   }
 
-  for (const symbol of summary.symbols) {
+  for (const symbol of symbols) {
     const byInterval = summary.series[symbol];
     if (!byInterval) {
       continue;
