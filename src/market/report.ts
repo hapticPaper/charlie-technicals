@@ -152,6 +152,7 @@ export function buildMarketReport(args: {
 }
 
 function formatFrontmatterString(value: string): string {
+  // Centralized frontmatter escaping; currently uses JSON-style quoting.
   return JSON.stringify(value);
 }
 

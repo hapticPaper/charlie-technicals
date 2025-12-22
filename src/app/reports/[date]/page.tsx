@@ -11,7 +11,13 @@ import { renderMdx } from "../../../lib/mdx";
 import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
 import type { MarketReport } from "../../../market/types";
 
-type ReportPageProps = { params: { date: string } };
+type ReportPageParams = { date: string };
+type ReportPageProps = { params: ReportPageParams | PromiseLike<ReportPageParams> };
+
+async function normalizeParams(params: ReportPageProps["params"]): Promise<ReportPageParams> {
+  // Next (Turbopack) may pass `params` as a thenable during prerendering.
+  return await params;
+}
 
 function getReportTitle(date: string): string {
   return `Market Report: ${date}`;
@@ -23,15 +29,13 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(props: ReportPageProps): Promise<Metadata> {
-  // Next (Turbopack) may pass `params` as a thenable during prerendering.
-  const { date } = await props.params;
+  const { date } = await normalizeParams(props.params);
 
   return { title: getReportTitle(date) };
 }
 
 export default async function ReportPage(props: ReportPageProps) {
-  // Next (Turbopack) may pass `params` as a thenable during prerendering.
-  const { date } = await props.params;
+  const { date } = await normalizeParams(props.params);
 
   let report: MarketReport;
   let mdxRaw: string;
