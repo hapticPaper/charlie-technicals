@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Dirent } from "node:fs";
@@ -129,9 +129,10 @@ export async function listAnalysisDates(): Promise<string[]> {
     }
 
     try {
-      await access(getAnalysisMdxPath(name));
-      await access(getAnalysisSummaryJsonPath(name));
-      dates.push(name);
+      const files = await readdir(getAnalysisDir(name));
+      if (files.includes("index.mdx") && files.includes("summary.json")) {
+        dates.push(name);
+      }
     } catch (error) {
       const code =
         typeof error === "object" && error !== null && "code" in error
