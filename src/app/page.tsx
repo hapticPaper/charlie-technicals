@@ -63,9 +63,12 @@ function badgeClassForSide(side: TradeSide): string {
       return styles.badgeBuy;
     case "sell":
       return styles.badgeSell;
-    default:
-      console.error(`[home] Unexpected trade side: ${String(side)}`);
+    default: {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[home] Unexpected trade side: ${String(side)}`);
+      }
       return styles.badgeNeutral;
+    }
   }
 }
 
