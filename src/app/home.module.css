@@ -1,0 +1,102 @@
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.card {
+  display: block;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface);
+  border-radius: 16px;
+  padding: 14px 14px 12px;
+  text-decoration: none;
+}
+
+.card:hover {
+  border-color: color-mix(in srgb, #fff 20%, var(--rp-border));
+  background: color-mix(in srgb, var(--rp-surface) 70%, rgba(255, 255, 255, 0.08));
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.date {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--rp-muted);
+}
+
+.mainIdea {
+  margin: 10px 0 0;
+  color: var(--rp-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.picks {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.pickRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.badgeBuy,
+.badgeSell,
+.badgeNeutral {
+  border: 1px solid var(--rp-border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.badgeBuy {
+  background: color-mix(in srgb, var(--rp-bull) 18%, transparent);
+  border-color: color-mix(in srgb, var(--rp-bull) 36%, var(--rp-border));
+}
+
+.badgeSell {
+  background: color-mix(in srgb, var(--rp-bear) 18%, transparent);
+  border-color: color-mix(in srgb, var(--rp-bear) 36%, var(--rp-border));
+}
+
+.badgeNeutral {
+  color: var(--rp-muted);
+}
+
+.pickText {
+  font-size: 13px;
+}
+
+.pickEntry {
+  font-size: 12px;
+  color: var(--rp-muted);
+}
+
+.pickStop {
+  font-size: 12px;
+  color: var(--rp-muted);
+}
