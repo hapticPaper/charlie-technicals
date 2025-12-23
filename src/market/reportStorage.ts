@@ -90,17 +90,23 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const asOfDate = normalizeCnbcAsOfDate(date);
+  let asOfDate: string;
+  try {
+    asOfDate = normalizeCnbcAsOfDate(date);
+  } catch (error) {
+    throw new Error(
+      `[market:reportStorage] Failed to normalize CNBC asOfDate for readCnbcVideoArticles. input=${date}`,
+      { cause: error }
+    );
+  }
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    let articleAsOfDate = article.asOfDate;
-    if (articleAsOfDate !== asOfDate) {
-      articleAsOfDate = normalizeCnbcAsOfDate(articleAsOfDate);
-    }
+    const articleAsOfDate =
+      article.asOfDate === asOfDate ? article.asOfDate : normalizeCnbcAsOfDate(article.asOfDate);
 
     if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
       throw new Error(
