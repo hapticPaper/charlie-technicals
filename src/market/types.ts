@@ -73,6 +73,8 @@ export type StoredCnbcVideoArticle = MarketNewsArticle & {
 * In-memory shape for CNBC video articles.
 *
 * `provider` is implied by the file path and omitted here.
+* `symbol` is the primary ticker symbol for the video when exactly one can be inferred;
+* otherwise it's `null`.
 */
 export type CnbcVideoArticle = MarketNewsArticle & {
   fetchedAt: string;

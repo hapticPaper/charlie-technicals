@@ -255,6 +255,14 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
         })}`
       );
     }
+
+    if (article.symbol !== null && typeof article.symbol !== "string") {
+      throw new Error(
+        `[market:storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
+          symbol: article.symbol
+        })}`
+      );
+    }
   }
 
   // Legacy snapshots persisted `symbol: "cnbc"` on each record; normalize that to `null`.
@@ -376,23 +384,27 @@ function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArti
     );
   }
 
-  return snapshot.articles.map((article) => ({
-    // Intentional explicit mapping to keep the persisted CNBC schema stable and obvious.
-    id: article.id,
-    title: article.title,
-    url: article.url,
-    publisher: article.publisher,
-    publishedAt: article.publishedAt,
-    relatedTickers: article.relatedTickers,
-    topic: article.topic,
-    hype: article.hype,
-    mainIdea: article.mainIdea,
-    summary: article.summary,
-    symbol: article.relatedTickers.length === 1 ? article.relatedTickers[0] ?? null : null,
-    provider: snapshot.provider,
-    fetchedAt: snapshot.fetchedAt,
-    asOfDate: snapshot.asOfDate
-  }));
+  return snapshot.articles.map((article) => {
+    const uniqRelatedTickers = Array.from(new Set(article.relatedTickers));
+
+    return {
+      // Intentional explicit mapping to keep the persisted CNBC schema stable and obvious.
+      id: article.id,
+      title: article.title,
+      url: article.url,
+      publisher: article.publisher,
+      publishedAt: article.publishedAt,
+      relatedTickers: uniqRelatedTickers,
+      topic: article.topic,
+      hype: article.hype,
+      mainIdea: article.mainIdea,
+      summary: article.summary,
+      symbol: uniqRelatedTickers.length === 1 ? uniqRelatedTickers[0] ?? null : null,
+      provider: snapshot.provider,
+      fetchedAt: snapshot.fetchedAt,
+      asOfDate: snapshot.asOfDate
+    };
+  });
 }
 
 function serializeNewsSnapshotForStorage(snapshot: MarketNewsSnapshot): unknown {

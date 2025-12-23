@@ -76,13 +76,19 @@ function extractTickersFromTitle(title: string): string[] {
       "EPS",
       "ETF",
       "ETFS",
+      "ECB",
       "FED",
       "FOMC",
       "GDP",
       "IPO",
+      "IMF",
+      "NATO",
+      "OPEC",
       "PCE",
       "SEC",
       "SPX",
+      "UN",
+      "UK",
       "US",
       "USA",
       "VIX"
@@ -291,8 +297,12 @@ export class CnbcVideoProvider {
 
       const relatedTickers = extractTickersFromTitle(title);
 
+      const tags = (asset.contentClassification ?? []).filter(
+        (tag): tag is string => typeof tag === "string" && tag.trim() !== ""
+      );
+
       const topic =
-        inferNewsTopic({ title }) ??
+        inferNewsTopic({ title, tags }) ??
         (relatedTickers.length === 1 ? relatedTickers[0]?.toLowerCase() : undefined);
       const hype = scoreNewsHype(title);
       const mainIdea = buildNewsMainIdea(title);
