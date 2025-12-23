@@ -90,6 +90,14 @@ body {
   background: var(--rp-surface);
 }
 
+.rpPanelSurface {
+  padding: 12px;
+}
+
+.rpPanelSurfaceSide {
+  padding: 14px;
+}
+
 .rpToolbar {
   display: flex;
   gap: 8px;

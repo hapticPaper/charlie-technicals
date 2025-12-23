@@ -105,7 +105,7 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
   return (
     <div className="rpSplitLayout">
       <div className="rpSplitMain">
-        <div className="rpPanelSurface" style={{ padding: 12 }}>
+        <div className="rpPanelSurface">
           <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
               <BarChart
@@ -163,7 +163,7 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
       </div>
 
       <div className="rpSplitSide">
-        <div className="rpPanelSurface" style={{ padding: 14 }}>
+        <div className="rpPanelSurface rpPanelSurfaceSide">
           <p className="report-muted" style={{ marginTop: 0 }}>
             <strong>Hover</strong> a topic to preview videos, then <strong>click</strong> to pin.
           </p>

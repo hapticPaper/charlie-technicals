@@ -298,7 +298,7 @@ export function CnbcTopicTrendWidgetClient(props: {
   return (
     <div className="rpSplitLayout">
       <div className="rpSplitMain">
-        <div className="rpPanelSurface" style={{ padding: 12 }}>
+        <div className="rpPanelSurface">
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer minWidth={0}>
               <AreaChart
@@ -352,7 +352,7 @@ export function CnbcTopicTrendWidgetClient(props: {
       </div>
 
       <div className="rpSplitSide">
-        <div className="rpPanelSurface" style={{ padding: 14 }}>
+        <div className="rpPanelSurface rpPanelSurfaceSide">
           <p className="report-muted" style={{ marginTop: 0 }}>
             <strong>Hover</strong> a day, then <strong>click</strong> a topic in the tooltip to filter videos.
           </p>
