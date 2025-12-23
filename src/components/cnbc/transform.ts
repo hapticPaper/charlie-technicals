@@ -101,6 +101,7 @@ export function toCnbcVideoCard(article: CnbcVideoArticle): CnbcVideoCard {
     id: article.id,
     title: article.title,
     url: article.url,
+    thumbnailUrl: typeof article.thumbnailUrl === "string" ? article.thumbnailUrl : null,
     publishedAt: article.publishedAt,
     topic: normalizeCnbcTopic(article),
     symbol: article.symbol ?? null

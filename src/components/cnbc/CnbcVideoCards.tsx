@@ -101,13 +101,40 @@ function topicBadgeLabel(topic: string): string {
   return topic.trim() || DEFAULT_CNBC_TOPIC_LABEL;
 }
 
+function formatThumbnailSrc(url: string, width: number, height: number): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "image.cnbcfm.com" || !u.pathname.startsWith("/api/v1/image/")) {
+      return url;
+    }
+    // Force list thumbnails to predictable dimensions even if the upstream URL includes a larger size.
+    u.searchParams.set("w", String(width));
+    u.searchParams.set("h", String(height));
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 const cardStyle: CSSProperties = {
-  display: "block",
+  display: "flex",
+  gap: 12,
+  alignItems: "stretch",
   padding: "10px 12px",
   borderRadius: 12,
   border: "1px solid var(--rp-border)",
   background: "var(--rp-surface)",
   textDecoration: "none"
+};
+
+const thumbStyle: CSSProperties = {
+  width: 104,
+  height: 58,
+  borderRadius: 10,
+  border: "1px solid var(--rp-border)",
+  objectFit: "cover",
+  background: "var(--rp-surface-2)",
+  flex: "0 0 auto"
 };
 
 const titleStyle: CSSProperties = {
@@ -143,34 +170,48 @@ export function CnbcVideoCards(props: {
 
         return (
           <a key={video.id} href={video.url} target="_blank" rel="noreferrer" style={cardStyle}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                gap: 12,
-                marginBottom: 6
-              }}
-            >
-              {publishedLabel ? <span className="report-muted">{publishedLabel}</span> : <span />}
-              {topic ? (
-                <span
-                  style={{
-                    fontSize: 12,
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                    border: "1px solid var(--rp-border)",
-                    background: "var(--rp-surface-2)",
-                    color: "var(--rp-muted)",
-                    whiteSpace: "nowrap"
-                  }}
-                >
-                  {topic}
-                </span>
-              ) : null}
-            </div>
+            {video.thumbnailUrl ? (
+              // Static export: Next.js image optimization is not available, so we use a plain img.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={formatThumbnailSrc(video.thumbnailUrl, 320, 180)}
+                alt=""
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                style={thumbStyle}
+              />
+            ) : null}
 
-            <div style={titleStyle}>{video.title}</div>
+            <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginBottom: 6
+                }}
+              >
+                {publishedLabel ? <span className="report-muted">{publishedLabel}</span> : <span />}
+                {topic ? (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      border: "1px solid var(--rp-border)",
+                      background: "var(--rp-surface-2)",
+                      color: "var(--rp-muted)",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {topic}
+                  </span>
+                ) : null}
+              </div>
+
+              <div style={titleStyle}>{video.title}</div>
+            </div>
           </a>
         );
       })}

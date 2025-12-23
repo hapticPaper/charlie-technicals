@@ -566,8 +566,16 @@ export type WriteNewsSnapshotResult =
   | { status: "skipped_existing"; path: string };
 
 function normalizeNewsArticleForMerge(article: MarketNewsArticle): MarketNewsArticle {
+  const normalizedThumbnailUrl =
+    typeof article.thumbnailUrl === "string"
+      ? article.thumbnailUrl.trim() !== ""
+        ? article.thumbnailUrl.trim()
+        : null
+      : article.thumbnailUrl;
+
   return {
     ...article,
+    thumbnailUrl: normalizedThumbnailUrl,
     relatedTickers: Array.from(new Set(article.relatedTickers))
   };
 }
@@ -579,6 +587,7 @@ function mergeNewsArticles(existing: MarketNewsArticle, incoming: MarketNewsArti
   const normalizedIncoming = normalizeNewsArticleForMerge(incoming);
   const merged: MarketNewsArticle = {
     ...normalizedIncoming,
+    thumbnailUrl: normalizedIncoming.thumbnailUrl ?? existing.thumbnailUrl,
     topic:
       normalizedIncoming.topic && normalizedIncoming.topic.trim() !== ""
         ? normalizedIncoming.topic
@@ -617,6 +626,7 @@ function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArti
       id: article.id,
       title: article.title,
       url: article.url,
+      thumbnailUrl: article.thumbnailUrl,
       publisher: article.publisher,
       publishedAt: article.publishedAt,
       relatedTickers: uniqRelatedTickers,
@@ -704,6 +714,7 @@ export async function writeNewsSnapshot(
           id: a.id,
           title: a.title,
           url: a.url,
+          thumbnailUrl: a.thumbnailUrl,
           publisher: a.publisher,
           publishedAt: a.publishedAt,
           relatedTickers: a.relatedTickers,

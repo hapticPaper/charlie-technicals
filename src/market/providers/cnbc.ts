@@ -15,6 +15,9 @@ const CNBC_SEARCH_QUERY = `query search($tag: String, $page: Int!, $pageSize: In
       id
       type
       url
+      promoImage {
+        url
+      }
       datePublished
       description
       title
@@ -98,6 +101,9 @@ type CnbcVideoAsset = {
   id: number;
   type: string;
   url: string;
+  promoImage?: {
+    url?: string | null;
+  } | null;
   datePublished?: string | null;
   description?: string | null;
   title?: string | null;
@@ -218,10 +224,16 @@ export class CnbcVideoProvider {
         relatedTickers
       });
 
+      const thumbnailUrl =
+        typeof asset.promoImage?.url === "string" && asset.promoImage.url.trim() !== ""
+          ? asset.promoImage.url
+          : undefined;
+
       articles.push({
         id: buildCnbcVideoId(url),
         title,
         url,
+        thumbnailUrl,
         publisher: CNBC_PUBLISHER,
         publishedAt: publishedAtDate.toISOString(),
         relatedTickers,

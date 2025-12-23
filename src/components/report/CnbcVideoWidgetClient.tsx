@@ -20,6 +20,12 @@ import { getRechartsInitialDimension } from "./rechartsConfig";
 type BarHoverPayload = {
   payload?: { topic?: unknown };
 };
+
+function getClickedBarTopic(payload: unknown): string | null {
+  const topic = (payload as BarHoverPayload | undefined)?.payload?.topic;
+  return typeof topic === "string" ? topic : null;
+}
+
 function getActiveBarTopic(evt: unknown): string | null {
   if (!evt || typeof evt !== "object") {
     return null;
@@ -59,7 +65,9 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
     setMounted(true);
   }, []);
 
-  const [activeTopic, setActiveTopic] = useState<string | null>(null);
+  const [previewTopic, setPreviewTopic] = useState<string | null>(null);
+  const [pinnedTopic, setPinnedTopic] = useState<string | null>(null);
+  const activeTopic = pinnedTopic ?? previewTopic;
 
   const activeDatum = useMemo(() => {
     if (!activeTopic) {
@@ -95,15 +103,10 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
               const nextTopic = getActiveBarTopic(evt);
-              setActiveTopic((prev) => {
-                if (!nextTopic) {
-                  return prev === null ? prev : null;
-                }
-
-                return prev === nextTopic ? prev : nextTopic;
-              });
+              if (nextTopic) {
+                setPreviewTopic(nextTopic);
+              }
             }}
-            onMouseLeave={() => setActiveTopic((prev) => (prev === null ? prev : null))}
           >
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />
@@ -117,8 +120,32 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
               }}
             />
             <Legend />
-            <Bar yAxisId="left" dataKey="count" name="videos" fill="var(--rp-price)" />
-            <Bar yAxisId="right" dataKey="avgHype" name="avg hype" fill="var(--rp-warn)" />
+            <Bar
+              yAxisId="left"
+              dataKey="count"
+              name="videos"
+              fill="var(--rp-price)"
+              onClick={(payload) => {
+                const topic = getClickedBarTopic(payload);
+                if (!topic) {
+                  return;
+                }
+                setPinnedTopic((prev) => (prev === topic ? null : topic));
+              }}
+            />
+            <Bar
+              yAxisId="right"
+              dataKey="avgHype"
+              name="avg hype"
+              fill="var(--rp-warn)"
+              onClick={(payload) => {
+                const topic = getClickedBarTopic(payload);
+                if (!topic) {
+                  return;
+                }
+                setPinnedTopic((prev) => (prev === topic ? null : topic));
+              }}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -133,12 +160,58 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
         }}
       >
         <p className="report-muted" style={{ marginTop: 0 }}>
-          <strong>Hover a topic</strong> to see the CNBC videos.
+          <strong>Hover</strong> a topic to preview videos, then <strong>click</strong> to pin.
         </p>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setPinnedTopic((prev) => {
+                if (prev) {
+                  return null;
+                }
+
+                return previewTopic;
+              });
+            }}
+            disabled={!previewTopic && !pinnedTopic}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface-2)",
+              color: "var(--rp-text)",
+              cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
+            }}
+          >
+            {pinnedTopic ? "Unpin topic" : "Pin topic"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPinnedTopic(null);
+              setPreviewTopic(null);
+            }}
+            disabled={!previewTopic && !pinnedTopic}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid var(--rp-border)",
+              background: "transparent",
+              color: "var(--rp-muted)",
+              cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
+            }}
+          >
+            Clear
+          </button>
+        </div>
 
         {activeDatum ? (
           <p className="report-muted">
             <strong>Videos:</strong> {activeDatum.videos.length} (topic: {activeDatum.topic})
+            {pinnedTopic ? " (pinned)" : null}
           </p>
         ) : null}
 

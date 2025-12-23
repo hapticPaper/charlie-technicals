@@ -32,6 +32,7 @@ export type MarketNewsArticle = {
   id: string;
   title: string;
   url: string;
+  thumbnailUrl?: string | null;
   publisher: string;
   publishedAt: string;
   relatedTickers: string[];
