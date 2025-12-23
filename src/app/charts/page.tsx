@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const PLUGIN_EXAMPLES = [
+type PluginExample = {
+  label: string;
+  url: string;
+  sandbox?: string;
+};
+
+const DEFAULT_IFRAME_SANDBOX = "allow-scripts";
+const IFRAME_LOAD_TIMEOUT_MS = 2500;
+
+const PLUGIN_EXAMPLES: ReadonlyArray<PluginExample> = [
   {
     label: "All plugin examples",
     url: "https://tradingview.github.io/lightweight-charts/plugin-examples/"
@@ -51,32 +60,35 @@ const PLUGIN_EXAMPLES = [
     label: "Heatmap series (example2)",
     url: "https://tradingview.github.io/lightweight-charts/plugin-examples/plugins/heatmap-series/example/example2.html"
   }
-] as const;
+];
 
-function ChartsExampleEmbed(props: { label: string; url: string }) {
-  const { label, url } = props;
+function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: string }) {
+  const { label, url, sandbox } = props;
   const [failed, setFailed] = useState(false);
   const loadedRef = useRef(false);
   const timeoutIdRef = useRef<number | null>(null);
+
+  const clearLoadTimeout = () => {
+    if (timeoutIdRef.current !== null) {
+      window.clearTimeout(timeoutIdRef.current);
+      timeoutIdRef.current = null;
+    }
+  };
 
   useEffect(() => {
     loadedRef.current = false;
     setFailed(false);
 
-    if (timeoutIdRef.current !== null) {
-      window.clearTimeout(timeoutIdRef.current);
-    }
+    clearLoadTimeout();
 
     timeoutIdRef.current = window.setTimeout(() => {
       if (!loadedRef.current) {
         setFailed(true);
       }
-    }, 2500);
+    }, IFRAME_LOAD_TIMEOUT_MS);
 
     return () => {
-      if (timeoutIdRef.current !== null) {
-        window.clearTimeout(timeoutIdRef.current);
-      }
+      clearLoadTimeout();
     };
   }, [url]);
 
@@ -95,19 +107,15 @@ function ChartsExampleEmbed(props: { label: string; url: string }) {
           title={label}
           src={url}
           loading="lazy"
-          sandbox="allow-scripts"
+          sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
           referrerPolicy="no-referrer"
           onLoad={() => {
             loadedRef.current = true;
-            if (timeoutIdRef.current !== null) {
-              window.clearTimeout(timeoutIdRef.current);
-            }
+            clearLoadTimeout();
           }}
           onError={() => {
             setFailed(true);
-            if (timeoutIdRef.current !== null) {
-              window.clearTimeout(timeoutIdRef.current);
-            }
+            clearLoadTimeout();
           }}
           style={{
             width: "100%",
