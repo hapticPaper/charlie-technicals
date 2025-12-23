@@ -8,6 +8,7 @@ const MAX_CNBC_WIDGET_ARTICLES = 500;
 type CnbcVideoSnapshot = CnbcVideoArticle[];
 
 function buildTopicData(articles: CnbcVideoSnapshot): CnbcTopicHypeDatum[] {
+  // Sort newest-first so we only consider the most recent CNBC videos.
   const sorted = [...articles].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const counts = new Map<string, { count: number; hypeSum: number }>();
 

@@ -243,6 +243,11 @@ export type StoredNewsData =
   | { kind: "snapshot"; snapshot: MarketNewsSnapshot }
   | { kind: "cnbc_articles"; articles: CnbcVideoArticle[] };
 
+/**
+* Preferred read API for news data.
+*
+* Note: `symbol === "cnbc"` is stored on disk as a flat array (not a `MarketNewsSnapshot`).
+*/
 export async function readNewsData(date: string, symbol: string): Promise<StoredNewsData> {
   if (symbol === "cnbc") {
     return { kind: "cnbc_articles", articles: await readCnbcVideoArticles(date) };
@@ -341,6 +346,7 @@ export type WriteNewsSnapshotResult =
 
 function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
   return snapshot.articles.map((article) => ({
+    // Intentional explicit mapping to keep the persisted CNBC schema stable and obvious.
     id: article.id,
     title: article.title,
     url: article.url,
