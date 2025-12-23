@@ -70,12 +70,16 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const fileDate = formatRawDataFileDate(date);
+  const asOfDate = /^\d{8}$/.test(date)
+    ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+    : date;
+
+  const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    if (article.provider !== "cnbc" || article.asOfDate !== date) {
+    if (article.provider !== "cnbc" || article.asOfDate !== asOfDate) {
       throw new Error(
         `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
           provider: article.provider,
