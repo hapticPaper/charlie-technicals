@@ -422,7 +422,7 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   }
 
   if (invalidCount > 0) {
-    const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s)`;
+    const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${dir} (expected YYYYMMDD.json)`;
     if (process.env.NODE_ENV !== "production") {
       console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
     } else {

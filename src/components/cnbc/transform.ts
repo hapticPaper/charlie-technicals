@@ -88,7 +88,7 @@ export function normalizeCnbcTopic(article: Pick<CnbcVideoArticle, "topic" | "ti
   const raw = typeof article.topic === "string" ? normalizeTopicKey(article.topic) : "";
 
   if (raw && raw !== "date" && !PLACEHOLDER_TOPICS.has(raw)) {
-    return raw;
+    return sanitizeTopicLabel(raw);
   }
 
   const inferred = inferTopicFromTitle(article.title);
@@ -97,14 +97,12 @@ export function normalizeCnbcTopic(article: Pick<CnbcVideoArticle, "topic" | "ti
 }
 
 export function toCnbcVideoCard(article: CnbcVideoArticle): CnbcVideoCard {
-  const topic = sanitizeTopicLabel(normalizeCnbcTopic(article));
-
   return {
     id: article.id,
     title: article.title,
     url: article.url,
     publishedAt: article.publishedAt,
-    topic,
+    topic: normalizeCnbcTopic(article),
     symbol: article.symbol ?? null
   };
 }
