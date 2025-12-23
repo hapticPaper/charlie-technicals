@@ -11,7 +11,7 @@ import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
 import { parseIsoDateYmd } from "../../../market/date";
-import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/storage";
+import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/reportStorage";
 import type { MarketReport } from "../../../market/types";
 
 type ReportPageParams = { date: string };

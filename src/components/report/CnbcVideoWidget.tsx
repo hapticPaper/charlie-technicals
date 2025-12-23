@@ -1,4 +1,4 @@
-import { readCnbcVideoArticles } from "../../market/storage";
+import { readCnbcVideoArticles } from "../../market/reportStorage";
 import type { CnbcVideoArticle } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";

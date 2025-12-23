@@ -1,0 +1,114 @@
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+
+import { formatRawDataFileDate } from "./dataConventions";
+import type {
+  CnbcVideoArticle,
+  MarketReport,
+  MarketReportHighlights,
+  StoredCnbcVideoArticle
+} from "./types";
+
+const CONTENT_DIR = path.join(process.cwd(), "content");
+const REPORTS_DIR = path.join(CONTENT_DIR, "reports");
+const CNBC_NEWS_DIR = path.join(CONTENT_DIR, "data", "cnbc", "news");
+
+export function getReportJsonPath(date: string): string {
+  return path.join(REPORTS_DIR, `${date}.json`);
+}
+
+export function getReportHighlightsJsonPath(date: string): string {
+  return path.join(REPORTS_DIR, `${date}.highlights.json`);
+}
+
+export function getReportMdxPath(date: string): string {
+  return path.join(REPORTS_DIR, `${date}.mdx`);
+}
+
+export function toReportHighlights(report: MarketReport): MarketReportHighlights {
+  return {
+    version: "v2-highlights",
+    date: report.date,
+    generatedAt: report.generatedAt,
+    picks: report.picks.map((p) => ({
+      symbol: p.symbol,
+      trade: {
+        side: p.trade.side,
+        entry: p.trade.entry,
+        stop: p.trade.stop
+      }
+    })),
+    summaries: {
+      veryShort: report.summaries.veryShort,
+      mainIdea: report.summaries.mainIdea
+    }
+  };
+}
+
+export async function readJson<T>(filePath: string): Promise<T> {
+  const raw = await readFile(filePath, "utf8");
+  return JSON.parse(raw) as T;
+}
+
+/**
+* Reads CNBC video articles for a day.
+*
+* The on-disk schema includes `provider`, `fetchedAt`, and `asOfDate` on each object.
+*
+* `provider` is implied by the file path and is omitted from the returned in-memory
+* objects.
+*/
+export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
+  const fileDate = formatRawDataFileDate(date);
+  const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
+  const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
+
+  for (const article of stored) {
+    if (article.provider !== "cnbc" || article.asOfDate !== date) {
+      throw new Error(
+        `[market:storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+          provider: article.provider,
+          asOfDate: article.asOfDate
+        })}`
+      );
+    }
+
+    if (article.symbol !== null && typeof article.symbol !== "string") {
+      throw new Error(
+        `[market:storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
+          symbol: article.symbol
+        })}`
+      );
+    }
+  }
+
+  // Legacy snapshots persisted `symbol: "cnbc"` on each record; normalize that to `null`.
+  return stored.map(({ provider: _provider, symbol, ...article }) => ({
+    ...article,
+    symbol: typeof symbol === "string" && symbol.toLowerCase() === "cnbc" ? null : symbol ?? null
+  }));
+}
+
+export async function listReportDates(): Promise<string[]> {
+  let entries: string[] = [];
+  try {
+    entries = await readdir(REPORTS_DIR);
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return entries
+    .filter((e) => e.endsWith(".mdx"))
+    .map((e) => e.replace(/\.mdx$/, ""))
+    .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
+    .sort();
+}

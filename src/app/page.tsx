@@ -8,7 +8,7 @@ import {
   listReportDates,
   readJson,
   toReportHighlights
-} from "../market/storage";
+} from "../market/reportStorage";
 import type { MarketReport, MarketReportHighlights, TradeSide } from "../market/types";
 
 async function readReportHighlights(date: string): Promise<MarketReportHighlights> {
