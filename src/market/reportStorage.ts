@@ -23,14 +23,10 @@ function normalizeCnbcAsOfDate(date: string): string {
   try {
     parseIsoDateYmd(asOfDate);
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? `[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date}): ${error.message}`
-        : `[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date})`;
-
-    throw new Error(message, {
-      cause: error
-    });
+    throw new Error(
+      `[market:reportStorage] Invalid CNBC asOfDate. Expected YYYYMMDD or YYYY-MM-DD. normalized=${asOfDate}, input=${date}`,
+      { cause: error }
+    );
   }
 
   return asOfDate;
@@ -107,7 +103,9 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
       throw new Error(
         `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
           provider: article.provider,
-          asOfDate: article.asOfDate
+          asOfDate: article.asOfDate,
+          normalizedAsOfDate: articleAsOfDate,
+          expectedAsOfDate: asOfDate
         })}`
       );
     }
