@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { IRange, LineData, SeriesMarker, Time, UTCTimestamp, WhitespaceData } from "lightweight-charts";
+import type {
+  HistogramData,
+  LineData,
+  SeriesMarker,
+  Time,
+  UTCTimestamp,
+  WhitespaceData
+} from "lightweight-charts";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
@@ -52,7 +59,11 @@ function formatMaybeNumber(value: unknown): string {
 }
 
 function extractSeriesValue(
-  point: LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp> | undefined
+  point:
+    | LineData<UTCTimestamp>
+    | HistogramData<UTCTimestamp>
+    | WhitespaceData<UTCTimestamp>
+    | undefined
 ): number | undefined {
   if (!point) {
     return undefined;
@@ -97,7 +108,10 @@ function toUtcTimestamp(t: number): UTCTimestamp | null {
   return Math.floor(seconds) as UTCTimestamp;
 }
 
-function toLineSeriesData(t: number[], values: Array<number | null>): Array<LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
+function toLineSeriesData(
+  t: number[],
+  values: Array<number | null>
+): Array<LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
   const out: Array<LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
   const len = Math.min(t.length, values.length);
 
@@ -114,6 +128,32 @@ function toLineSeriesData(t: number[], values: Array<number | null>): Array<Line
     }
 
     out.push({ time, value });
+  }
+
+  return out;
+}
+
+function toHistogramSeriesData(
+  t: number[],
+  values: number[],
+  colors: string[]
+): Array<HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
+  const out: Array<HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
+  const len = Math.min(t.length, values.length, colors.length);
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(t[i]);
+    if (time === null) {
+      continue;
+    }
+
+    const value = values[i];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      out.push({ time });
+      continue;
+    }
+
+    out.push({ time, value, color: colors[i] });
   }
 
   return out;
@@ -197,57 +237,44 @@ export function ReportChart(props: {
 
   const { series, annotations } = props;
 
-  const priceWrapperRef = useRef<HTMLDivElement | null>(null);
-  const priceChartRef = useRef<HTMLDivElement | null>(null);
-  const priceTooltipRef = useRef<HTMLDivElement | null>(null);
-
-  const rsiWrapperRef = useRef<HTMLDivElement | null>(null);
-  const rsiChartRef = useRef<HTMLDivElement | null>(null);
-  const rsiTooltipRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
 
   const squeezeMarkers = useMemo(() => buildSqueezeMarkers(series), [series]);
 
   const active = series.signals.filter((s) => s.active).map((s) => s.label);
   const trade = annotations?.trade;
   const isBuy = trade?.side === "buy";
-  const legendItems = ["Price", "SMA 20", "EMA 20"];
-  if (series.bollinger20) {
-    legendItems.push("Bollinger Bands (20)");
-  }
-  if (series.keltner20) {
-    legendItems.push("Keltner Channels (20)");
-  }
-  if (squeezeMarkers.length > 0) {
-    legendItems.push("TTM Squeeze markers");
-  }
 
   useEffect(() => {
     if (!mounted) {
       return;
     }
 
-    const priceWrapper = priceWrapperRef.current;
-    const priceChartEl = priceChartRef.current;
-    const priceTooltip = priceTooltipRef.current;
+    const wrapper = wrapperRef.current;
+    const chartEl = chartRef.current;
+    const tooltip = tooltipRef.current;
 
-    const rsiWrapper = rsiWrapperRef.current;
-    const rsiChartEl = rsiChartRef.current;
-    const rsiTooltip = rsiTooltipRef.current;
-
-    if (!priceWrapper || !priceChartEl || !rsiWrapper || !rsiChartEl) {
+    if (!wrapper || !chartEl) {
       return;
     }
 
-    const priceChartElement = priceChartEl;
-    const rsiChartElement = rsiChartEl;
+    const chartElement = chartEl;
 
     let disposed = false;
     let cleanup = () => {};
 
     async function run() {
-      const { createChart, createSeriesMarkers, ColorType, CrosshairMode, LineSeries, LineStyle } = await import(
-        "lightweight-charts"
-      );
+      const {
+        ColorType,
+        CrosshairMode,
+        HistogramSeries,
+        LineSeries,
+        LineStyle,
+        createChart,
+        createSeriesMarkers
+      } = await import("lightweight-charts");
       if (disposed) {
         return;
       }
@@ -269,7 +296,16 @@ export function ReportChart(props: {
       const warn = readCssVar("--rp-warn", "#f59e0b");
       const target = readCssVar("--rp-target", "#38bdf8");
 
-      const sharedOptions = {
+      const hasVolume =
+        Array.isArray(series.volume) &&
+        series.volume.length === series.t.length &&
+        series.volume.some((v) => typeof v === "number" && Number.isFinite(v) && v > 0);
+
+      const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
+      const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
+      const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
+
+      const chart = createChart(chartElement, {
         autoSize: true,
         layout: {
           background: { type: ColorType.Solid, color: surface },
@@ -283,34 +319,33 @@ export function ReportChart(props: {
         },
         rightPriceScale: {
           borderColor: border,
-          textColor: muted
+          textColor: muted,
+          scaleMargins: priceScaleMargins
         },
         timeScale: {
           borderColor: border,
           timeVisible: true,
-          secondsVisible: false
+          secondsVisible: false,
+          rightOffset: 10
         },
         crosshair: {
           mode: CrosshairMode.Magnet
         }
-      };
+      });
 
-      const priceChart = createChart(priceChartElement, sharedOptions);
-      const rsiChart = createChart(rsiChartElement, sharedOptions);
-
-      const closeSeries = priceChart.addSeries(LineSeries, {
+      const closeSeries = chart.addSeries(LineSeries, {
         color: priceColor,
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false
       });
-      const smaSeries = priceChart.addSeries(LineSeries, {
+      const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,
         lineWidth: 1,
         priceLineVisible: false,
         lastValueVisible: false
       });
-      const emaSeries = priceChart.addSeries(LineSeries, {
+      const emaSeries = chart.addSeries(LineSeries, {
         color: emaColor,
         lineWidth: 1,
         priceLineVisible: false,
@@ -318,7 +353,7 @@ export function ReportChart(props: {
       });
 
       const bbUpperSeries = series.bollinger20
-        ? priceChart.addSeries(LineSeries, {
+        ? chart.addSeries(LineSeries, {
             color: bollingerColor,
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
@@ -327,7 +362,7 @@ export function ReportChart(props: {
           })
         : null;
       const bbLowerSeries = series.bollinger20
-        ? priceChart.addSeries(LineSeries, {
+        ? chart.addSeries(LineSeries, {
             color: bollingerColor,
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
@@ -336,7 +371,7 @@ export function ReportChart(props: {
           })
         : null;
       const kcUpperSeries = series.keltner20
-        ? priceChart.addSeries(LineSeries, {
+        ? chart.addSeries(LineSeries, {
             color: keltnerColor,
             lineWidth: 1,
             lineStyle: LineStyle.SparseDotted,
@@ -345,7 +380,7 @@ export function ReportChart(props: {
           })
         : null;
       const kcLowerSeries = series.keltner20
-        ? priceChart.addSeries(LineSeries, {
+        ? chart.addSeries(LineSeries, {
             color: keltnerColor,
             lineWidth: 1,
             lineStyle: LineStyle.SparseDotted,
@@ -354,6 +389,35 @@ export function ReportChart(props: {
           })
         : null;
 
+      const volumeSeries = hasVolume
+        ? chart.addSeries(HistogramSeries, {
+            priceScaleId: "volume",
+            priceLineVisible: false,
+            lastValueVisible: false
+          })
+        : null;
+
+      const rsiSeries = chart.addSeries(LineSeries, {
+        color: rsiColor,
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        priceScaleId: "rsi",
+        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
+      });
+
+      chart.priceScale("rsi").applyOptions({
+        scaleMargins: rsiScaleMargins,
+        visible: false
+      });
+
+      if (volumeSeries && volumeScaleMargins) {
+        chart.priceScale("volume").applyOptions({
+          scaleMargins: volumeScaleMargins,
+          visible: false
+        });
+      }
+
       closeSeries.setData(toLineSeriesData(series.t, series.close));
       smaSeries.setData(toLineSeriesData(series.t, series.sma20));
       emaSeries.setData(toLineSeriesData(series.t, series.ema20));
@@ -361,6 +425,17 @@ export function ReportChart(props: {
       bbLowerSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.lower ?? []));
       kcUpperSeries?.setData(toLineSeriesData(series.t, series.keltner20?.upper ?? []));
       kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
+      rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
+
+      if (volumeSeries && hasVolume && series.volume) {
+        const colors = series.close.map((close, idx) => {
+          const prev = idx > 0 ? series.close[idx - 1] : close;
+          const up = typeof prev === "number" && Number.isFinite(prev) ? close >= prev : true;
+          const base = up ? bull : bear;
+          return promoteAlpha(base, 0.65);
+        });
+        volumeSeries.setData(toHistogramSeriesData(series.t, series.volume, colors));
+      }
 
       const squeezeMarkerPlugin =
         squeezeMarkers.length > 0
@@ -393,109 +468,88 @@ export function ReportChart(props: {
         });
       }
 
-      const rsiSeries = rsiChart.addSeries(LineSeries, {
-        color: rsiColor,
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
-      });
-      rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
       rsiSeries.createPriceLine({ price: 70, color: border, lineStyle: LineStyle.Dotted, lineWidth: 1, title: "70" });
       rsiSeries.createPriceLine({ price: 30, color: border, lineStyle: LineStyle.Dotted, lineWidth: 1, title: "30" });
 
-      priceChart.timeScale().fitContent();
-      rsiChart.timeScale().fitContent();
+      chart.timeScale().fitContent();
+      chart.timeScale().applyOptions({ rightOffset: 10 });
 
-      const syncing = { value: false };
-      const syncPriceToRsi = (range: IRange<Time> | null) => {
-        if (!range) {
-          return;
-        }
-        if (syncing.value) {
-          return;
-        }
-        syncing.value = true;
-        try {
-          rsiChart.timeScale().setVisibleRange(range);
-        } finally {
-          syncing.value = false;
-        }
-      };
-      const syncRsiToPrice = (range: IRange<Time> | null) => {
-        if (!range) {
-          return;
-        }
-        if (syncing.value) {
-          return;
-        }
-        syncing.value = true;
-        try {
-          priceChart.timeScale().setVisibleRange(range);
-        } finally {
-          syncing.value = false;
-        }
-      };
-
-      priceChart.timeScale().subscribeVisibleTimeRangeChange(syncPriceToRsi);
-      rsiChart.timeScale().subscribeVisibleTimeRangeChange(syncRsiToPrice);
-
-      if (priceTooltip) {
-        priceTooltip.style.whiteSpace = "pre";
-        priceTooltip.style.color = text;
-        priceTooltip.style.pointerEvents = "none";
-        priceTooltip.style.background = surface;
-        priceTooltip.style.border = `1px solid ${border}`;
-        priceTooltip.style.borderRadius = "10px";
-        priceTooltip.style.padding = "8px 10px";
-        priceTooltip.style.fontSize = "12px";
-        priceTooltip.style.opacity = "0";
+      if (tooltip) {
+        tooltip.style.whiteSpace = "pre";
+        tooltip.style.color = text;
+        tooltip.style.pointerEvents = "none";
+        tooltip.style.background = surface;
+        tooltip.style.border = `1px solid ${border}`;
+        tooltip.style.borderRadius = "10px";
+        tooltip.style.padding = "8px 10px";
+        tooltip.style.fontSize = "12px";
+        tooltip.style.opacity = "0";
       }
 
-      if (rsiTooltip) {
-        rsiTooltip.style.whiteSpace = "pre";
-        rsiTooltip.style.color = text;
-        rsiTooltip.style.pointerEvents = "none";
-        rsiTooltip.style.background = surface;
-        rsiTooltip.style.border = `1px solid ${border}`;
-        rsiTooltip.style.borderRadius = "10px";
-        rsiTooltip.style.padding = "8px 10px";
-        rsiTooltip.style.fontSize = "12px";
-        rsiTooltip.style.opacity = "0";
-      }
-
-      priceChart.subscribeCrosshairMove((param) => {
-        if (!priceTooltip) {
+      chart.subscribeCrosshairMove((param) => {
+        if (!tooltip) {
           return;
         }
 
         const timeLabel = formatChartTime(param.time);
         if (!param.point || !timeLabel) {
-          priceTooltip.style.opacity = "0";
+          tooltip.style.opacity = "0";
           return;
         }
 
-        const close = param.seriesData.get(closeSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
-        const sma = param.seriesData.get(smaSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
-        const ema = param.seriesData.get(emaSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
+        const close = param.seriesData.get(closeSeries) as
+          | LineData<UTCTimestamp>
+          | WhitespaceData<UTCTimestamp>
+          | undefined;
+        const sma = param.seriesData.get(smaSeries) as
+          | LineData<UTCTimestamp>
+          | WhitespaceData<UTCTimestamp>
+          | undefined;
+        const ema = param.seriesData.get(emaSeries) as
+          | LineData<UTCTimestamp>
+          | WhitespaceData<UTCTimestamp>
+          | undefined;
         const bbU = bbUpperSeries
-          ? (param.seriesData.get(bbUpperSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          ? (param.seriesData.get(bbUpperSeries) as
+              | LineData<UTCTimestamp>
+              | WhitespaceData<UTCTimestamp>
+              | undefined)
           : undefined;
         const bbL = bbLowerSeries
-          ? (param.seriesData.get(bbLowerSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          ? (param.seriesData.get(bbLowerSeries) as
+              | LineData<UTCTimestamp>
+              | WhitespaceData<UTCTimestamp>
+              | undefined)
           : undefined;
         const kcU = kcUpperSeries
-          ? (param.seriesData.get(kcUpperSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          ? (param.seriesData.get(kcUpperSeries) as
+              | LineData<UTCTimestamp>
+              | WhitespaceData<UTCTimestamp>
+              | undefined)
           : undefined;
         const kcL = kcLowerSeries
-          ? (param.seriesData.get(kcLowerSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          ? (param.seriesData.get(kcLowerSeries) as
+              | LineData<UTCTimestamp>
+              | WhitespaceData<UTCTimestamp>
+              | undefined)
+          : undefined;
+        const rsi = param.seriesData.get(rsiSeries) as
+          | LineData<UTCTimestamp>
+          | WhitespaceData<UTCTimestamp>
+          | undefined;
+        const vol = volumeSeries
+          ? (param.seriesData.get(volumeSeries) as
+              | HistogramData<UTCTimestamp>
+              | WhitespaceData<UTCTimestamp>
+              | undefined)
           : undefined;
 
         const lines = [
           timeLabel,
           `Close: ${formatMaybeNumber(extractSeriesValue(close))}`,
           `SMA 20: ${formatMaybeNumber(extractSeriesValue(sma))}`,
-          `EMA 20: ${formatMaybeNumber(extractSeriesValue(ema))}`
+          `EMA 20: ${formatMaybeNumber(extractSeriesValue(ema))}`,
+          `RSI 14: ${formatMaybeNumber(extractSeriesValue(rsi))}`
         ];
         if (bbUpperSeries && bbLowerSeries) {
           lines.push(
@@ -507,38 +561,17 @@ export function ReportChart(props: {
             `KC U/L: ${formatMaybeNumber(extractSeriesValue(kcU))} / ${formatMaybeNumber(extractSeriesValue(kcL))}`
           );
         }
-
-        priceTooltip.textContent = lines.join("\n");
-        priceTooltip.style.opacity = "1";
-      });
-
-      rsiChart.subscribeCrosshairMove((param) => {
-        if (!rsiTooltip) {
-          return;
+        if (volumeSeries) {
+          lines.push(`Vol: ${formatMaybeNumber(extractSeriesValue(vol))}`);
         }
 
-        const timeLabel = formatChartTime(param.time);
-        if (!param.point || !timeLabel) {
-          rsiTooltip.style.opacity = "0";
-          return;
-        }
-
-        const rsiValue = param.seriesData.get(rsiSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
-        const lines = [
-          timeLabel,
-          `RSI 14: ${formatMaybeNumber(extractSeriesValue(rsiValue))}`
-        ];
-
-        rsiTooltip.textContent = lines.join("\n");
-        rsiTooltip.style.opacity = "1";
+        tooltip.textContent = lines.join("\n");
+        tooltip.style.opacity = "1";
       });
 
       cleanup = () => {
         squeezeMarkerPlugin?.detach();
-        priceChart.timeScale().unsubscribeVisibleTimeRangeChange(syncPriceToRsi);
-        rsiChart.timeScale().unsubscribeVisibleTimeRangeChange(syncRsiToPrice);
-        priceChart.remove();
-        rsiChart.remove();
+        chart.remove();
       };
     }
 
@@ -548,7 +581,7 @@ export function ReportChart(props: {
       disposed = true;
       cleanup();
     };
-  }, [mounted, series, trade, isBuy]);
+  }, [mounted, series, trade, isBuy, squeezeMarkers]);
 
   if (!mounted) {
     return (
@@ -563,18 +596,7 @@ export function ReportChart(props: {
         <div
           style={{
             width: "100%",
-            height: 260,
-            borderRadius: 12,
-            border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)",
-            overflow: "hidden"
-          }}
-        />
-        <div
-          style={{
-            width: "100%",
-            height: 200,
-            marginTop: 12,
+            height: 420,
             borderRadius: 12,
             border: "1px solid var(--rp-border)",
             background: "var(--rp-surface)",
@@ -596,40 +618,19 @@ export function ReportChart(props: {
       ) : null}
 
       <div
-        ref={priceWrapperRef}
+        ref={wrapperRef}
         style={{
           position: "relative",
           width: "100%",
-          height: 260,
+          height: 420,
           borderRadius: 12,
           border: "1px solid var(--rp-border)",
           background: "var(--rp-surface)",
           overflow: "hidden"
         }}
       >
-        <div ref={priceChartRef} style={{ position: "absolute", inset: 0 }} />
-        <div ref={priceTooltipRef} style={{ position: "absolute", top: 10, left: 10 }} />
-      </div>
-
-      <p className="report-muted" style={{ margin: "8px 0 0" }}>
-        <strong>Legend:</strong> {legendItems.join(" / ")}
-      </p>
-
-      <div
-        ref={rsiWrapperRef}
-        style={{
-          position: "relative",
-          width: "100%",
-          height: 200,
-          marginTop: 12,
-          borderRadius: 12,
-          border: "1px solid var(--rp-border)",
-          background: "var(--rp-surface)",
-          overflow: "hidden"
-        }}
-      >
-        <div ref={rsiChartRef} style={{ position: "absolute", inset: 0 }} />
-        <div ref={rsiTooltipRef} style={{ position: "absolute", top: 10, left: 10 }} />
+        <div ref={chartRef} style={{ position: "absolute", inset: 0 }} />
+        <div ref={tooltipRef} style={{ position: "absolute", top: 10, left: 10 }} />
       </div>
     </section>
   );

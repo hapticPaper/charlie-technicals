@@ -161,6 +161,7 @@ export type ReportIntervalSeries = {
   close: number[];
   high: number[];
   low: number[];
+  volume?: number[];
   sma20: Array<number | null>;
   ema20: Array<number | null>;
   rsi14: Array<number | null>;
