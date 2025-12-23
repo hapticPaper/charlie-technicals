@@ -329,7 +329,7 @@ export function atr(bars: MarketBar[], period: number): Array<number | null> {
 
     const currTr = tr[i];
     if (!isFiniteNumber(currTr)) {
-      out[i] = null;
+      out[i] = prev;
       continue;
     }
 
