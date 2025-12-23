@@ -27,6 +27,14 @@ const PRICE_SCALE_ID = "right" as const;
 const VOLUME_SCALE_ID = "volume" as const;
 const RSI_SCALE_ID = "rsi" as const;
 
+// Trade-level autoscaling padding when trade levels extend the candle range.
+// `zeroSpan*` is used for degenerate ranges (span 0) to avoid a flat-looking chart.
+const TRADE_AUTOSCALE_PAD = {
+  spanPadRatio: 0.02,
+  zeroSpanPadRatio: 0.002,
+  zeroSpanMinPad: 0.001
+} as const;
+
 function formatChartTime(time: Time | undefined): string {
   if (!time) {
     return "";
@@ -528,13 +536,6 @@ export function ReportChart(props: {
             return base;
           }
 
-          // Trade-level autoscaling padding when trade levels extend the candle range.
-          // The zero-span fallback is tuned for typical equity price ranges.
-          const SPAN_PAD_RATIO = 0.02; // 2% of the expanded range
-          const ZERO_SPAN_PAD_RATIO = 0.002; // 0.2% of the max magnitude value
-          const ZERO_SPAN_MIN_PAD = 0.001; // minimum pad in price units
-          const ZERO_SPAN_MAX_PAD = 10; // cap pad in price units
-
           const baseMin = base.priceRange.minValue;
           const baseMax = base.priceRange.maxValue;
 
@@ -553,16 +554,13 @@ export function ReportChart(props: {
           const span = maxValue - minValue;
           let pad: number;
           if (span > 0) {
-            pad = span * SPAN_PAD_RATIO;
+            pad = span * TRADE_AUTOSCALE_PAD.spanPadRatio;
           } else {
             const maxMagnitude = Math.max(Math.abs(minValue), Math.abs(maxValue));
             pad =
               maxMagnitude === 0
-                ? ZERO_SPAN_MIN_PAD
-                : Math.min(
-                    ZERO_SPAN_MAX_PAD,
-                    Math.max(ZERO_SPAN_MIN_PAD, maxMagnitude * ZERO_SPAN_PAD_RATIO)
-                  );
+                ? TRADE_AUTOSCALE_PAD.zeroSpanMinPad
+                : Math.max(TRADE_AUTOSCALE_PAD.zeroSpanMinPad, maxMagnitude * TRADE_AUTOSCALE_PAD.zeroSpanPadRatio);
           }
 
           return {
