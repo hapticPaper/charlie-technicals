@@ -1,14 +1,23 @@
 import { getNewsPath, readJson } from "../../market/storage";
-import type { MarketNewsSnapshot } from "../../market/types";
+import type { MarketNewsArticle } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 const MAX_CNBC_WIDGET_ARTICLES = 500;
 
-function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
+type CnbcVideoArticle = MarketNewsArticle & {
+  symbol: string;
+  provider: string;
+  fetchedAt: string;
+  asOfDate: string;
+};
+
+type CnbcVideoSnapshot = CnbcVideoArticle[];
+
+function buildTopicData(articles: CnbcVideoSnapshot): CnbcTopicHypeDatum[] {
   const counts = new Map<string, { count: number; hypeSum: number }>();
 
-  for (const article of snapshot.articles.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
+  for (const article of articles.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
     const topic = (article.topic ?? "other").trim().toLowerCase();
     if (topic === "") {
       continue;
@@ -32,9 +41,9 @@ function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
 }
 
 export async function CnbcVideoWidget(props: { date: string }) {
-  let snapshot: MarketNewsSnapshot;
+  let articles: CnbcVideoSnapshot;
   try {
-    snapshot = await readJson<MarketNewsSnapshot>(getNewsPath(props.date, "cnbc"));
+    articles = await readJson<CnbcVideoSnapshot>(getNewsPath(props.date, "cnbc"));
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error
@@ -47,11 +56,12 @@ export async function CnbcVideoWidget(props: { date: string }) {
     throw error;
   }
 
-  if (snapshot.articles.length === 0) {
+  if (articles.length === 0) {
     return null;
   }
 
-  const data = buildTopicData(snapshot);
+  const asOfDate = articles[0]?.asOfDate ?? props.date;
+  const data = buildTopicData(articles);
   if (data.length === 0) {
     return null;
   }
@@ -60,7 +70,7 @@ export async function CnbcVideoWidget(props: { date: string }) {
     <section>
       <h2>CNBC video topics</h2>
       <p className="report-muted">
-        <strong>Videos:</strong> {snapshot.articles.length} (as of {snapshot.asOfDate})
+        <strong>Videos:</strong> {articles.length} (as of {asOfDate})
       </p>
       <CnbcVideoWidgetClient data={data} />
     </section>

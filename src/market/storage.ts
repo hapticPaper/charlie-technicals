@@ -346,7 +346,19 @@ export async function writeNewsSnapshot(
       return { status: "skipped_existing" as const, path: filePath };
     }
 
-    await writeJson(tmpPath, snapshot);
+    if (snapshot.symbol === "cnbc") {
+      const articles = snapshot.articles.map((article) => ({
+        ...article,
+        symbol: snapshot.symbol,
+        provider: snapshot.provider,
+        fetchedAt: snapshot.fetchedAt,
+        asOfDate: snapshot.asOfDate
+      }));
+
+      await writeJson(tmpPath, articles);
+    } else {
+      await writeJson(tmpPath, snapshot);
+    }
     await rename(tmpPath, filePath);
     return { status: "written" as const, path: filePath };
   });
