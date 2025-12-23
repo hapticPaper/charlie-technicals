@@ -88,24 +88,37 @@ function TopicTooltip(props: {
 }) {
   const date = typeof props.label === "string" ? props.label : null;
 
-  const entries = (props.payload ?? [])
-    .map((entry) => {
-      const topic = parseTooltipTopic(entry.name);
-      if (!topic) {
-        return null;
-      }
+  const entries = useMemo(() => {
+    return (props.payload ?? [])
+      .map((entry) => {
+        const topic = parseTooltipTopic(entry.name);
+        if (!topic) {
+          return null;
+        }
 
-      const count = parseTooltipCount(entry.value);
-      return {
-        topic,
-        count,
-        color: typeof entry.color === "string" ? entry.color : undefined
-      };
-    })
-    .filter(
-      (entry): entry is { topic: string; count: number; color: string | undefined } =>
-        entry !== null && entry.count > 0
-    );
+        const count = parseTooltipCount(entry.value);
+        return {
+          topic,
+          count,
+          color: typeof entry.color === "string" ? entry.color : undefined
+        };
+      })
+      .filter(
+        (entry): entry is { topic: string; count: number; color: string | undefined } =>
+          entry !== null && entry.count > 0
+      );
+  }, [props.payload]);
+
+  const bestTopic = useMemo(() => {
+    const best = entries.reduce<{ topic: string; count: number } | null>((acc, entry) => {
+      if (!acc || entry.count > acc.count) {
+        return { topic: entry.topic, count: entry.count };
+      }
+      return acc;
+    }, null);
+
+    return best?.topic ?? null;
+  }, [entries]);
 
   useEffect(() => {
     if (!props.active || !date) {
@@ -115,17 +128,10 @@ function TopicTooltip(props: {
       return;
     }
 
-    const best = entries.reduce<{ topic: string; count: number } | null>((acc, entry) => {
-      if (!acc || entry.count > acc.count) {
-        return { topic: entry.topic, count: entry.count };
-      }
-      return acc;
-    }, null);
-
-    if (best) {
-      props.onSelect({ date, topic: best.topic });
+    if (bestTopic) {
+      props.onSelect({ date, topic: bestTopic });
     }
-  }, [date, entries, props.active, props.onSelect, props.pinnedTopic, props.selectedTopic]);
+  }, [bestTopic, date, props.active, props.onSelect, props.pinnedTopic, props.selectedTopic]);
 
   if (!props.active || !date || entries.length === 0) {
     return null;

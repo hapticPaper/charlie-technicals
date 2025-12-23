@@ -104,6 +104,9 @@ function topicBadgeLabel(topic: string): string {
 function formatThumbnailSrc(url: string, width: number, height: number): string {
   try {
     const u = new URL(url);
+    if (u.hostname !== "image.cnbcfm.com" || !u.pathname.startsWith("/api/v1/image/")) {
+      return url;
+    }
     if (!u.searchParams.has("w")) {
       u.searchParams.set("w", String(width));
     }

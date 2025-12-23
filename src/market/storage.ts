@@ -566,8 +566,16 @@ export type WriteNewsSnapshotResult =
   | { status: "skipped_existing"; path: string };
 
 function normalizeNewsArticleForMerge(article: MarketNewsArticle): MarketNewsArticle {
+  const normalizedThumbnailUrl =
+    typeof article.thumbnailUrl === "string"
+      ? article.thumbnailUrl.trim() !== ""
+        ? article.thumbnailUrl.trim()
+        : null
+      : article.thumbnailUrl;
+
   return {
     ...article,
+    thumbnailUrl: normalizedThumbnailUrl,
     relatedTickers: Array.from(new Set(article.relatedTickers))
   };
 }
