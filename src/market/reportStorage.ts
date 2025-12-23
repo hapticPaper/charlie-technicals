@@ -1,4 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
+import type { Dirent } from "node:fs";
 import path from "node:path";
 
 import { formatRawDataFileDate } from "./dataConventions";
@@ -47,7 +48,11 @@ export function toReportHighlights(report: MarketReport): MarketReportHighlights
 
 export async function readJson<T>(filePath: string): Promise<T> {
   const raw = await readFile(filePath, "utf8");
-  return JSON.parse(raw) as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    throw new Error(`[market:reportStorage] Failed to parse JSON: ${filePath}`, { cause: error });
+  }
 }
 
 /**
@@ -90,9 +95,9 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
 }
 
 export async function listReportDates(): Promise<string[]> {
-  let entries: string[] = [];
+  let entries: Dirent[] = [];
   try {
-    entries = await readdir(REPORTS_DIR);
+    entries = await readdir(REPORTS_DIR, { withFileTypes: true });
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error
@@ -107,8 +112,8 @@ export async function listReportDates(): Promise<string[]> {
   }
 
   return entries
-    .filter((e) => e.endsWith(".mdx"))
-    .map((e) => e.replace(/\.mdx$/, ""))
+    .filter((e) => e.isFile() && e.name.endsWith(".mdx"))
+    .map((e) => e.name.replace(/\.mdx$/, ""))
     .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
     .sort();
 }
