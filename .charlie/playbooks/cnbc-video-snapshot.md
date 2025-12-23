@@ -32,7 +32,7 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 
 4. Enrich the snapshot by reading headlines and doing the dimensionality reduction:
 
-   - For each saved video, read `title` and set:
+   - For each saved video, Charlie must read `title` and set:
      - `topic` to a short, low-dimensional best guess theme (avoid show/segment names).
      - `relatedTickers` to the tickers you are confident the video is primarily about.
      - `symbol` to the primary ticker when exactly one is clearly implied; otherwise `null`.
@@ -47,11 +47,16 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
   - `topic` is best-effort and should reflect what the video is about (not the show/segment name).
   - `symbol` is best-effort and should be the primary ticker symbol when one can be inferred (otherwise `null`).
   - If both a specific ticker and a broader theme are present, prefer the ticker for `symbol` and capture the theme in `topic`.
-  - `other` is a UI fallback label for missing topics, not a valid topic.
+  - `other` is a UI fallback label for missing topics, not a valid topic. Never set `topic` to `other` in stored data.
 
 ## Verify
 
 - `content/data/cnbc/news/<YYYYMMDD>.json` exists.
+- Spot-check topics (avoid the all-`other` failure mode):
+
+  ```bash
+  jq -r '.[].topic // "other"' content/data/cnbc/news/<YYYYMMDD>.json | sort | uniq -c | sort -nr | head
+  ```
 
 ## Rollback
 
