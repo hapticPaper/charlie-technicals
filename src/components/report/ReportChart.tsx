@@ -431,8 +431,14 @@ export function ReportChart(props: {
         volumeSeries.setData(
           toHistogramSeriesData(series.t, series.volume, (idx) => {
             const close = series.close[idx];
-            const prev = idx > 0 ? series.close[idx - 1] : close;
             const closeOk = typeof close === "number" && Number.isFinite(close);
+
+            if (idx === 0) {
+              // First bar has no prior close: treat finite close as "up" and missing data as muted.
+              return promoteAlpha(closeOk ? bull : muted, 0.65);
+            }
+
+            const prev = series.close[idx - 1];
             const prevOk = typeof prev === "number" && Number.isFinite(prev);
 
             if (!closeOk) {
