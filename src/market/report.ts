@@ -1,10 +1,16 @@
 import type {
   AnalyzedSeries,
+  BollingerBandsSeries,
+  KeltnerChannelsSeries,
   MarketInterval,
   MarketReport,
   ReportPick,
-  ReportIntervalSeries
+  ReportIntervalSeries,
+  SqueezeState,
+  TtmSqueezeSeries
 } from "./types";
+
+import { SQUEEZE_STATES } from "./types";
 
 import type { TradePlan, TradeSide } from "./types";
 
@@ -135,35 +141,281 @@ function buildTradePlan(series15m: AnalyzedSeries, side: TradeSide): TradePlan {
   return { side, entry, stop, targets };
 }
 
-function toNullableNumber(value: number | null | undefined): number | null {
+function toNullableNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportIntervalSeries {
-  const sma20 = Array.isArray(analyzed.indicators.sma20) ? analyzed.indicators.sma20 : undefined;
-  const ema20 = Array.isArray(analyzed.indicators.ema20) ? analyzed.indicators.ema20 : undefined;
-  const rsi14 = Array.isArray(analyzed.indicators.rsi14) ? analyzed.indicators.rsi14 : undefined;
+function toNullableBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportIntervalSeries {
   const bars = analyzed.bars;
   const startIndex = Math.max(0, bars.length - maxPoints);
   const slicedBars = bars.slice(startIndex);
+  const sliceLength = slicedBars.length;
+
+  const warnPrefix = `[report] ${analyzed.symbol}/${analyzed.interval}`;
+
+  function warn(message: string): void {
+    console.warn(`${warnPrefix} ${message}`);
+  }
+
+  function sliceNullableNumberSeries(value: unknown, context: string): Array<number | null> {
+    const fallback = new Array(sliceLength).fill(null);
+
+    if (!Array.isArray(value)) {
+      warn(`Invalid ${context} series: expected array`);
+      return fallback;
+    }
+    if (value.length !== bars.length) {
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return fallback;
+    }
+
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v !== "number") {
+        invalidCount += 1;
+        return null;
+      }
+
+      return toNullableNumber(v);
+    });
+
+    if (invalidCount > 0) {
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-number items to null`);
+    }
+
+    return out;
+  }
+
+  function sliceStrictNullableNumberSeries(
+    value: unknown,
+    context: string
+  ): Array<number | null> | undefined {
+    if (!Array.isArray(value)) {
+      warn(`Invalid ${context} series: expected array`);
+      return undefined;
+    }
+    if (value.length !== bars.length) {
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return undefined;
+    }
+
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v !== "number") {
+        invalidCount += 1;
+        return null;
+      }
+
+      return toNullableNumber(v);
+    });
+
+    if (invalidCount > 0) {
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-number items to null`);
+    }
+
+    return out;
+  }
+
+  function sliceStrictNullableBoolSeries(
+    value: unknown,
+    context: string
+  ): Array<boolean | null> | undefined {
+    if (!Array.isArray(value)) {
+      warn(`Invalid ${context} series: expected array`);
+      return undefined;
+    }
+    if (value.length !== bars.length) {
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return undefined;
+    }
+
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v !== "boolean") {
+        invalidCount += 1;
+        return null;
+      }
+
+      return toNullableBoolean(v);
+    });
+
+    if (invalidCount > 0) {
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-boolean items to null`);
+    }
+
+    return out;
+  }
+
+  function sliceStrictNullableSqueezeStateSeries(
+    value: unknown,
+    context: string
+  ): Array<SqueezeState | null> | undefined {
+    if (!Array.isArray(value)) {
+      warn(`Invalid ${context} series: expected array`);
+      return undefined;
+    }
+    if (value.length !== bars.length) {
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return undefined;
+    }
+
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v === "string" && (SQUEEZE_STATES as readonly string[]).includes(v)) {
+        return v as SqueezeState;
+      }
+
+      invalidCount += 1;
+      return null;
+    });
+
+    if (invalidCount > 0) {
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-state items to null`);
+    }
+
+    return out;
+  }
+
+  type ChannelSeries = { middle: Array<number | null>; upper: Array<number | null>; lower: Array<number | null> };
+
+  function sliceChannelSeries(value: unknown, context: string): ChannelSeries | undefined {
+    if (!isRecord(value)) {
+      warn(`Invalid ${context} series: expected object`);
+      return undefined;
+    }
+
+    const middle = sliceStrictNullableNumberSeries(value.middle, `${context}.middle`);
+    const upper = sliceStrictNullableNumberSeries(value.upper, `${context}.upper`);
+    const lower = sliceStrictNullableNumberSeries(value.lower, `${context}.lower`);
+    if (!middle || !upper || !lower) {
+      return undefined;
+    }
+
+    return {
+      middle,
+      upper,
+      lower
+    };
+  }
+
+  function sliceTtmSqueezeSeries(value: unknown, context: string): TtmSqueezeSeries | undefined {
+    if (!isRecord(value)) {
+      warn(`Invalid ${context} series: expected object`);
+      return undefined;
+    }
+
+    const bollinger = sliceChannelSeries(value.bollinger, `${context}.bollinger`);
+    const keltner = sliceChannelSeries(value.keltner, `${context}.keltner`);
+    if (!bollinger || !keltner) {
+      return undefined;
+    }
+
+    const squeezeOn = sliceStrictNullableBoolSeries(value.squeezeOn, `${context}.squeezeOn`);
+    const squeezeOff = sliceStrictNullableBoolSeries(value.squeezeOff, `${context}.squeezeOff`);
+    const momentum = sliceStrictNullableNumberSeries(value.momentum, `${context}.momentum`);
+    if (!squeezeOn || !squeezeOff || !momentum) {
+      return undefined;
+    }
+
+    const derivedSqueezeState = squeezeOn.map((on, idx) => {
+      const off = squeezeOff[idx];
+      if (on === null || off === null) {
+        return null;
+      }
+      return on ? "on" : off ? "off" : "neutral";
+    });
+
+    const squeezeState =
+      value.squeezeState === undefined
+        ? derivedSqueezeState
+        : sliceStrictNullableSqueezeStateSeries(value.squeezeState, `${context}.squeezeState`) ?? derivedSqueezeState;
+
+    const hasMomentum = momentum.some((v) => v !== null);
+    const hasSqueezeFlag = squeezeOn.some((v) => v !== null) || squeezeOff.some((v) => v !== null);
+    if (!hasMomentum && !hasSqueezeFlag) {
+      return undefined;
+    }
+
+    return {
+      bollinger,
+      keltner,
+      squeezeOn,
+      squeezeOff,
+      squeezeState,
+      momentum
+    };
+  }
+
+  const sma =
+    analyzed.indicators.sma20 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.sma20, "sma20");
+  const ema =
+    analyzed.indicators.ema20 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.ema20, "ema20");
+  const rsi =
+    analyzed.indicators.rsi14 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.rsi14, "rsi14");
+  const atr =
+    analyzed.indicators.atr14 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.atr14, "atr14");
+
+  const bollingerOut =
+    analyzed.indicators.bollinger20 === undefined
+      ? undefined
+      : (sliceChannelSeries(analyzed.indicators.bollinger20, "bollinger20") as
+          | BollingerBandsSeries
+          | undefined);
+  const keltnerOut =
+    analyzed.indicators.keltner20 === undefined
+      ? undefined
+      : (sliceChannelSeries(analyzed.indicators.keltner20, "keltner20") as
+          | KeltnerChannelsSeries
+          | undefined);
+  const ttmOut =
+    analyzed.indicators.ttmSqueeze20 === undefined
+      ? undefined
+      : sliceTtmSqueezeSeries(analyzed.indicators.ttmSqueeze20, "ttmSqueeze20");
 
   const t = slicedBars.map((b) => Math.floor(new Date(b.t).getTime() / 1000));
   const close = slicedBars.map((b) => b.c);
   const high = slicedBars.map((b) => b.h);
   const low = slicedBars.map((b) => b.l);
-  const sma = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return sma20 ? toNullableNumber(sma20[i]) : null;
-  });
-  const ema = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return ema20 ? toNullableNumber(ema20[i]) : null;
-  });
-  const rsi = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return rsi14 ? toNullableNumber(rsi14[i]) : null;
-  });
 
   return {
     symbol: analyzed.symbol,
@@ -175,6 +427,10 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     sma20: sma,
     ema20: ema,
     rsi14: rsi,
+    atr14: atr,
+    bollinger20: bollingerOut,
+    keltner20: keltnerOut,
+    ttmSqueeze20: ttmOut,
     signals: analyzed.signals
   };
 }

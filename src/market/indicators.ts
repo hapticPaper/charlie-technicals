@@ -1,4 +1,11 @@
-import type { MacdSeries } from "./types";
+import type {
+  BollingerBandsSeries,
+  KeltnerChannelsSeries,
+  MacdSeries,
+  MarketBar,
+  SqueezeState,
+  TtmSqueezeSeries
+} from "./types";
 
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -156,4 +163,350 @@ export function macd(
   }
 
   return { macd: macdLine, signal, histogram };
+}
+
+export function stdev(values: Array<number | null>, period: number): Array<number | null> {
+  if (period <= 0) {
+    throw new Error(`stdev period must be > 0, got ${period}`);
+  }
+
+  const out: Array<number | null> = new Array(values.length).fill(null);
+  let sum = 0;
+  let sumSq = 0;
+  let count = 0;
+
+  for (let i = 0; i < values.length; i += 1) {
+    const v = values[i];
+    if (isFiniteNumber(v)) {
+      sum += v;
+      sumSq += v * v;
+      count += 1;
+    }
+
+    const dropIndex = i - period;
+    if (dropIndex >= 0) {
+      const drop = values[dropIndex];
+      if (isFiniteNumber(drop)) {
+        sum -= drop;
+        sumSq -= drop * drop;
+        count -= 1;
+      }
+    }
+
+    // Only emit when the last `period` samples are all finite.
+    if (i >= period - 1 && count === period) {
+      const mean = sum / period;
+      const variance = sumSq / period - mean * mean;
+      out[i] = Math.sqrt(Math.max(0, variance));
+    }
+  }
+
+  return out;
+}
+
+export function highest(values: Array<number | null>, period: number): Array<number | null> {
+  if (period <= 0) {
+    throw new Error(`highest period must be > 0, got ${period}`);
+  }
+
+  // O(n * period) is acceptable here because the configured periods are small.
+  // Non-strict: ignores missing values. If no values are present in the window, emits null.
+  const out: Array<number | null> = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i += 1) {
+    let max = -Infinity;
+    let count = 0;
+
+    for (let j = i - period + 1; j <= i; j += 1) {
+      const v = values[j];
+      if (!isFiniteNumber(v)) {
+        continue;
+      }
+      count += 1;
+      max = Math.max(max, v);
+    }
+
+    out[i] = count > 0 ? max : null;
+  }
+
+  return out;
+}
+
+export function lowest(values: Array<number | null>, period: number): Array<number | null> {
+  if (period <= 0) {
+    throw new Error(`lowest period must be > 0, got ${period}`);
+  }
+
+  // O(n * period) is acceptable here because the configured periods are small.
+  // Non-strict: ignores missing values. If no values are present in the window, emits null.
+  const out: Array<number | null> = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i += 1) {
+    let min = Infinity;
+    let count = 0;
+
+    for (let j = i - period + 1; j <= i; j += 1) {
+      const v = values[j];
+      if (!isFiniteNumber(v)) {
+        continue;
+      }
+      count += 1;
+      min = Math.min(min, v);
+    }
+
+    out[i] = count > 0 ? min : null;
+  }
+
+  return out;
+}
+
+function trueRange(bars: MarketBar[]): Array<number | null> {
+  const out: Array<number | null> = new Array(bars.length).fill(null);
+
+  for (let i = 0; i < bars.length; i += 1) {
+    const b = bars[i];
+    const prev = bars[i - 1];
+    const high = b?.h;
+    const low = b?.l;
+    const prevClose = prev?.c;
+
+    const highValue = isFiniteNumber(high) ? high : null;
+    const lowValue = isFiniteNumber(low) ? low : null;
+    const prevCloseValue = isFiniteNumber(prevClose) ? prevClose : null;
+
+    if (highValue !== null && lowValue !== null) {
+      // Normalize in case the data source reports inverted bars (high < low).
+      const normHigh = Math.max(highValue, lowValue);
+      const normLow = Math.min(highValue, lowValue);
+      const hl = normHigh - normLow;
+      if (prevCloseValue === null) {
+        out[i] = hl;
+        continue;
+      }
+
+      out[i] = Math.max(hl, Math.abs(normHigh - prevCloseValue), Math.abs(normLow - prevCloseValue));
+      continue;
+    }
+
+    if (highValue === null && lowValue === null) {
+      continue;
+    }
+
+    // If the feed only provides one bound (high or low), treat the missing
+    // bound as `prevClose` and fall back to `abs(bound - prevClose)`.
+    // This requires `prevClose` to be present.
+    if (prevCloseValue === null) {
+      continue;
+    }
+
+    if (highValue !== null) {
+      out[i] = Math.abs(highValue - prevCloseValue);
+      continue;
+    }
+
+    if (lowValue !== null) {
+      out[i] = Math.abs(lowValue - prevCloseValue);
+    }
+  }
+
+  return out;
+}
+
+export function atr(bars: MarketBar[], period: number): Array<number | null> {
+  if (period <= 0) {
+    throw new Error(`ATR period must be > 0, got ${period}`);
+  }
+
+  const tr = trueRange(bars);
+  const seed = sma(tr, period);
+  const out: Array<number | null> = new Array(bars.length).fill(null);
+
+  let prev: number | null = null;
+  for (let i = 0; i < bars.length; i += 1) {
+    const seeded = seed[i];
+    if (prev === null) {
+      if (isFiniteNumber(seeded)) {
+        prev = seeded;
+        out[i] = prev;
+      }
+      continue;
+    }
+
+    const currTr = tr[i];
+    if (!isFiniteNumber(currTr)) {
+      // Preserve continuity by carrying forward the last ATR value when TR is missing.
+      out[i] = prev;
+      continue;
+    }
+
+    prev = (prev * (period - 1) + currTr) / period;
+    out[i] = prev;
+  }
+
+  return out;
+}
+
+export function bollingerBands(
+  values: Array<number | null>,
+  period: number,
+  stdevMult: number
+): BollingerBandsSeries {
+  if (!(typeof stdevMult === "number" && Number.isFinite(stdevMult) && stdevMult > 0)) {
+    throw new Error(`Bollinger stdevMult must be > 0, got ${stdevMult}`);
+  }
+
+  const middle = sma(values, period);
+  const sd = stdev(values, period);
+  const upper: Array<number | null> = new Array(values.length).fill(null);
+  const lower: Array<number | null> = new Array(values.length).fill(null);
+
+  for (let i = 0; i < values.length; i += 1) {
+    const m = middle[i];
+    const s = sd[i];
+    if (!isFiniteNumber(m) || !isFiniteNumber(s)) {
+      continue;
+    }
+
+    upper[i] = m + s * stdevMult;
+    lower[i] = m - s * stdevMult;
+  }
+
+  return { middle, upper, lower };
+}
+
+export function keltnerChannels(
+  bars: MarketBar[],
+  period: number,
+  atrMult: number
+): KeltnerChannelsSeries {
+  if (!(typeof atrMult === "number" && Number.isFinite(atrMult) && atrMult > 0)) {
+    throw new Error(`Keltner atrMult must be > 0, got ${atrMult}`);
+  }
+
+  const close = bars.map((b) => (isFiniteNumber(b.c) ? b.c : null));
+  const middle = ema(close, period);
+  const range = atr(bars, period);
+  const upper: Array<number | null> = new Array(bars.length).fill(null);
+  const lower: Array<number | null> = new Array(bars.length).fill(null);
+
+  for (let i = 0; i < bars.length; i += 1) {
+    const m = middle[i];
+    const r = range[i];
+    if (!isFiniteNumber(m) || !isFiniteNumber(r)) {
+      continue;
+    }
+
+    upper[i] = m + r * atrMult;
+    lower[i] = m - r * atrMult;
+  }
+
+  return { middle, upper, lower };
+}
+
+export function linreg(values: Array<number | null>, period: number): Array<number | null> {
+  if (period <= 0) {
+    throw new Error(`linreg period must be > 0, got ${period}`);
+  }
+
+  const out: Array<number | null> = new Array(values.length).fill(null);
+  const n = period;
+  const sumX = (n * (n - 1)) / 2;
+  const sumX2 = (n * (n - 1) * (2 * n - 1)) / 6;
+  const denom = n * sumX2 - sumX * sumX;
+
+  for (let i = period - 1; i < values.length; i += 1) {
+    let sumY = 0;
+    let sumXY = 0;
+    let count = 0;
+
+    for (let j = 0; j < period; j += 1) {
+      const y = values[i - period + 1 + j];
+      if (!isFiniteNumber(y)) {
+        continue;
+      }
+
+      count += 1;
+      sumY += y;
+      sumXY += j * y;
+    }
+
+    if (count !== period) {
+      continue;
+    }
+
+    const slope = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+    const intercept = (sumY - slope * sumX) / n;
+    out[i] = intercept + slope * (n - 1);
+  }
+
+  return out;
+}
+
+export function ttmSqueeze(
+  bars: MarketBar[],
+  period: number,
+  bbMult: number,
+  kcMult: number
+): TtmSqueezeSeries {
+  if (!(typeof bbMult === "number" && Number.isFinite(bbMult) && bbMult > 0)) {
+    throw new Error(`TTM Squeeze bbMult must be > 0, got ${bbMult}`);
+  }
+  if (!(typeof kcMult === "number" && Number.isFinite(kcMult) && kcMult > 0)) {
+    throw new Error(`TTM Squeeze kcMult must be > 0, got ${kcMult}`);
+  }
+
+  const close = bars.map((b) => (isFiniteNumber(b.c) ? b.c : null));
+  const high = bars.map((b) => (isFiniteNumber(b.h) ? b.h : null));
+  const low = bars.map((b) => (isFiniteNumber(b.l) ? b.l : null));
+
+  const bollinger = bollingerBands(close, period, bbMult);
+  const keltner = keltnerChannels(bars, period, kcMult);
+
+  const squeezeOn: Array<boolean | null> = new Array(bars.length).fill(null);
+  const squeezeOff: Array<boolean | null> = new Array(bars.length).fill(null);
+  const squeezeState: Array<SqueezeState | null> = new Array(bars.length).fill(null);
+
+  for (let i = 0; i < bars.length; i += 1) {
+    const bbU = bollinger.upper[i];
+    const bbL = bollinger.lower[i];
+    const kcU = keltner.upper[i];
+    const kcL = keltner.lower[i];
+    if (!isFiniteNumber(bbU) || !isFiniteNumber(bbL) || !isFiniteNumber(kcU) || !isFiniteNumber(kcL)) {
+      continue;
+    }
+
+    const on = bbU < kcU && bbL > kcL;
+    const off = !on && bbU > kcU && bbL < kcL;
+    squeezeOn[i] = on;
+    squeezeOff[i] = off;
+    squeezeState[i] = on ? "on" : off ? "off" : "neutral";
+  }
+
+  const highestHigh = highest(high, period);
+  const lowestLow = lowest(low, period);
+  const smaClose = sma(close, period);
+
+  const source: Array<number | null> = new Array(bars.length).fill(null);
+  for (let i = 0; i < bars.length; i += 1) {
+    const c = close[i];
+    const hh = highestHigh[i];
+    const ll = lowestLow[i];
+    const sm = smaClose[i];
+    if (!isFiniteNumber(c) || !isFiniteNumber(hh) || !isFiniteNumber(ll) || !isFiniteNumber(sm)) {
+      continue;
+    }
+
+    const mid = (hh + ll) / 2;
+    const mean = (mid + sm) / 2;
+    source[i] = c - mean;
+  }
+
+  const momentum = linreg(source, period);
+
+  return {
+    bollinger,
+    keltner,
+    squeezeOn,
+    squeezeOff,
+    squeezeState,
+    momentum
+  };
 }

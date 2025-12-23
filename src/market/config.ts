@@ -10,6 +10,11 @@ export type IndicatorDefinition =
   | { id: string; type: "sma"; period: number; source: "close" }
   | { id: string; type: "ema"; period: number; source: "close" }
   | { id: string; type: "rsi"; period: number; source: "close" }
+  | { id: string; type: "stdev"; period: number; source: "close" }
+  | { id: string; type: "atr"; period: number; source: "bars" }
+  | { id: string; type: "bollingerBands"; period: number; stdevMult: number; source: "close" }
+  | { id: string; type: "keltnerChannels"; period: number; atrMult: number; source: "bars" }
+  | { id: string; type: "ttmSqueeze"; period: number; bbMult: number; kcMult: number; source: "bars" }
   | {
       id: string;
       type: "macd";
@@ -63,6 +68,14 @@ function assertPositiveInteger(value: unknown, name: string): number {
   return n;
 }
 
+function assertPositiveNumber(value: unknown, name: string): number {
+  const n = assertNumber(value, name);
+  if (!(n > 0)) {
+    throw new Error(`${name} must be > 0, got ${n}`);
+  }
+  return n;
+}
+
 function validateIndicator(raw: unknown): IndicatorDefinition {
   if (!isRecord(raw)) {
     throw new Error("indicator must be an object");
@@ -71,11 +84,14 @@ function validateIndicator(raw: unknown): IndicatorDefinition {
   const id = assertString(raw.id, "indicator.id");
   const type = assertString(raw.type, "indicator.type");
   const source = assertString(raw.source, "indicator.source");
-  if (source !== "close") {
+  if (source !== "close" && source !== "bars") {
     throw new Error(`Unsupported indicator.source: ${source}`);
   }
 
-  if (type === "sma" || type === "ema" || type === "rsi") {
+  if (type === "sma" || type === "ema" || type === "rsi" || type === "stdev") {
+    if (source !== "close") {
+      throw new Error(`indicator.${id}.source must be close`);
+    }
     return {
       id,
       type,
@@ -84,7 +100,67 @@ function validateIndicator(raw: unknown): IndicatorDefinition {
     };
   }
 
+  if (type === "atr") {
+    if (source !== "bars") {
+      throw new Error(`indicator.${id}.source must be bars`);
+    }
+
+    return {
+      id,
+      type,
+      source: "bars",
+      period: assertPositiveInteger(raw.period, `indicator.${id}.period`)
+    };
+  }
+
+  if (type === "bollingerBands") {
+    if (source !== "close") {
+      throw new Error(`indicator.${id}.source must be close`);
+    }
+
+    return {
+      id,
+      type,
+      source: "close",
+      period: assertPositiveInteger(raw.period, `indicator.${id}.period`),
+      stdevMult: assertPositiveNumber(raw.stdevMult, `indicator.${id}.stdevMult`)
+    };
+  }
+
+  if (type === "keltnerChannels") {
+    if (source !== "bars") {
+      throw new Error(`indicator.${id}.source must be bars`);
+    }
+
+    return {
+      id,
+      type,
+      source: "bars",
+      period: assertPositiveInteger(raw.period, `indicator.${id}.period`),
+      atrMult: assertPositiveNumber(raw.atrMult, `indicator.${id}.atrMult`)
+    };
+  }
+
+  if (type === "ttmSqueeze") {
+    if (source !== "bars") {
+      throw new Error(`indicator.${id}.source must be bars`);
+    }
+
+    return {
+      id,
+      type,
+      source: "bars",
+      period: assertPositiveInteger(raw.period, `indicator.${id}.period`),
+      bbMult: assertPositiveNumber(raw.bbMult, `indicator.${id}.bbMult`),
+      kcMult: assertPositiveNumber(raw.kcMult, `indicator.${id}.kcMult`)
+    };
+  }
+
   if (type === "macd") {
+    if (source !== "close") {
+      throw new Error(`indicator.${id}.source must be close`);
+    }
+
     const fastPeriod = assertPositiveInteger(raw.fastPeriod, `indicator.${id}.fastPeriod`);
     const slowPeriod = assertPositiveInteger(raw.slowPeriod, `indicator.${id}.slowPeriod`);
     const signalPeriod = assertPositiveInteger(raw.signalPeriod, `indicator.${id}.signalPeriod`);
