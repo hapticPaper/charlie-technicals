@@ -156,15 +156,21 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
   const slicedBars = bars.slice(startIndex);
   const sliceLength = slicedBars.length;
 
+  const warnPrefix = `[report] ${analyzed.symbol}/${analyzed.interval}`;
+
+  function warn(message: string): void {
+    console.warn(`${warnPrefix} ${message}`);
+  }
+
   function sliceNullableNumberSeries(value: unknown, context: string): Array<number | null> {
     const fallback = new Array(sliceLength).fill(null);
 
     if (!Array.isArray(value)) {
-      console.warn(`Invalid ${context} series: expected array`);
+      warn(`Invalid ${context} series: expected array`);
       return fallback;
     }
     if (value.length !== bars.length) {
-      console.warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
       return fallback;
     }
 
@@ -185,22 +191,59 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     });
 
     if (invalidCount > 0) {
-      console.warn(`Invalid ${context} series values: coerced ${invalidCount} non-number items to null`);
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-number items to null`);
     }
 
     return out;
   }
 
-  function sliceNullableBoolSeries(value: unknown, context: string): Array<boolean | null> {
-    const fallback = new Array(sliceLength).fill(null) as Array<boolean | null>;
-
+  function sliceStrictNullableNumberSeries(
+    value: unknown,
+    context: string
+  ): Array<number | null> | undefined {
     if (!Array.isArray(value)) {
-      console.warn(`Invalid ${context} series: expected array`);
-      return fallback;
+      warn(`Invalid ${context} series: expected array`);
+      return undefined;
     }
     if (value.length !== bars.length) {
-      console.warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
-      return fallback;
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return undefined;
+    }
+
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v !== "number") {
+        invalidCount += 1;
+        return null;
+      }
+
+      return toNullableNumber(v);
+    });
+
+    if (invalidCount > 0) {
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-number items to null`);
+    }
+
+    return out;
+  }
+
+  function sliceStrictNullableBoolSeries(
+    value: unknown,
+    context: string
+  ): Array<boolean | null> | undefined {
+    if (!Array.isArray(value)) {
+      warn(`Invalid ${context} series: expected array`);
+      return undefined;
+    }
+    if (value.length !== bars.length) {
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return undefined;
     }
 
     let invalidCount = 0;
@@ -220,7 +263,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     });
 
     if (invalidCount > 0) {
-      console.warn(`Invalid ${context} series values: coerced ${invalidCount} non-boolean items to null`);
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-boolean items to null`);
     }
 
     return out;
@@ -230,20 +273,27 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
 
   function sliceChannelSeries(value: unknown, context: string): ChannelSeries | undefined {
     if (!isRecord(value)) {
-      console.warn(`Invalid ${context} series: expected object`);
+      warn(`Invalid ${context} series: expected object`);
+      return undefined;
+    }
+
+    const middle = sliceStrictNullableNumberSeries(value.middle, `${context}.middle`);
+    const upper = sliceStrictNullableNumberSeries(value.upper, `${context}.upper`);
+    const lower = sliceStrictNullableNumberSeries(value.lower, `${context}.lower`);
+    if (!middle || !upper || !lower) {
       return undefined;
     }
 
     return {
-      middle: sliceNullableNumberSeries(value.middle, `${context}.middle`),
-      upper: sliceNullableNumberSeries(value.upper, `${context}.upper`),
-      lower: sliceNullableNumberSeries(value.lower, `${context}.lower`)
+      middle,
+      upper,
+      lower
     };
   }
 
   function sliceTtmSqueezeSeries(value: unknown, context: string): TtmSqueezeSeries | undefined {
     if (!isRecord(value)) {
-      console.warn(`Invalid ${context} series: expected object`);
+      warn(`Invalid ${context} series: expected object`);
       return undefined;
     }
 
@@ -253,12 +303,25 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
       return undefined;
     }
 
+    const squeezeOn = sliceStrictNullableBoolSeries(value.squeezeOn, `${context}.squeezeOn`);
+    const squeezeOff = sliceStrictNullableBoolSeries(value.squeezeOff, `${context}.squeezeOff`);
+    const momentum = sliceStrictNullableNumberSeries(value.momentum, `${context}.momentum`);
+    if (!squeezeOn || !squeezeOff || !momentum) {
+      return undefined;
+    }
+
+    const hasMomentum = momentum.some((v) => v !== null);
+    const hasSqueezeFlag = squeezeOn.some((v) => v !== null) || squeezeOff.some((v) => v !== null);
+    if (!hasMomentum && !hasSqueezeFlag) {
+      return undefined;
+    }
+
     return {
       bollinger,
       keltner,
-      squeezeOn: sliceNullableBoolSeries(value.squeezeOn, `${context}.squeezeOn`),
-      squeezeOff: sliceNullableBoolSeries(value.squeezeOff, `${context}.squeezeOff`),
-      momentum: sliceNullableNumberSeries(value.momentum, `${context}.momentum`)
+      squeezeOn,
+      squeezeOff,
+      momentum
     };
   }
 
