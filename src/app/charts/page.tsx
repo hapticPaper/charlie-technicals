@@ -66,6 +66,7 @@ const PLUGIN_EXAMPLES: ReadonlyArray<PluginExample> = [
 function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: string }) {
   const { label, url, sandbox } = props;
   const statusId = useId();
+  const [open, setOpen] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [failed, setFailed] = useState(false);
   const timeoutIdRef = useRef<number | null>(null);
@@ -78,6 +79,13 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   };
 
   useEffect(() => {
+    if (!open) {
+      setFailed(false);
+      setTimedOut(false);
+      clearLoadTimeout();
+      return;
+    }
+
     setFailed(false);
     setTimedOut(false);
 
@@ -93,10 +101,15 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
     return () => {
       clearLoadTimeout();
     };
-  }, [url]);
+  }, [open, url]);
 
   return (
-    <details style={{ marginTop: 12 }}>
+    <details
+      style={{ marginTop: 12 }}
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open);
+      }}
+    >
       <summary>{label}</summary>
       <p
         id={statusId}
@@ -114,31 +127,32 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
           : ""}
       </p>
 
-      <iframe
-        title={label}
-        aria-describedby={statusId}
-        src={url}
-        loading="lazy"
-        sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
-        referrerPolicy="no-referrer"
-        onLoad={() => {
-          setFailed(false);
-          setTimedOut(false);
-          clearLoadTimeout();
-        }}
-        onError={() => {
-          setFailed(true);
-          setTimedOut(false);
-          clearLoadTimeout();
-        }}
-        style={{
-          width: "100%",
-          height: 640,
-          border: "1px solid var(--rp-border)",
-          borderRadius: 12,
-          background: "var(--rp-surface)"
-        }}
-      />
+      {open ? (
+        <iframe
+          title={label}
+          aria-describedby={statusId}
+          src={url}
+          loading="lazy"
+          sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
+          referrerPolicy="no-referrer"
+          onLoad={() => {
+            setFailed(false);
+            setTimedOut(false);
+            clearLoadTimeout();
+          }}
+          onError={() => {
+            setFailed(true);
+            clearLoadTimeout();
+          }}
+          style={{
+            width: "100%",
+            height: 640,
+            border: "1px solid var(--rp-border)",
+            borderRadius: 12,
+            background: "var(--rp-surface)"
+          }}
+        />
+      ) : null}
 
       <p className="report-muted" style={{ margin: "10px 0 0" }}>
         Some upstream examples may block embedding or load slowly. If the chart doesn’t load, use the “Open in a new tab”
