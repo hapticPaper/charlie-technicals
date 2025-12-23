@@ -233,6 +233,10 @@ export async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
+export async function readCnbcVideoArticles(date: string): Promise<StoredCnbcVideoArticle[]> {
+  return readJson<StoredCnbcVideoArticle[]>(getNewsPath(date, "cnbc"));
+}
+
 export async function listReportDates(): Promise<string[]> {
   const dir = getReportsDir();
   let entries: string[] = [];
@@ -341,6 +345,9 @@ function serializeNewsSnapshotForStorage(snapshot: MarketNewsSnapshot): unknown 
 
 /**
 * Writes a news snapshot for a given symbol/date.
+*
+* Note: `symbol === "cnbc"` snapshots are stored on disk as a flat array of
+* `StoredCnbcVideoArticle` instead of a `MarketNewsSnapshot`.
 *
 * News snapshots are immutable: if the target file already exists, the write is
 * skipped and the existing snapshot is left untouched.

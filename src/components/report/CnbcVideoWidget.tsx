@@ -1,4 +1,4 @@
-import { getNewsPath, readJson } from "../../market/storage";
+import { readCnbcVideoArticles } from "../../market/storage";
 import type { StoredCnbcVideoArticle } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
@@ -36,7 +36,7 @@ function buildTopicData(articles: CnbcVideoSnapshot): CnbcTopicHypeDatum[] {
 export async function CnbcVideoWidget(props: { date: string }) {
   let articles: CnbcVideoSnapshot;
   try {
-    articles = await readJson<CnbcVideoSnapshot>(getNewsPath(props.date, "cnbc"));
+    articles = await readCnbcVideoArticles(props.date);
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error
@@ -54,6 +54,12 @@ export async function CnbcVideoWidget(props: { date: string }) {
   }
 
   const articleDates = Array.from(new Set(articles.map((a) => a.asOfDate).filter(Boolean)));
+  if (articleDates.length !== 1) {
+    console.error("[CnbcVideoWidget] inconsistent asOfDate values", {
+      requestedDate: props.date,
+      articleDates
+    });
+  }
   const asOfDate = articleDates.length === 1 ? articleDates[0]! : props.date;
   const data = buildTopicData(articles);
   if (data.length === 0) {
