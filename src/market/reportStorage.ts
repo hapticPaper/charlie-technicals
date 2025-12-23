@@ -32,15 +32,26 @@ function normalizeAndValidateCnbcAsOfDate(date: string): string {
   return asOfDate;
 }
 
+function assertReportDateIsoYmd(date: string): void {
+  try {
+    parseIsoDateYmd(date);
+  } catch (error) {
+    throw new Error(`[market:reportStorage] Invalid report date: ${date}`, { cause: error });
+  }
+}
+
 export function getReportJsonPath(date: string): string {
+  assertReportDateIsoYmd(date);
   return path.join(REPORTS_DIR, `${date}.json`);
 }
 
 export function getReportHighlightsJsonPath(date: string): string {
+  assertReportDateIsoYmd(date);
   return path.join(REPORTS_DIR, `${date}.highlights.json`);
 }
 
 export function getReportMdxPath(date: string): string {
+  assertReportDateIsoYmd(date);
   return path.join(REPORTS_DIR, `${date}.mdx`);
 }
 
