@@ -37,6 +37,7 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
   Array<{ date: string; articles: CnbcVideoArticle[] }>
 > {
   const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
+  const failed: Array<{ date: string; message: string }> = [];
   const scanDates = [...allDates].sort().slice(-MAX_SCAN_DAYS).reverse();
 
   // Scan newest-to-oldest until we have N non-empty days. Fetch in small concurrent batches.
@@ -57,8 +58,17 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
       }
 
       const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      console.error(`[home:cnbc] Failed reading CNBC videos for ${date}: ${message}`);
+      failed.push({ date, message: message.length > 140 ? `${message.slice(0, 140)}…` : message });
     }
+  }
+
+  if (failed.length > 0) {
+    const preview = failed
+      .slice(0, 5)
+      .map(({ date, message }) => `${date} (${message})`)
+      .join(", ");
+    const suffix = failed.length > 5 ? ", …" : "";
+    console.error(`[home:cnbc] Failed reading CNBC videos for ${failed.length} day(s): ${preview}${suffix}`);
   }
 
   return dayArticles;
