@@ -528,23 +528,29 @@ export function ReportChart(props: {
             return base;
           }
 
-          let minValue = base.priceRange.minValue;
-          let maxValue = base.priceRange.maxValue;
+          const baseMin = base.priceRange.minValue;
+          const baseMax = base.priceRange.maxValue;
+
+          let minValue = baseMin;
+          let maxValue = baseMax;
 
           for (const value of tradePrices) {
             minValue = Math.min(minValue, value);
             maxValue = Math.max(maxValue, value);
           }
 
-          if (minValue === base.priceRange.minValue && maxValue === base.priceRange.maxValue) {
+          if (minValue === baseMin && maxValue === baseMax) {
             return base;
           }
+
+          const span = maxValue - minValue;
+          const pad = span > 0 ? span * 0.02 : Math.abs(maxValue) * 0.002 + 0.01;
 
           return {
             ...base,
             priceRange: {
-              minValue,
-              maxValue
+              minValue: minValue - pad,
+              maxValue: maxValue + pad
             }
           };
         }
