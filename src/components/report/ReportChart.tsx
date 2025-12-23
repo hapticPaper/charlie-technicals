@@ -446,6 +446,7 @@ export function ReportChart(props: {
             }
 
             if (!prevOk) {
+              // Missing previous close: default to bullish rather than guessing down.
               return promoteAlpha(bull, 0.65);
             }
 

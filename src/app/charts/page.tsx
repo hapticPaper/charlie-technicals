@@ -8,8 +8,9 @@ type PluginExample = {
   sandbox?: string;
 };
 
+// Intentionally omit allow-same-origin to reduce third-party iframe privileges.
 const DEFAULT_IFRAME_SANDBOX = "allow-scripts";
-const IFRAME_LOAD_TIMEOUT_MS = 2500;
+const IFRAME_LOAD_TIMEOUT_MS = 5000;
 
 const PLUGIN_EXAMPLES: ReadonlyArray<PluginExample> = [
   {
@@ -150,7 +151,7 @@ export default function ChartsPlaygroundPage() {
       </p>
 
       {PLUGIN_EXAMPLES.slice(1).map((e) => (
-        <ChartsExampleEmbed key={e.url} label={e.label} url={e.url} />
+        <ChartsExampleEmbed key={e.url} label={e.label} url={e.url} sandbox={e.sandbox} />
       ))}
     </>
   );
