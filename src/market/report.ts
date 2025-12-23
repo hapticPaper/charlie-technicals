@@ -870,6 +870,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
       : sliceTtmSqueezeSeries(analyzed.indicators.ttmSqueeze20, "ttmSqueeze20");
 
   const t = slicedBars.map((b) => Math.floor(new Date(b.t).getTime() / 1000));
+  const open = slicedBars.map((b) => b.o);
   const close = slicedBars.map((b) => b.c);
   const high = slicedBars.map((b) => b.h);
   const low = slicedBars.map((b) => b.l);
@@ -879,6 +880,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     symbol: analyzed.symbol,
     interval: analyzed.interval,
     t,
+    open,
     close,
     high,
     low,
