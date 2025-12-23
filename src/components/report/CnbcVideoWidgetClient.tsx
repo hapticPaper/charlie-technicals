@@ -13,8 +13,7 @@ import {
 
 import { useEffect, useState } from "react";
 
-// Recharts defaults `initialDimension` to `-1`, which triggers a warning before ResizeObserver runs.
-const RECHARTS_INITIAL_DIMENSION = { width: 1, height: 1 };
+import { RECHARTS_INITIAL_DIMENSION } from "./rechartsConfig";
 
 export type CnbcTopicHypeDatum = {
   topic: string;

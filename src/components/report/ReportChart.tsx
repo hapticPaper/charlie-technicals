@@ -15,8 +15,7 @@ import { useEffect, useState } from "react";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
-// Recharts defaults `initialDimension` to `-1`, which triggers a warning before ResizeObserver runs.
-const RECHARTS_INITIAL_DIMENSION = { width: 1, height: 1 };
+import { RECHARTS_INITIAL_DIMENSION } from "./rechartsConfig";
 
 type ChartAnnotations = {
   trade?: TradePlan;
