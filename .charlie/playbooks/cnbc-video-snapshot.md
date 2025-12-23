@@ -3,6 +3,8 @@
 ## Overview
 Scrape the CNBC Latest Video feed and write a news snapshot under `content/data/cnbc/news/<YYYYMMDD>.json`.
 
+Note: this is also run as part of `bun run market:data` (the full acquisition stage).
+
 ## Creates
 
 None. This playbook writes local artifacts under `content/data/cnbc/news/`.
@@ -17,6 +19,7 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 - Guardrails:
   - Do not modify existing historical snapshot files for past dates unless you are explicitly regenerating a known-bad snapshot (e.g. a parsing bug).
     In that case, delete the file first and re-run the command for that date, and reference the incident in the PR description.
+  - For today's date (America/New_York), reruns merge into the existing snapshot so late videos can be picked up without losing prior topic/ticker enrichment.
 
 ## Steps
 

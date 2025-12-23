@@ -1,11 +1,11 @@
-# Market data snapshot (raw OHLCV)
+# Market acquisition snapshot (OHLCV + news + CNBC)
 
 ## Overview
-Fetch raw OHLCV bars for the configured symbol universe and time windows, and write them under `content/data/<date>/`.
+Fetch the daily acquisition snapshot (raw OHLCV bars + Yahoo news + CNBC videos) and write the results under `content/data/`.
 
 ## Creates
 
-None. This playbook writes local artifacts under `content/data/<DATE>/` for downstream analysis.
+None. This playbook writes local artifacts under `content/data/` for downstream analysis.
 
 ## Prerequisites
 
@@ -15,7 +15,9 @@ None. This playbook writes local artifacts under `content/data/<DATE>/` for down
 ## Limits
 
 - Guardrails:
-  - Do not modify existing historical snapshot files for past dates.
+  - Historical snapshots are treated as immutable.
+  - For today's date (America/New_York), reruns merge into existing snapshots to fill gaps and pick up late updates.
+  - When doing a full daily workflow, use the same `<DATE>` across acquisition, analysis, and report steps. Avoid interleaving runs for different dates in one branch.
 
 ## Steps
 
@@ -27,14 +29,33 @@ None. This playbook writes local artifacts under `content/data/<DATE>/` for down
    bun run market:data --date=<DATE>
    ```
 
-3. Confirm the new folder exists: `content/data/<DATE>/`.
+3. Confirm the new files exist:
+
+   - Raw OHLCV bars:
+     - `content/data/<SYMBOL>/<INTERVAL>/<YYYYMMDD>.json`
+   - Yahoo news:
+     - `content/data/<SYMBOL>/news/<YYYYMMDD>.json`
+   - CNBC videos:
+     - `content/data/cnbc/news/<YYYYMMDD>.json`
 
 4. Do not open a PR (these are intermediate artifacts).
 
+   If you're doing a full daily run, the daily report playbook PR should include the new `content/data/**/<YYYYMMDD>.json` snapshots for that date.
+
 ## Verify
 
-- `content/data/<DATE>/` exists and contains one `.json` per symbol+interval.
+- Spot-check that raw bars + news snapshots exist for a representative symbol:
+
+  - `content/data/SPY/1d/<YYYYMMDD>.json`
+  - `content/data/SPY/news/<YYYYMMDD>.json`
+  - `content/data/cnbc/news/<YYYYMMDD>.json`
 
 ## Rollback
 
-- Delete the `content/data/<DATE>/` folder if you want to discard the fetched snapshots.
+- For today's date (America/New_York), delete the `<YYYYMMDD>.json` snapshots you fetched under:
+
+  - `content/data/<SYMBOL>/<INTERVAL>/`
+  - `content/data/<SYMBOL>/news/`
+  - `content/data/cnbc/news/`
+
+- For historical dates, do not delete or overwrite existing snapshots unless you are explicitly regenerating a known-bad snapshot (and you should document the incident in the PR description).

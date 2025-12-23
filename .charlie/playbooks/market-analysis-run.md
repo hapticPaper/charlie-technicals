@@ -3,6 +3,8 @@
 ## Overview
 Compute indicators and signal hits from `content/data/<date>/...` and write the results under `content/analysis/<date>/`.
 
+Note: `content/analysis/` is gitignored. It's a transient build artifact used to generate the final daily report.
+
 ## Creates
 
 None. This playbook writes local artifacts under `content/analysis/<DATE>/`.
