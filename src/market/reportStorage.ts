@@ -51,7 +51,10 @@ export async function readJson<T>(filePath: string): Promise<T> {
   try {
     return JSON.parse(raw) as T;
   } catch (error) {
-    throw new Error(`[market:reportStorage] Failed to parse JSON: ${filePath}`, { cause: error });
+    const message = error instanceof Error ? `: ${error.message}` : "";
+    throw new Error(`[market:reportStorage] Failed to parse JSON: ${filePath}${message}`, {
+      cause: error
+    });
   }
 }
 
@@ -112,6 +115,7 @@ export async function listReportDates(): Promise<string[]> {
   }
 
   return entries
+    // Only treat regular files as reports; ignore directories, symlinks, etc.
     .filter((e) => e.isFile() && e.name.endsWith(".mdx"))
     .map((e) => e.name.replace(/\.mdx$/, ""))
     .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
