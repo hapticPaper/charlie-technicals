@@ -30,8 +30,14 @@ function getActiveBarTopic(evt: unknown): string | null {
     return null;
   }
 
-  const topic = (activePayload[0] as BarHoverPayload | undefined)?.payload?.topic;
-  return typeof topic === "string" ? topic : null;
+  for (const entry of activePayload) {
+    const topic = (entry as BarHoverPayload | undefined)?.payload?.topic;
+    if (typeof topic === "string") {
+      return topic;
+    }
+  }
+
+  return null;
 }
 
 export type CnbcTopicHypeDatum = {
