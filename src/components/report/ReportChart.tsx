@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  AreaData,
   CandlestickData,
   HistogramData,
   LineData,
@@ -25,6 +26,8 @@ const PRICE_SCALE_ID = "right" as const;
 // Dedicated scales for non-price indicators.
 const VOLUME_SCALE_ID = "volume" as const;
 const RSI_SCALE_ID = "rsi" as const;
+const MOMENTUM_SCALE_ID = "momentum" as const;
+const SHADE_SCALE_ID = "shade" as const;
 
 function formatChartTime(time: Time | undefined): string {
   if (!time) {
@@ -306,6 +309,30 @@ function toLineSeriesData(
   return out;
 }
 
+function toAreaShadeSeriesData(
+  t: number[],
+  shouldShade: Array<boolean | null>
+): Array<AreaData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
+  const out: Array<AreaData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
+  const len = Math.min(t.length, shouldShade.length);
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(t[i]);
+    if (time === null) {
+      continue;
+    }
+
+    if (shouldShade[i] !== true) {
+      out.push({ time });
+      continue;
+    }
+
+    out.push({ time, value: 1 });
+  }
+
+  return out;
+}
+
 function toHistogramSeriesData(
   t: number[],
   values: Array<number | null>,
@@ -441,12 +468,14 @@ export function ReportChart(props: {
     async function run() {
       const {
         ColorType,
+        AreaSeries,
         CandlestickSeries,
         CrosshairMode,
         HistogramSeries,
         LineSeries,
         LineStyle,
         createChart,
+        createImageWatermark,
         createSeriesMarkers
       } = await import("lightweight-charts");
       if (disposed) {
@@ -469,10 +498,21 @@ export function ReportChart(props: {
       const warn = readCssVar("--rp-warn", "#f59e0b");
       const target = readCssVar("--rp-target", "#38bdf8");
 
+      const squeezeOnShade = promoteAlpha(warn, 0.08);
+      const squeezeOffShade = promoteAlpha(bull, 0.08);
+
       const hasVolume =
         Array.isArray(series.volume) &&
         series.volume.length === series.t.length &&
         series.volume.some((v) => typeof v === "number" && Number.isFinite(v));
+
+      const hasSqueeze =
+        Array.isArray(series.ttmSqueeze20?.squeezeState) &&
+        series.ttmSqueeze20.squeezeState.length === series.t.length;
+      const hasMomentum =
+        Array.isArray(series.ttmSqueeze20?.momentum) &&
+        series.ttmSqueeze20.momentum.length === series.t.length &&
+        series.ttmSqueeze20.momentum.some((v) => typeof v === "number" && Number.isFinite(v));
 
       const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
@@ -505,6 +545,58 @@ export function ReportChart(props: {
           mode: CrosshairMode.Magnet
         }
       });
+
+      function escapeSvgText(value: string): string {
+        return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      }
+
+      const pane = chart.panes()[0];
+      const watermarkSvg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="170">` +
+        `<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}</style>` +
+        `<text x="100%" y="68" text-anchor="end" font-size="72" font-weight="700" fill="#ffffff">${escapeSvgText(
+          series.symbol
+        )}</text>` +
+        `<text x="100%" y="140" text-anchor="end" font-size="46" font-weight="700" fill="#ffffff">${escapeSvgText(
+          series.interval
+        )}</text>` +
+        `</svg>`;
+      const watermarkPlugin = pane
+        ? createImageWatermark(
+            pane,
+            `data:image/svg+xml,${encodeURIComponent(watermarkSvg)}`,
+            {
+              alpha: 0.12,
+              padding: 12,
+              maxWidth: 420
+            }
+          )
+        : null;
+
+      const squeezeOnShadeSeries = hasSqueeze
+        ? chart.addSeries(AreaSeries, {
+            topColor: squeezeOnShade,
+            bottomColor: squeezeOnShade,
+            lineColor: "transparent",
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            priceScaleId: SHADE_SCALE_ID,
+            autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+          })
+        : null;
+      const squeezeOffShadeSeries = hasSqueeze
+        ? chart.addSeries(AreaSeries, {
+            topColor: squeezeOffShade,
+            bottomColor: squeezeOffShade,
+            lineColor: "transparent",
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            priceScaleId: SHADE_SCALE_ID,
+            autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+          })
+        : null;
 
       const priceSeries = chart.addSeries(CandlestickSeries, {
         upColor: bull,
@@ -589,10 +681,42 @@ export function ReportChart(props: {
         autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
       });
 
+      const momentumSeries = hasMomentum
+        ? chart.addSeries(HistogramSeries, {
+            priceScaleId: MOMENTUM_SCALE_ID,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            base: 0
+          })
+        : null;
+
+      const trendSeries = chart.addSeries(LineSeries, {
+        color: muted,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        priceScaleId: PRICE_SCALE_ID,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+
+      if (hasSqueeze) {
+        chart.priceScale(SHADE_SCALE_ID).applyOptions({
+          scaleMargins: priceScaleMargins,
+          visible: false
+        });
+      }
+
       chart.priceScale(RSI_SCALE_ID).applyOptions({
         scaleMargins: rsiScaleMargins,
         visible: false
       });
+
+      if (momentumSeries) {
+        chart.priceScale(MOMENTUM_SCALE_ID).applyOptions({
+          scaleMargins: rsiScaleMargins,
+          visible: false
+        });
+      }
 
       if (volumeSeries && volumeScaleMargins) {
         chart.priceScale(VOLUME_SCALE_ID).applyOptions({
@@ -615,6 +739,65 @@ export function ReportChart(props: {
       kcUpperSeries?.setData(toLineSeriesData(series.t, series.keltner20?.upper ?? []));
       kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
       rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
+
+      if (hasSqueeze && series.ttmSqueeze20?.squeezeState) {
+        squeezeOnShadeSeries?.setData(
+          toAreaShadeSeriesData(
+            series.t,
+            series.ttmSqueeze20.squeezeState.map((s) => s === "on")
+          )
+        );
+        squeezeOffShadeSeries?.setData(
+          toAreaShadeSeriesData(
+            series.t,
+            series.ttmSqueeze20.squeezeState.map((s) => s === "off")
+          )
+        );
+      }
+
+      if (momentumSeries && hasMomentum && series.ttmSqueeze20?.momentum) {
+        const values = series.ttmSqueeze20.momentum;
+        let absMax = 0;
+        for (const v of values) {
+          if (typeof v === "number" && Number.isFinite(v)) {
+            absMax = Math.max(absMax, Math.abs(v));
+          }
+        }
+        if (!Number.isFinite(absMax) || absMax <= 0) {
+          absMax = 1;
+        }
+
+        momentumSeries.applyOptions({
+          autoscaleInfoProvider: () => ({ priceRange: { minValue: -absMax, maxValue: absMax } })
+        });
+
+        momentumSeries.setData(
+          toHistogramSeriesData(series.t, values, (idx) => {
+            const v = values[idx];
+            if (typeof v !== "number" || !Number.isFinite(v)) {
+              return promoteAlpha(muted, 0.4);
+            }
+            return promoteAlpha(v >= 0 ? bull : bear, 0.45);
+          })
+        );
+      }
+
+      const trendCandles = series.interval === "15m" ? 96 : 55;
+      if (series.close.length >= 2) {
+        const end = series.close.length - 1;
+        const start = Math.max(0, end - trendCandles);
+        const startTime = toUtcTimestamp(series.t[start]);
+        const endTime = toUtcTimestamp(series.t[end]);
+        const startValue = series.close[start];
+        const endValue = series.close[end];
+
+        if (startTime !== null && endTime !== null && [startValue, endValue].every((v) => Number.isFinite(v))) {
+          trendSeries.setData([
+            { time: startTime, value: startValue },
+            { time: endTime, value: endValue }
+          ]);
+        }
+      }
 
       if (volumeSeries && hasVolume && series.volume) {
         volumeSeries.setData(
@@ -779,7 +962,63 @@ export function ReportChart(props: {
         tooltip.style.opacity = "1";
       });
 
+      const alertTimeouts = new Set<number>();
+      const alertLines = new Set<ReturnType<typeof priceSeries.createPriceLine>>();
+
+      chart.subscribeClick((param) => {
+        const sourceEvent = (param as { sourceEvent?: unknown }).sourceEvent;
+        const hasShift =
+          sourceEvent &&
+          typeof sourceEvent === "object" &&
+          "shiftKey" in sourceEvent &&
+          Boolean((sourceEvent as { shiftKey?: unknown }).shiftKey);
+        if (!hasShift) {
+          return;
+        }
+
+        if (!param.point) {
+          return;
+        }
+
+        const price = priceSeries.coordinateToPrice(param.point.y);
+        if (typeof price !== "number" || !Number.isFinite(price)) {
+          return;
+        }
+
+        const line = priceSeries.createPriceLine({
+          price,
+          color: warn,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          title: `Alert ${price.toFixed(2)}`
+        });
+
+        alertLines.add(line);
+        const timeoutId = window.setTimeout(() => {
+          try {
+            priceSeries.removePriceLine(line);
+          } catch {
+            // Ignore if chart was disposed.
+          }
+          alertLines.delete(line);
+          alertTimeouts.delete(timeoutId);
+        }, 5000);
+        alertTimeouts.add(timeoutId);
+      });
+
       cleanup = () => {
+        for (const id of alertTimeouts) {
+          window.clearTimeout(id);
+        }
+        for (const line of alertLines) {
+          try {
+            priceSeries.removePriceLine(line);
+          } catch {
+            // Ignore if chart was disposed.
+          }
+        }
+
+        watermarkPlugin?.detach();
         squeezeMarkerPlugin?.detach();
         chart.remove();
       };

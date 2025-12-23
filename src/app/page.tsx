@@ -110,9 +110,6 @@ export default async function HomePage() {
     return (
       <>
         <h1>Charlie technicals</h1>
-        <p className="report-muted">
-          <Link href="/charts">Charts playground</Link>
-        </p>
         <p>
           No reports yet. Run <code>bun run market:run</code> to generate today&apos;s report.
         </p>
@@ -124,9 +121,6 @@ export default async function HomePage() {
     <>
       <h1>Charlie technicals</h1>
       <p className="report-muted">Daily highlights. Click a day for the full rundown.</p>
-      <p className="report-muted">
-        <Link href="/charts">Charts playground</Link>
-      </p>
 
       <CnbcTopicTrendWidget />
 
