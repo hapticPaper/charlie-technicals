@@ -1,6 +1,8 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { getTodayNYDateString } from "../lib/date";
+
 import { analyzeSeries } from "./analyze";
 import { mapWithConcurrency as mapWithConcurrencyLimit } from "./concurrency";
 import { loadAnalysisConfig, loadSymbols } from "./config";
@@ -14,6 +16,7 @@ import {
   getAnalysisDir,
   loadRawSeriesWindow,
   newsSnapshotExists,
+  rawSeriesSnapshotExists,
   readJson,
   writeReport,
   writeAnalyzedSeries,
@@ -42,10 +45,12 @@ export async function runMarketCnbcVideos(date: string): Promise<{
 }> {
   await ensureDataDir();
 
+  const isTodayNy = date === getTodayNYDateString();
+
   const symbol = "cnbc";
   const provider = new CnbcVideoProvider();
 
-  if (await newsSnapshotExists(date, symbol)) {
+  if ((await newsSnapshotExists(date, symbol)) && !isTodayNy) {
     return { status: "skipped_existing", totalUrls: 0, newArticles: 0 };
   }
 
@@ -61,7 +66,9 @@ export async function runMarketCnbcVideos(date: string): Promise<{
     totalUrls = fetched.totalUrls;
     keptUrls = fetched.keptUrls;
 
-    const res = await writeNewsSnapshot(date, fetched.snapshot);
+    const res = await writeNewsSnapshot(date, fetched.snapshot, {
+      mode: isTodayNy ? "fill_existing" : "skip_existing"
+    });
     return { status: res.status, totalUrls, newArticles: keptUrls };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -90,17 +97,27 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
   const cfg = await loadAnalysisConfig();
   const symbols = await loadSymbols();
   const intervals = cfg.intervals;
+  // Only today's snapshots are merged in-place to fill gaps and pick up late updates.
+  // Historical dates are treated as immutable.
+  const isTodayNy = date === getTodayNYDateString();
 
   const tasks = symbols.flatMap((symbol) => intervals.map((interval) => ({ symbol, interval })));
 
   const seriesResults = await mapWithConcurrency(tasks, opts, async ({ symbol, interval }) => {
     try {
-      const series = await provider.fetchSeries(symbol, interval, date);
-      if (series.bars.length === 0) {
-        return { symbol, status: "missing" as const };
+      const hasExisting = await rawSeriesSnapshotExists(date, symbol, interval);
+      if (hasExisting && !isTodayNy) {
+        return { symbol, status: "skipped_existing" as const };
       }
 
-      const res = await writeRawSeries(date, series);
+      const series = await provider.fetchSeries(symbol, interval, date);
+      if (series.bars.length === 0) {
+        return { symbol, status: hasExisting ? ("skipped_existing" as const) : ("missing" as const) };
+      }
+
+      const res = await writeRawSeries(date, series, {
+        mode: isTodayNy ? "fill_existing" : "skip_existing"
+      });
       return { symbol, status: res.status };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -121,12 +138,14 @@ export async function runMarketData(date: string, opts: ConcurrencyOptions = {})
 
   const newsResults = await mapWithConcurrency(symbols, { concurrency: newsConcurrency }, async (symbol) => {
     try {
-      if (await newsSnapshotExists(date, symbol)) {
+      if ((await newsSnapshotExists(date, symbol)) && !isTodayNy) {
         return { symbol, status: "skipped_existing" as const };
       }
 
       const snapshot = await provider.fetchNews(symbol, date);
-      const res = await writeNewsSnapshot(date, snapshot);
+      const res = await writeNewsSnapshot(date, snapshot, {
+        mode: isTodayNy ? "fill_existing" : "skip_existing"
+      });
       return { symbol, status: res.status };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -172,15 +191,18 @@ export async function runMarketNews(date: string, opts: ConcurrencyOptions = {})
 
   const provider = new YahooMarketDataProvider();
   const symbols = await loadSymbols();
+  const isTodayNy = date === getTodayNYDateString();
 
   const newsResults = await mapWithConcurrency(symbols, opts, async (symbol) => {
     try {
-      if (await newsSnapshotExists(date, symbol)) {
+      if ((await newsSnapshotExists(date, symbol)) && !isTodayNy) {
         return { symbol, status: "skipped_existing" as const };
       }
 
       const snapshot = await provider.fetchNews(symbol, date);
-      const res = await writeNewsSnapshot(date, snapshot);
+      const res = await writeNewsSnapshot(date, snapshot, {
+        mode: isTodayNy ? "fill_existing" : "skip_existing"
+      });
       return { symbol, status: res.status };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
