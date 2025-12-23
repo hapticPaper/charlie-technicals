@@ -76,7 +76,9 @@ export type KeltnerChannelsSeries = {
   lower: Array<number | null>;
 };
 
-export type SqueezeState = "on" | "off" | "neutral";
+export const SQUEEZE_STATES = ["on", "off", "neutral"] as const;
+
+export type SqueezeState = (typeof SQUEEZE_STATES)[number];
 
 export type TtmSqueezeSeries = {
   bollinger: BollingerBandsSeries;

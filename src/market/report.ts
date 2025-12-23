@@ -10,6 +10,8 @@ import type {
   TtmSqueezeSeries
 } from "./types";
 
+import { SQUEEZE_STATES } from "./types";
+
 import type { TradePlan, TradeSide } from "./types";
 
 function activeSignals(series: ReportIntervalSeries): string[] {
@@ -163,8 +165,6 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     console.warn(`${warnPrefix} ${message}`);
   }
 
-  const SQUEEZE_STATES: readonly SqueezeState[] = ["on", "off", "neutral"];
-
   function sliceNullableNumberSeries(value: unknown, context: string): Array<number | null> {
     const fallback = new Array(sliceLength).fill(null);
 
@@ -293,7 +293,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
         return null;
       }
 
-      if (typeof v === "string" && SQUEEZE_STATES.includes(v as SqueezeState)) {
+      if (typeof v === "string" && (SQUEEZE_STATES as readonly string[]).includes(v)) {
         return v as SqueezeState;
       }
 
