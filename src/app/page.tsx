@@ -84,6 +84,26 @@ function labelForSide(side: TradeSide): string {
   }
 }
 
+function toTimestamp(date: string): number | null {
+  const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    const ts = Date.UTC(Number(year), Number(month) - 1, Number(day));
+    return Number.isFinite(ts) ? ts : null;
+  }
+
+  const isoWithTzMatch =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.exec(
+      date,
+    );
+  if (!isoWithTzMatch) {
+    return null;
+  }
+
+  const ts = Date.parse(date);
+  return Number.isFinite(ts) ? ts : null;
+}
+
 export default async function HomePage() {
   const dates = (await listReportDates()).slice().sort((a, b) => b.localeCompare(a));
   const results = await Promise.allSettled(dates.map((date) => readReportHighlights(date)));
@@ -120,20 +140,26 @@ export default async function HomePage() {
     );
   }
 
-  const toCardTs = (d: string): number => {
-    const isYYYYMMDD = /^\d{4}-\d{2}-\d{2}$/.test(d);
-    const isISODateTime = /^\d{4}-\d{2}-\d{2}T/.test(d);
-    const ts = Date.parse(isYYYYMMDD ? `${d}T00:00:00Z` : isISODateTime ? d : "");
-
-    if (!Number.isFinite(ts)) {
-      console.warn(`[home] Unexpected report card date format: ${d}`);
-      return 0;
-    }
-
-    return ts;
+  // Prefer chronological sort when possible; push unrecognized formats to the end.
+  const sortKey = (date: string): { valid: boolean; ts: number; raw: string } => {
+    const ts = toTimestamp(date);
+    return { valid: ts !== null, ts: ts ?? 0, raw: date };
   };
 
-  const sortedCards = cards.slice().sort((a, b) => toCardTs(b.date) - toCardTs(a.date));
+  const sortedCards = cards.slice().sort((a, b) => {
+    const aKey = sortKey(a.date);
+    const bKey = sortKey(b.date);
+
+    if (aKey.valid !== bKey.valid) {
+      return aKey.valid ? -1 : 1;
+    }
+
+    if (aKey.ts !== bKey.ts) {
+      return bKey.ts - aKey.ts;
+    }
+
+    return bKey.raw.localeCompare(aKey.raw);
+  });
   const latestCard = sortedCards[0] ?? null;
   const historyCards = sortedCards.slice(1);
 
