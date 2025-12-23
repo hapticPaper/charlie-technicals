@@ -15,7 +15,8 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 ## Limits
 
 - Guardrails:
-  - Do not modify existing historical snapshot files for past dates.
+  - Do not modify existing historical snapshot files for past dates unless you are explicitly regenerating a known-bad snapshot.
+    In that case, delete the file first and re-run the command for that date.
 
 ## Steps
 
@@ -28,6 +29,13 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
    ```
 
 3. Confirm the file exists: `content/data/cnbc/news/<YYYYMMDD>.json`.
+
+## Notes
+
+- The folder name `cnbc` is the data namespace (provider), not a ticker symbol.
+- Within each saved video object:
+  - `topic` is best-effort and should reflect what the video is about (not the show/segment name).
+  - `symbol` is best-effort and should be the primary ticker symbol when one can be inferred (otherwise `null`).
 
 ## Verify
 

@@ -60,19 +60,21 @@ export type MarketNewsSnapshot = {
 * Changes here are backwards-incompatible with existing snapshot files.
 */
 export type StoredCnbcVideoArticle = MarketNewsArticle & {
-  symbol: string;
   provider: string;
   fetchedAt: string;
   asOfDate: string;
+  symbol: string | null;
 };
 
 /**
-* In-memory shape for CNBC video articles. `symbol` and `provider` are implied by the
-* file path and are omitted here.
+* In-memory shape for CNBC video articles.
+*
+* `provider` is implied by the file path and omitted here.
 */
 export type CnbcVideoArticle = MarketNewsArticle & {
   fetchedAt: string;
   asOfDate: string;
+  symbol: string | null;
 };
 
 export type SignalHit = {

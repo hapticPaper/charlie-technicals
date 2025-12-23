@@ -237,18 +237,19 @@ export async function readJson<T>(filePath: string): Promise<T> {
 /**
 * Reads CNBC video articles for a day.
 *
-* The on-disk schema includes `symbol` and `provider` on each object, but those are
-* implied by the file path and omitted from the returned in-memory objects.
+* The on-disk schema includes `provider`, `fetchedAt`, and `asOfDate` on each object.
+*
+* `provider` is implied by the file path and is omitted from the returned in-memory
+* objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
   const filePath = getNewsPath(date, "cnbc");
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    if (article.symbol !== "cnbc" || article.provider !== "cnbc" || article.asOfDate !== date) {
+    if (article.provider !== "cnbc" || article.asOfDate !== date) {
       throw new Error(
         `[market:storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
-          symbol: article.symbol,
           provider: article.provider,
           asOfDate: article.asOfDate
         })}`
@@ -256,7 +257,10 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
     }
   }
 
-  return stored.map(({ symbol: _symbol, provider: _provider, ...article }) => article);
+  return stored.map(({ provider: _provider, symbol, ...article }) => ({
+    ...article,
+    symbol: typeof symbol === "string" && symbol.toLowerCase() === "cnbc" ? null : symbol ?? null
+  }));
 }
 
 export type StoredNewsData =
@@ -383,7 +387,7 @@ function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArti
     hype: article.hype,
     mainIdea: article.mainIdea,
     summary: article.summary,
-    symbol: snapshot.symbol,
+    symbol: article.relatedTickers.length === 1 ? article.relatedTickers[0] ?? null : null,
     provider: snapshot.provider,
     fetchedAt: snapshot.fetchedAt,
     asOfDate: snapshot.asOfDate

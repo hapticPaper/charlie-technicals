@@ -64,6 +64,83 @@ function buildCnbcVideoId(url: string): string {
   return `cnbc:${url}`;
 }
 
+function extractTickersFromTitle(title: string): string[] {
+  const drop = new Set(
+    [
+      "AI",
+      "CEO",
+      "CFO",
+      "CPI",
+      "CNBC",
+      "DJIA",
+      "EPS",
+      "ETF",
+      "ETFS",
+      "FED",
+      "FOMC",
+      "GDP",
+      "IPO",
+      "PCE",
+      "SEC",
+      "SPX",
+      "US",
+      "USA",
+      "VIX"
+    ].map((t) => t.toUpperCase())
+  );
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (candidate: string) => {
+    const trimmed = candidate.trim();
+    if (trimmed === "") {
+      return;
+    }
+    if (drop.has(trimmed)) {
+      return;
+    }
+    if (seen.has(trimmed)) {
+      return;
+    }
+    seen.add(trimmed);
+    out.push(trimmed);
+  };
+
+  for (const match of title.matchAll(/\$([A-Z]{2,5})\b/g)) {
+    push(match[1] ?? "");
+  }
+
+  for (const match of title.matchAll(/\(([A-Z]{2,5})\)/g)) {
+    push(match[1] ?? "");
+  }
+
+  const colonIdx = title.indexOf(":");
+  if (colonIdx >= 0) {
+    const tail = title.slice(colonIdx + 1);
+    const tokens = tail.match(/\b[A-Z]{2,5}\b/g) ?? [];
+    if (tokens.length >= 2) {
+      for (const token of tokens) {
+        push(token);
+      }
+    }
+  }
+
+  const leadingCompany = title.match(/^([A-Z]{2,5})\s+(CEO|CFO|CTO|COO|chair|chairman|president)\b/);
+  if (leadingCompany) {
+    push(leadingCompany[1] ?? "");
+  }
+
+  if (/\bshares\b|\bstock\b|\bstocks\b/i.test(title)) {
+    const tokens = title.match(/\b[A-Z]{2,5}\b/g) ?? [];
+    for (const token of tokens) {
+      push(token);
+    }
+  }
+
+  return out.sort();
+}
+
 async function fetchJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
   if (timeoutMs <= 0) {
     throw new Error(`timeoutMs must be > 0, got ${timeoutMs} for ${url}`);
@@ -207,14 +284,11 @@ export class CnbcVideoProvider {
         continue;
       }
 
-      const relatedTickers: string[] = [];
-      const tags = [
-        asset.section?.title,
-        asset.section?.eyebrow,
-        ...(asset.contentClassification ?? [])
-      ].filter((tag): tag is string => typeof tag === "string" && tag.trim() !== "");
+      const relatedTickers = extractTickersFromTitle(title);
 
-      const topic = inferNewsTopic({ title, tags });
+      const topic =
+        inferNewsTopic({ title }) ??
+        (relatedTickers.length === 1 ? relatedTickers[0]?.toLowerCase() : undefined);
       const hype = scoreNewsHype(title);
       const mainIdea = buildNewsMainIdea(title);
       const summary = buildNewsSummary({
