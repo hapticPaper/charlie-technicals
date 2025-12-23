@@ -60,6 +60,9 @@ export async function CnbcTopicTrendWidget() {
     return null;
   }
 
+  dayArticles.sort((a, b) => a.date.localeCompare(b.date));
+  const latestDate = dayArticles[dayArticles.length - 1]?.date ?? null;
+
   const totals = new Map<string, number>();
   for (const { articles } of dayArticles) {
     for (const article of articles) {
@@ -120,7 +123,8 @@ export async function CnbcTopicTrendWidget() {
     <section style={{ marginTop: 28 }}>
       <h2>CNBC topic trends</h2>
       <p className="report-muted">
-        <strong>Days:</strong> {dayArticles.length} (latest {dayArticles[dayArticles.length - 1]?.date})
+        <strong>Days:</strong> {dayArticles.length}
+        {latestDate ? ` (latest ${latestDate})` : null}
       </p>
 
       <CnbcTopicTrendWidgetClient data={data} topics={topics} videosByDate={videosByDate} />

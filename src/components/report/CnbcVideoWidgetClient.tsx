@@ -16,6 +16,15 @@ import { useEffect, useMemo, useState } from "react";
 import { CnbcVideoCards } from "../cnbc/CnbcVideoCards";
 import type { CnbcVideoCard } from "../cnbc/types";
 
+type BarHoverEvent = {
+  activePayload?: Array<{ payload?: { topic?: unknown } }>;
+} | null | undefined;
+
+function getActiveTopic(evt: BarHoverEvent): string | null {
+  const topic = evt?.activePayload?.[0]?.payload?.topic;
+  return typeof topic === "string" ? topic : null;
+}
+
 export type CnbcTopicHypeDatum = {
   topic: string;
   count: number;
@@ -67,11 +76,7 @@ export function CnbcVideoWidgetClient(props: {
             data={props.data}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
-              const topic = (evt as { activePayload?: Array<{ payload?: { topic?: unknown } }> } | null)?.activePayload?.[0]
-                ?.payload?.topic;
-              if (typeof topic === "string") {
-                setActiveTopic(topic);
-              }
+              setActiveTopic(getActiveTopic(evt as BarHoverEvent));
             }}
             onMouseLeave={() => setActiveTopic(null)}
           >
