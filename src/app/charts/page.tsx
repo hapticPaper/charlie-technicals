@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 const PLUGIN_EXAMPLES = [
   {
     label: "All plugin examples",
@@ -49,6 +53,43 @@ const PLUGIN_EXAMPLES = [
   }
 ] as const;
 
+function ChartsExampleEmbed(props: { label: string; url: string }) {
+  const { label, url } = props;
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <details style={{ marginTop: 12 }}>
+      <summary>{label}</summary>
+      <p className="report-muted" style={{ margin: "6px 0 10px" }}>
+        <a href={url} target="_blank" rel="noreferrer">
+          Open in a new tab
+        </a>
+        {failed ? " · Embedding blocked" : ""}
+      </p>
+
+      {failed ? null : (
+        <iframe
+          title={label}
+          src={url}
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            setFailed(true);
+          }}
+          style={{
+            width: "100%",
+            height: 640,
+            border: "1px solid var(--rp-border)",
+            borderRadius: 12,
+            background: "var(--rp-surface)"
+          }}
+        />
+      )}
+    </details>
+  );
+}
+
 export default function ChartsPlaygroundPage() {
   return (
     <>
@@ -65,26 +106,7 @@ export default function ChartsPlaygroundPage() {
       </p>
 
       {PLUGIN_EXAMPLES.slice(1).map((e) => (
-        <details key={e.url} style={{ marginTop: 12 }}>
-          <summary>{e.label}</summary>
-          <p className="report-muted" style={{ margin: "6px 0 10px" }}>
-            <a href={e.url} target="_blank" rel="noreferrer">
-              Open in a new tab
-            </a>
-          </p>
-          <iframe
-            title={e.label}
-            src={e.url}
-            loading="lazy"
-            style={{
-              width: "100%",
-              height: 640,
-              border: "1px solid var(--rp-border)",
-              borderRadius: 12,
-              background: "var(--rp-surface)"
-            }}
-          />
-        </details>
+        <ChartsExampleEmbed key={e.url} label={e.label} url={e.url} />
       ))}
     </>
   );
