@@ -2,6 +2,7 @@ import type {
   AnalyzedSeries,
   BollingerBandsSeries,
   KeltnerChannelsSeries,
+  MarketBar,
   MarketInterval,
   MarketReport,
   MostActiveEntry,
@@ -21,27 +22,6 @@ function activeSignals(series: ReportIntervalSeries): string[] {
 
 function activeSignalLabels(series: AnalyzedSeries): string[] {
   return series.signals.filter((s) => s.active).map((s) => s.label);
-}
-
-function getSignalActive(series: AnalyzedSeries, id: string): boolean {
-  return series.signals.some((s) => s.id === id && s.active);
-}
-
-function inferTradeSideFromSignals(series: AnalyzedSeries): TradeSide | null {
-  if (getSignalActive(series, "macd-bull-cross")) {
-    return "buy";
-  }
-  if (getSignalActive(series, "macd-bear-cross")) {
-    return "sell";
-  }
-  if (getSignalActive(series, "rsi-oversold")) {
-    return "buy";
-  }
-  if (getSignalActive(series, "rsi-overbought")) {
-    return "sell";
-  }
-
-  return null;
 }
 
 function lastFiniteNumber(values: Array<number | null> | undefined, index: number): number | null {
@@ -66,6 +46,209 @@ function computeMoveAtr1d(series1d: AnalyzedSeries): {
   const absMove1dAtr14 = move1dAtr14 !== null ? Math.abs(move1dAtr14) : null;
 
   return { atr14, move1d, move1dAtr14, absMove1dAtr14 };
+}
+
+function computeRocPct(bars: MarketBar[], lookback: number): number | null {
+  const smooth = 3;
+  if (lookback <= 0) {
+    return null;
+  }
+
+  const idx = bars.length - 1;
+  const prevIdx = idx - lookback;
+  const recentStart = idx - (smooth - 1);
+  const prevStart = prevIdx - (smooth - 1);
+  if (prevStart < 0 || recentStart < 0) {
+    return null;
+  }
+
+  const recentCloses = bars.slice(recentStart, idx + 1).map((b) => b.c).filter((v) => Number.isFinite(v));
+  const prevCloses = bars.slice(prevStart, prevIdx + 1).map((b) => b.c).filter((v) => Number.isFinite(v));
+  if (recentCloses.length < smooth || prevCloses.length < smooth) {
+    return null;
+  }
+
+  const avgRecent = recentCloses.reduce((sum, v) => sum + v, 0) / recentCloses.length;
+  const avgPrev = prevCloses.reduce((sum, v) => sum + v, 0) / prevCloses.length;
+  if (!(Number.isFinite(avgRecent) && Number.isFinite(avgPrev) && avgPrev !== 0)) {
+    return null;
+  }
+
+  const roc = (avgRecent - avgPrev) / avgPrev;
+  return Number.isFinite(roc) ? roc : null;
+}
+
+function sign(value: number): -1 | 0 | 1 {
+  if (value > 0) {
+    return 1;
+  }
+  if (value < 0) {
+    return -1;
+  }
+  return 0;
+}
+
+type BreakoutHit =
+  | {
+      direction: "up" | "down";
+      window: 20 | 55 | 252;
+      level: number;
+    }
+  | null;
+
+function previousHighLow(bars: MarketBar[], lookback: number): { high: number; low: number } | null {
+  const end = bars.length - 1;
+  const start = end - lookback;
+  if (start < 0 || end <= 0) {
+    return null;
+  }
+
+  const window = bars.slice(start, end);
+  if (window.length === 0) {
+    return null;
+  }
+
+  const highs = window.map((b) => b.h).filter((v) => Number.isFinite(v));
+  const lows = window.map((b) => b.l).filter((v) => Number.isFinite(v));
+  if (highs.length === 0 || lows.length === 0) {
+    return null;
+  }
+
+  return {
+    high: Math.max(...highs),
+    low: Math.min(...lows)
+  };
+}
+
+function detectDailyBreakout(series1d: AnalyzedSeries): BreakoutHit {
+  const last = series1d.bars.at(-1);
+  if (!last || !Number.isFinite(last.c)) {
+    return null;
+  }
+
+  const close = last.c;
+  const windows = [252, 55, 20] as const;
+  for (const w of windows) {
+    const hl = previousHighLow(series1d.bars, w);
+    if (!hl) {
+      continue;
+    }
+
+    if (close > hl.high) {
+      return { direction: "up", window: w, level: hl.high };
+    }
+    if (close < hl.low) {
+      return { direction: "down", window: w, level: hl.low };
+    }
+  }
+
+  return null;
+}
+
+function computePivotLevels(bars: MarketBar[], maxBars: number): { support: number | null; resistance: number | null } {
+  const last = bars.at(-1);
+  if (!last || !Number.isFinite(last.c)) {
+    return { support: null, resistance: null };
+  }
+
+  const close = last.c;
+  const windowBars = bars.slice(-Math.max(maxBars, 10));
+  const leftRight = 2;
+
+  const pivotHighs: number[] = [];
+  const pivotLows: number[] = [];
+
+  for (let i = leftRight; i < windowBars.length - leftRight; i += 1) {
+    const center = windowBars[i];
+    if (!center) {
+      continue;
+    }
+
+    const ch = center.h;
+    const cl = center.l;
+    if (!(Number.isFinite(ch) && Number.isFinite(cl))) {
+      continue;
+    }
+
+    let isPivotHigh = true;
+    let isPivotLow = true;
+    for (let j = 1; j <= leftRight; j += 1) {
+      const left = windowBars[i - j];
+      const right = windowBars[i + j];
+      if (!left || !right) {
+        isPivotHigh = false;
+        isPivotLow = false;
+        break;
+      }
+
+      if (!(Number.isFinite(left.h) && Number.isFinite(right.h) && Number.isFinite(left.l) && Number.isFinite(right.l))) {
+        isPivotHigh = false;
+        isPivotLow = false;
+        break;
+      }
+
+      if (ch <= left.h || ch <= right.h) {
+        isPivotHigh = false;
+      }
+      if (cl >= left.l || cl >= right.l) {
+        isPivotLow = false;
+      }
+    }
+
+    if (isPivotHigh) {
+      pivotHighs.push(ch);
+    }
+    if (isPivotLow) {
+      pivotLows.push(cl);
+    }
+  }
+
+  const supportCandidates = pivotLows.filter((p) => p < close);
+  const resistanceCandidates = pivotHighs.filter((p) => p > close);
+
+  const support = supportCandidates.length > 0 ? Math.max(...supportCandidates) : null;
+  const resistance = resistanceCandidates.length > 0 ? Math.min(...resistanceCandidates) : null;
+  return { support, resistance };
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const sum = values.reduce((acc, v) => acc + v, 0);
+  return sum / values.length;
+}
+
+function computeParticipation1d(series1d: AnalyzedSeries, atr1d: number | null): {
+  rangeAtr: number | null;
+  volumeMultiple20: number | null;
+  direction: "up" | "down" | null;
+} {
+  const last = series1d.bars.at(-1);
+  const prev = series1d.bars.at(-2);
+  if (!last || !prev) {
+    return { rangeAtr: null, volumeMultiple20: null, direction: null };
+  }
+
+  const range = Number.isFinite(last.h) && Number.isFinite(last.l) ? last.h - last.l : null;
+  const rangeAtr =
+    range !== null && typeof atr1d === "number" && Number.isFinite(atr1d) && atr1d > 0 ? range / atr1d : null;
+
+  const prevBars = series1d.bars.slice(-21, -1);
+  const volAvg = average(prevBars.map((b) => b.v).filter((v) => Number.isFinite(v)));
+  const volumeMultiple20 =
+    volAvg !== null && Number.isFinite(last.v) && volAvg > 0 ? last.v / volAvg : null;
+
+  const direction =
+    Number.isFinite(last.c) && Number.isFinite(prev.c)
+      ? last.c > prev.c
+        ? "up"
+        : last.c < prev.c
+          ? "down"
+          : null
+      : null;
+
+  return { rangeAtr, volumeMultiple20, direction };
 }
 
 function inferTradeSideFromTrend(series: AnalyzedSeries): TradeSide | null {
@@ -546,23 +729,29 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
 function buildPicks(args: {
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
 }): { picks: ReportPick[]; watchlist: ReportPick[] } {
-  const SCORE_WEIGHTS = {
-    signals15: 3,
-    signals1h: 2,
-    signals1d: 2,
-    agree15_1h: 3,
-    agree15_1d: 4,
-    signalSidePresent: 6,
-    trendMatch: 1,
-    trendAgree: 1
+  // Policy:
+  // - Technical trades: should be driven by an explicit setup (momentum alignment, breakouts, or levels) and
+  //   ideally have a >= 1 ATR daily move when ATR is available.
+  // - Watchlist: trend-following setups, or explicit setups that are still sub-ATR on the day.
+  const MIN_TRADE_ABS_MOVE_ATR = 1;
+  const MOMENTUM_LOOKBACK = {
+    "15m": 20,
+    "1h": 20,
+    "1d": 20
   } as const;
 
-  // Policy:
-  // - Technical trades: require an explicit signal (RSI/MACD) and a >= 1 ATR daily move when ATR is available.
-  // - Watchlist: trend-following setups, or signal-based setups with a sub-ATR daily move.
-  const MIN_TRADE_ABS_MOVE_ATR = 1;
+  const LEVEL_LOOKBACK_1D = 90;
+  const NEAR_LEVEL_MAX_ATR = 0.35;
+  const PARTICIPATION_MIN_RANGE_ATR = 1;
+  const PARTICIPATION_MIN_VOL_MULT = 1.3;
 
-  const candidates: Array<ReportPick & { absMove1dAtr14: number | null }> = [];
+  type Candidate = ReportPick & {
+    absMove1dAtr14: number | null;
+    breakout: BreakoutHit;
+    hasParticipation: boolean;
+  };
+
+  const candidates: Candidate[] = [];
 
   for (const symbol of Object.keys(args.analyzedBySymbol)) {
     const series15m = args.analyzedBySymbol[symbol]?.["15m"];
@@ -572,17 +761,27 @@ function buildPicks(args: {
       continue;
     }
 
-    const side15 = inferTradeSideFromSignals(series15m);
-    const side1h = series1h ? inferTradeSideFromSignals(series1h) : null;
-    const side1d = inferTradeSideFromSignals(series1d);
+    const breakout = detectDailyBreakout(series1d);
+
+    const roc15 = computeRocPct(series15m.bars, MOMENTUM_LOOKBACK["15m"]);
+    const roc1h = series1h ? computeRocPct(series1h.bars, MOMENTUM_LOOKBACK["1h"]) : null;
+    const roc1d = computeRocPct(series1d.bars, MOMENTUM_LOOKBACK["1d"]);
+
+    const rocValues = [roc15, roc1h, roc1d].filter((v): v is number => typeof v === "number");
+    const rocSigns = rocValues.map(sign).filter((s): s is -1 | 1 => s !== 0);
+    const momentumAligned = rocSigns.length >= 2 && rocSigns.every((s) => s === rocSigns[0]);
+    const momentumSide: TradeSide | null = momentumAligned ? (rocSigns[0] === 1 ? "buy" : "sell") : null;
+
+    const strongDailyMomentumSide: TradeSide | null =
+      typeof roc1d === "number" && Math.abs(roc1d) >= 0.03 ? (roc1d > 0 ? "buy" : roc1d < 0 ? "sell" : null) : null;
+
+    const breakoutSide: TradeSide | null = breakout ? (breakout.direction === "up" ? "buy" : "sell") : null;
 
     const sideTrend15 = inferTradeSideFromTrend(series15m);
     const sideTrend1h = series1h ? inferTradeSideFromTrend(series1h) : null;
     const sideTrend1d = inferTradeSideFromTrend(series1d);
 
-    const signalSide = side15 ?? side1h ?? side1d;
-    const trendSide = sideTrend15 ?? sideTrend1h ?? sideTrend1d;
-    const side = signalSide ?? trendSide;
+    const side = breakoutSide ?? momentumSide ?? strongDailyMomentumSide ?? sideTrend1d ?? sideTrend1h ?? sideTrend15;
     if (!side) {
       continue;
     }
@@ -597,6 +796,29 @@ function buildPicks(args: {
     const move1dAtr14 = moveInfo.move1dAtr14;
     const absMove1dAtr14 = moveInfo.absMove1dAtr14;
 
+    const levels = computePivotLevels(series1d.bars, LEVEL_LOOKBACK_1D);
+    const close1d = series1d.bars.at(-1)?.c;
+    const supportDistAtr =
+      typeof close1d === "number" && typeof levels.support === "number" && typeof atr1d === "number" && atr1d > 0
+        ? (close1d - levels.support) / atr1d
+        : null;
+    const resistanceDistAtr =
+      typeof close1d === "number" && typeof levels.resistance === "number" && typeof atr1d === "number" && atr1d > 0
+        ? (levels.resistance - close1d) / atr1d
+        : null;
+
+    const nearSupport =
+      typeof supportDistAtr === "number" && supportDistAtr >= 0 && supportDistAtr <= NEAR_LEVEL_MAX_ATR;
+    const nearResistance =
+      typeof resistanceDistAtr === "number" && resistanceDistAtr >= 0 && resistanceDistAtr <= NEAR_LEVEL_MAX_ATR;
+
+    const participation = computeParticipation1d(series1d, atr1d);
+    const hasParticipation =
+      typeof participation.rangeAtr === "number" &&
+      participation.rangeAtr >= PARTICIPATION_MIN_RANGE_ATR &&
+      typeof participation.volumeMultiple20 === "number" &&
+      participation.volumeMultiple20 >= PARTICIPATION_MIN_VOL_MULT;
+
     const close15 = series15m.bars.at(-1)?.c;
     const ema15 = Array.isArray(series15m.indicators.ema20)
       ? lastFiniteNumber(series15m.indicators.ema20, series15m.bars.length - 1)
@@ -610,49 +832,102 @@ function buildPicks(args: {
         ? Math.min(0.06, Math.abs((close15 - ema15) / close15))
         : 0;
 
+    const nearLevel = (side === "buy" && nearSupport) || (side === "sell" && nearResistance);
+    const trendAligned = sideTrend1d === side || sideTrend1h === side || sideTrend15 === side;
+    const momentumSetup = (momentumAligned || strongDailyMomentumSide !== null) && hasParticipation;
+    const explicitSetup = breakout !== null || momentumSetup || (nearLevel && trendAligned);
+
     let score = 0;
-    score += signals15.length * SCORE_WEIGHTS.signals15;
-    score += signals1h.length * SCORE_WEIGHTS.signals1h;
-    score += signals1d.length * SCORE_WEIGHTS.signals1d;
-    if (side15 && side1h && side15 === side1h) {
-      score += SCORE_WEIGHTS.agree15_1h;
+    score += Math.round(trendStrength * 900);
+
+    score += (signals15.length + signals1h.length + signals1d.length) * 2;
+
+    if (typeof roc1d === "number") {
+      score += Math.round(Math.min(60, Math.abs(roc1d) * 1200));
     }
-    if (side15 && side1d && side15 === side1d) {
-      score += SCORE_WEIGHTS.agree15_1d;
+    if (typeof roc1h === "number") {
+      score += Math.round(Math.min(45, Math.abs(roc1h) * 4500));
     }
-    if (signalSide) {
-      score += SCORE_WEIGHTS.signalSidePresent;
+    if (typeof roc15 === "number") {
+      score += Math.round(Math.min(35, Math.abs(roc15) * 8500));
     }
-    if (sideTrend1d === side) {
-      score += SCORE_WEIGHTS.trendMatch;
+    if (momentumAligned) {
+      score += 25;
     }
-    if (sideTrend1h === side) {
-      score += SCORE_WEIGHTS.trendMatch;
+
+    if (breakout) {
+      score += breakout.window === 252 ? 55 : breakout.window === 55 ? 40 : 25;
     }
-    if (sideTrend15 === side) {
-      score += SCORE_WEIGHTS.trendMatch;
+
+    if (hasParticipation) {
+      score += 25;
+      if (participation.direction && ((side === "buy" && participation.direction === "up") || (side === "sell" && participation.direction === "down"))) {
+        score += 10;
+      }
     }
-    if (sideTrend1d && sideTrend1h && sideTrend1d === sideTrend1h) {
-      score += SCORE_WEIGHTS.trendAgree;
+
+    if (side === "buy" && nearSupport) {
+      score += 20;
     }
-    if (sideTrend1h && sideTrend15 && sideTrend1h === sideTrend15) {
-      score += SCORE_WEIGHTS.trendAgree;
-    }
-    if (sideTrend1d && sideTrend15 && sideTrend1d === sideTrend15) {
-      score += SCORE_WEIGHTS.trendAgree;
-    }
-    score += Math.round(trendStrength * 1000);
-    if (rsi15 !== null) {
-      score += Math.round(Math.min(10, Math.abs(rsi15 - 50) / 5));
+    if (side === "sell" && nearResistance) {
+      score += 20;
     }
 
     if (absMove1dAtr14 !== null) {
-      const baseBonus = absMove1dAtr14 * 5;
-      const bigMoveBonus = absMove1dAtr14 >= 2 ? 20 : 0;
-      score += Math.round(Math.min(45, baseBonus + bigMoveBonus));
+      const baseBonus = absMove1dAtr14 * 6;
+      const bigMoveBonus = absMove1dAtr14 >= 2 ? 12 : 0;
+      score += Math.round(Math.min(42, baseBonus + bigMoveBonus));
+    }
+
+    if (rsi15 !== null) {
+      score += Math.round(Math.min(8, Math.abs(rsi15 - 50) / 6));
     }
 
     const rationale: string[] = [];
+    if (breakout) {
+      const dirLabel = breakout.direction === "up" ? "above" : "below";
+      rationale.push(`Breakout: close ${dirLabel} prior ${breakout.window}d level (${breakout.level.toFixed(2)}).`);
+    }
+
+    const momentumLabels: string[] = [];
+    if (typeof roc15 === "number") {
+      momentumLabels.push(`15m ${roc15 >= 0 ? "+" : ""}${(roc15 * 100).toFixed(1)}%`);
+    }
+    if (typeof roc1h === "number") {
+      momentumLabels.push(`1h ${roc1h >= 0 ? "+" : ""}${(roc1h * 100).toFixed(1)}%`);
+    }
+    if (typeof roc1d === "number") {
+      momentumLabels.push(`1d ${roc1d >= 0 ? "+" : ""}${(roc1d * 100).toFixed(1)}%`);
+    }
+    if (momentumLabels.length > 0) {
+      rationale.push(`Momentum: ${momentumLabels.join(", ")}${momentumAligned ? " (aligned)" : ""}.`);
+    }
+
+    if (typeof levels.support === "number" || typeof levels.resistance === "number") {
+      const parts: string[] = [];
+      if (typeof levels.support === "number") {
+        const dist = typeof supportDistAtr === "number" ? ` (${supportDistAtr.toFixed(2)} ATR)` : "";
+        parts.push(`support ${levels.support.toFixed(2)}${dist}`);
+      }
+      if (typeof levels.resistance === "number") {
+        const dist = typeof resistanceDistAtr === "number" ? ` (${resistanceDistAtr.toFixed(2)} ATR)` : "";
+        parts.push(`resistance ${levels.resistance.toFixed(2)}${dist}`);
+      }
+      if (parts.length > 0) {
+        rationale.push(`Levels (1d pivots): ${parts.join("; ")}.`);
+      }
+    }
+
+    if (hasParticipation) {
+      const dirLabel =
+        participation.direction === "up" ? "demand" : participation.direction === "down" ? "supply" : "participation";
+      const rangeLabel = typeof participation.rangeAtr === "number" ? `${participation.rangeAtr.toFixed(1)} ATR range` : "";
+      const volLabel =
+        typeof participation.volumeMultiple20 === "number" ? `${participation.volumeMultiple20.toFixed(1)}x vol` : "";
+      const joiner = rangeLabel && volLabel ? ", " : "";
+      rationale.push(`Supply/demand proxy: ${rangeLabel}${joiner}${volLabel} (${dirLabel}).`);
+    }
+
     if (atr1d !== null) {
       let moveLabel = "";
       if (move1d !== null && absMove1dAtr14 !== null) {
@@ -673,12 +948,10 @@ function buildPicks(args: {
     if (sideTrend1d) {
       rationale.push(`1d trend bias: ${sideTrend1d === "buy" ? "bullish" : "bearish"}`);
     }
-    if (!signalSide) {
-      rationale.push(
-        "Trend-following watchlist setup (no RSI/MACD signal on the latest bar; not promoted to a technical trade)."
-      );
-    } else if (absMove1dAtr14 !== null && absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR) {
-      rationale.push("Signal-based but 1d move < 1 ATR; kept on the watchlist.");
+    if (!explicitSetup) {
+      rationale.push("Trend-following watchlist setup (no breakout/momentum/level trigger on the latest bar).");
+    } else if (!breakout && absMove1dAtr14 !== null && absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR) {
+      rationale.push("Setup present but 1d move < 1 ATR; kept on the watchlist.");
     }
     if (rationale.length === 0) {
       rationale.push("Trend continuation setup (no explicit rule hit on the latest bar).");
@@ -686,7 +959,7 @@ function buildPicks(args: {
 
     candidates.push({
       symbol,
-      basis: signalSide ? "signal" : "trend",
+      basis: explicitSetup ? "signal" : "trend",
       score,
       trade: buildTradePlan(series15m, side, atr1d),
       atr14_1d: atr1d,
@@ -698,25 +971,26 @@ function buildPicks(args: {
         "15m": signals15,
         "1h": signals1h,
         "1d": signals1d
-      }
+      },
+      breakout,
+      hasParticipation
     });
   }
 
   candidates.sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
 
-  type Candidate = ReportPick & { absMove1dAtr14: number | null };
-
   function stripCandidate(candidate: Candidate): ReportPick {
-    const { absMove1dAtr14, ...pick } = candidate;
+    const { absMove1dAtr14, breakout, hasParticipation, ...pick } = candidate;
     void absMove1dAtr14;
+    void breakout;
+    void hasParticipation;
     return pick;
   }
 
   function isTechnicalTrade(candidate: Candidate): boolean {
-    return (
-      candidate.basis === "signal" &&
-      (candidate.absMove1dAtr14 === null || candidate.absMove1dAtr14 >= MIN_TRADE_ABS_MOVE_ATR)
-    );
+    const moveOk = candidate.absMove1dAtr14 === null || candidate.absMove1dAtr14 >= MIN_TRADE_ABS_MOVE_ATR;
+    const breakoutOk = candidate.breakout !== null && candidate.hasParticipation;
+    return candidate.basis === "signal" && (moveOk || breakoutOk);
   }
 
   function isWatchlistEntry(candidate: Candidate, picked: Set<string>): boolean {
@@ -724,10 +998,8 @@ function buildPicks(args: {
       return false;
     }
 
-    return (
-      candidate.basis === "trend" ||
-      (candidate.absMove1dAtr14 !== null && candidate.absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR)
-    );
+    const subAtr = candidate.absMove1dAtr14 !== null && candidate.absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR;
+    return candidate.basis === "trend" || subAtr;
   }
 
   const picks = candidates.filter(isTechnicalTrade).slice(0, REPORT_MAX_PICKS).map(stripCandidate);
@@ -809,6 +1081,95 @@ function buildSummaries(
     REPORT_VERY_SHORT_MAX_WORDS
   );
 
+  let breadthUp = 0;
+  let breadthDown = 0;
+  let breadthTotal = 0;
+  let breakoutsUp = 0;
+  let breakoutsDown = 0;
+  const dollarVolumes: Array<{ symbol: string; dollarVolume1d: number }> = [];
+
+  for (const symbol of Object.keys(analyzedBySymbol)) {
+    const series1d = analyzedBySymbol[symbol]?.["1d"];
+    if (!series1d) {
+      continue;
+    }
+
+    const last = series1d.bars.at(-1);
+    const prev = series1d.bars.at(-2);
+    if (last && prev && Number.isFinite(last.c) && Number.isFinite(prev.c) && prev.c !== 0) {
+      const ret = (last.c - prev.c) / prev.c;
+      breadthTotal += 1;
+      if (ret > 0) {
+        breadthUp += 1;
+      } else if (ret < 0) {
+        breadthDown += 1;
+      }
+    }
+
+    if (symbol !== "^VIX") {
+      const breakout = detectDailyBreakout(series1d);
+      if (breakout?.direction === "up") {
+        breakoutsUp += 1;
+      } else if (breakout?.direction === "down") {
+        breakoutsDown += 1;
+      }
+    }
+
+    if (last) {
+      const dollarVolume1d = safeDollarVolume(last);
+      if (dollarVolume1d !== null) {
+        dollarVolumes.push({ symbol, dollarVolume1d });
+      }
+    }
+  }
+
+  const breadthPct = breadthTotal > 0 ? breadthUp / breadthTotal : null;
+
+  dollarVolumes.sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || a.symbol.localeCompare(b.symbol));
+  const totalDollarVolume = dollarVolumes.reduce((sum, v) => sum + v.dollarVolume1d, 0);
+  const top10DollarVolume = dollarVolumes.slice(0, 10).reduce((sum, v) => sum + v.dollarVolume1d, 0);
+  const concentrationPct = totalDollarVolume > 0 ? top10DollarVolume / totalDollarVolume : null;
+
+  const vixSeries = analyzedBySymbol["^VIX"]?.["1d"];
+  const vixLast = vixSeries?.bars.at(-1);
+  const vixPrev = vixSeries?.bars.at(-2);
+  const vixClose = vixLast && Number.isFinite(vixLast.c) ? vixLast.c : null;
+  const vixChangePct =
+    vixLast && vixPrev && Number.isFinite(vixLast.c) && Number.isFinite(vixPrev.c) && vixPrev.c !== 0
+      ? (vixLast.c - vixPrev.c) / vixPrev.c
+      : null;
+
+  const regimeParts: string[] = [];
+  if (breadthPct !== null) {
+    regimeParts.push(
+      `breadth ${(breadthPct * 100).toFixed(0)}% up / ${((breadthDown / breadthTotal) * 100).toFixed(0)}% down (${breadthUp}/${breadthDown}/${breadthTotal})`
+    );
+  }
+  if (vixClose !== null) {
+    const vixPctLabel =
+      vixChangePct !== null ? ` (${vixChangePct >= 0 ? "+" : ""}${(vixChangePct * 100).toFixed(1)}%)` : "";
+    regimeParts.push(`VIX ${vixClose.toFixed(1)}${vixPctLabel}`);
+  }
+  if (concentrationPct !== null) {
+    regimeParts.push(`concentration top10 ${(concentrationPct * 100).toFixed(0)}% of $vol`);
+  }
+  if (breakoutsUp + breakoutsDown > 0) {
+    regimeParts.push(`breakouts ${breakoutsUp}↑/${breakoutsDown}↓ (20/55/252d)`);
+  }
+
+  let regimeLabel: string | null = null;
+  if (breadthPct !== null && vixChangePct !== null) {
+    if (breadthPct >= 0.55 && vixChangePct <= -0.02) {
+      regimeLabel = "risk-on";
+    } else if (breadthPct <= 0.45 && vixChangePct >= 0.02) {
+      regimeLabel = "risk-off";
+    } else {
+      regimeLabel = "mixed";
+    }
+  } else if (breadthPct !== null) {
+    regimeLabel = breadthPct >= 0.55 ? "risk-on" : breadthPct <= 0.45 ? "risk-off" : "mixed";
+  }
+
   const absMoveAtrValues: number[] = [];
   for (const symbol of Object.keys(analyzedBySymbol)) {
     const series1d = analyzedBySymbol[symbol]?.["1d"];
@@ -827,6 +1188,10 @@ function buildSummaries(
   const movedAtLeast2Atr = absMoveAtrValues.filter((v) => v >= 2).length;
 
   const mainIdeaParts: string[] = [];
+  if (regimeParts.length > 0) {
+    const label = regimeLabel ? `${regimeLabel}: ` : "";
+    mainIdeaParts.push(`Fear/greed + concentration: ${label}${regimeParts.join("; ")}.`);
+  }
   if (medAbsMoveAtr !== null) {
     mainIdeaParts.push(
       `Volatility context: median 1d move was ${medAbsMoveAtr.toFixed(1)} ATR (≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
@@ -834,7 +1199,7 @@ function buildSummaries(
   }
   if (picks.length === 0 && lines.length === 0) {
     mainIdeaParts.push(
-      "Across the configured universe, the ruleset did not flag an overbought/oversold RSI or a MACD cross on the latest bar."
+      "Across the configured universe, the ruleset did not flag aligned momentum, breakouts, or key level interactions on the latest bar."
     );
   } else if (picks.length > 0) {
     mainIdeaParts.push(
@@ -861,6 +1226,10 @@ function buildSummaries(
 
   const summaryParts: string[] = [];
   summaryParts.push(`Report date: ${date}.`);
+  if (regimeParts.length > 0) {
+    const label = regimeLabel ? `${regimeLabel}: ` : "";
+    summaryParts.push(`Risk tone (fear/greed + concentration): ${label}${regimeParts.join("; ")}.`);
+  }
   if (picks.length > 0) {
     summaryParts.push("Top setups:");
     for (const p of picks) {
