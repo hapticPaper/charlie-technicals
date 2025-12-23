@@ -66,7 +66,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   for (const article of stored) {
     if (article.provider !== "cnbc" || article.asOfDate !== date) {
       throw new Error(
-        `[market:storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+        `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
           provider: article.provider,
           asOfDate: article.asOfDate
         })}`
@@ -75,7 +75,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
 
     if (article.symbol !== null && typeof article.symbol !== "string") {
       throw new Error(
-        `[market:storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
+        `[market:reportStorage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
           symbol: article.symbol
         })}`
       );
