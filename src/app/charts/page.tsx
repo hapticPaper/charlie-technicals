@@ -86,6 +86,8 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
       if (!loadedRef.current) {
         setFailed(true);
       }
+
+      timeoutIdRef.current = null;
     }, IFRAME_LOAD_TIMEOUT_MS);
 
     return () => {
@@ -100,7 +102,7 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
         <a href={url} target="_blank" rel="noreferrer">
           Open in a new tab
         </a>
-        {failed ? " · Embedding blocked" : ""}
+        {failed ? " · Embedding may be blocked" : ""}
       </p>
 
       {failed ? null : (
@@ -129,7 +131,8 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
       )}
 
       <p className="report-muted" style={{ margin: "10px 0 0" }}>
-        Some upstream examples may block embedding. If the chart doesn’t load, use the “Open in a new tab” link above.
+        Some upstream examples may block embedding or load slowly. If the chart doesn’t load, use the “Open in a new tab”
+        link above.
       </p>
     </details>
   );
