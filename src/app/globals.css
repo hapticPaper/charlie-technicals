@@ -82,6 +82,49 @@ body {
   min-width: 0;
 }
 
+.rpPanelSurface {
+  border-radius: 12px;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface);
+}
+
+.rpPanelSkeleton {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface);
+}
+
+.rpToolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.rpToolbarButton {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface-2);
+  color: var(--rp-text);
+  cursor: pointer;
+}
+
+.rpToolbarButton:disabled {
+  cursor: not-allowed;
+}
+
+.rpToolbarButton:focus-visible {
+  outline: 2px solid var(--rp-target);
+  outline-offset: 2px;
+}
+
+.rpToolbarButtonSecondary {
+  background: transparent;
+  color: var(--rp-muted);
+}
+
 @media (min-width: 900px) {
   .rpSplitLayout {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);

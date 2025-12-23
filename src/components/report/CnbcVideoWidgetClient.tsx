@@ -85,13 +85,8 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
             aria-busy="true"
             aria-label="Loading CNBC video topics chart"
             role="status"
-            style={{
-              width: "100%",
-              height: 260,
-              borderRadius: 12,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface)"
-            }}
+            className="rpPanelSkeleton"
+            style={{ height: 260 }}
           />
         </div>
         <div className="rpSplitSide">
@@ -99,13 +94,8 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
             aria-busy="true"
             aria-label="Loading CNBC video topics"
             role="status"
-            style={{
-              width: "100%",
-              height: 260,
-              borderRadius: 12,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface)"
-            }}
+            className="rpPanelSkeleton"
+            style={{ height: 260 }}
           />
         </div>
       </div>
@@ -115,15 +105,7 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
   return (
     <div className="rpSplitLayout">
       <div className="rpSplitMain">
-        <div
-          style={{
-            width: "100%",
-            borderRadius: 12,
-            border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)",
-            padding: 12
-          }}
-        >
+        <div className="rpPanelSurface" style={{ padding: 12 }}>
           <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
               <BarChart
@@ -181,19 +163,12 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
       </div>
 
       <div className="rpSplitSide">
-        <div
-          style={{
-            padding: 14,
-            borderRadius: 12,
-            border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)"
-          }}
-        >
+        <div className="rpPanelSurface" style={{ padding: 14 }}>
           <p className="report-muted" style={{ marginTop: 0 }}>
             <strong>Hover</strong> a topic to preview videos, then <strong>click</strong> to pin.
           </p>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <div className="rpToolbar">
             <button
               type="button"
               onClick={() => {
@@ -206,14 +181,7 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
                 });
               }}
               disabled={!previewTopic && !pinnedTopic}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid var(--rp-border)",
-                background: "var(--rp-surface-2)",
-                color: "var(--rp-text)",
-                cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
-              }}
+              className="rpToolbarButton"
             >
               {pinnedTopic ? "Unpin topic" : "Pin topic"}
             </button>
@@ -225,14 +193,7 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
                 setPreviewTopic(null);
               }}
               disabled={!previewTopic && !pinnedTopic}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid var(--rp-border)",
-                background: "transparent",
-                color: "var(--rp-muted)",
-                cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
-              }}
+              className="rpToolbarButton rpToolbarButtonSecondary"
             >
               Clear
             </button>

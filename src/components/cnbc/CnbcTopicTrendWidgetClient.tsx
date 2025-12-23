@@ -278,13 +278,8 @@ export function CnbcTopicTrendWidgetClient(props: {
             aria-busy="true"
             aria-label="Loading CNBC topic trend chart"
             role="status"
-            style={{
-              width: "100%",
-              height: 320,
-              borderRadius: 12,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface)"
-            }}
+            className="rpPanelSkeleton"
+            style={{ height: 320 }}
           />
         </div>
         <div className="rpSplitSide">
@@ -292,13 +287,8 @@ export function CnbcTopicTrendWidgetClient(props: {
             aria-busy="true"
             aria-label="Loading CNBC topic videos"
             role="status"
-            style={{
-              width: "100%",
-              height: 320,
-              borderRadius: 12,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface)"
-            }}
+            className="rpPanelSkeleton"
+            style={{ height: 320 }}
           />
         </div>
       </div>
@@ -308,15 +298,7 @@ export function CnbcTopicTrendWidgetClient(props: {
   return (
     <div className="rpSplitLayout">
       <div className="rpSplitMain">
-        <div
-          style={{
-            width: "100%",
-            borderRadius: 12,
-            border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)",
-            padding: 12
-          }}
-        >
+        <div className="rpPanelSurface" style={{ padding: 12 }}>
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer minWidth={0}>
               <AreaChart
@@ -370,19 +352,12 @@ export function CnbcTopicTrendWidgetClient(props: {
       </div>
 
       <div className="rpSplitSide">
-        <div
-          style={{
-            padding: 14,
-            borderRadius: 12,
-            border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)"
-          }}
-        >
+        <div className="rpPanelSurface" style={{ padding: 14 }}>
           <p className="report-muted" style={{ marginTop: 0 }}>
             <strong>Hover</strong> a day, then <strong>click</strong> a topic in the tooltip to filter videos.
           </p>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <div className="rpToolbar">
             <button
               type="button"
               onClick={() => {
@@ -395,14 +370,7 @@ export function CnbcTopicTrendWidgetClient(props: {
                 });
               }}
               disabled={!preview.date && !pinned.date}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid var(--rp-border)",
-                background: "var(--rp-surface-2)",
-                color: "var(--rp-text)",
-                cursor: !preview.date && !pinned.date ? "not-allowed" : "pointer"
-              }}
+              className="rpToolbarButton"
             >
               {pinned.date ? "Unpin date" : "Pin date"}
             </button>
@@ -419,14 +387,7 @@ export function CnbcTopicTrendWidgetClient(props: {
                 });
               }}
               disabled={!preview.topic && !pinned.topic}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid var(--rp-border)",
-                background: "var(--rp-surface-2)",
-                color: "var(--rp-text)",
-                cursor: !preview.topic && !pinned.topic ? "not-allowed" : "pointer"
-              }}
+              className="rpToolbarButton"
             >
               {pinned.topic ? "Unpin topic" : "Pin topic"}
             </button>
@@ -438,14 +399,7 @@ export function CnbcTopicTrendWidgetClient(props: {
                 setPreview({ date: null, topic: null });
               }}
               disabled={!preview.date && !preview.topic && !pinned.date && !pinned.topic}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: "1px solid var(--rp-border)",
-                background: "transparent",
-                color: "var(--rp-muted)",
-                cursor: !preview.date && !preview.topic && !pinned.date && !pinned.topic ? "not-allowed" : "pointer"
-              }}
+              className="rpToolbarButton rpToolbarButtonSecondary"
             >
               Clear
             </button>
