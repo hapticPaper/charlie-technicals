@@ -265,17 +265,31 @@ function trueRange(bars: MarketBar[]): Array<number | null> {
     const low = b?.l;
     const prevClose = prev?.c;
 
-    if (!isFiniteNumber(high) || !isFiniteNumber(low)) {
+    const highValue = isFiniteNumber(high) ? high : null;
+    const lowValue = isFiniteNumber(low) ? low : null;
+    const prevCloseValue = isFiniteNumber(prevClose) ? prevClose : null;
+
+    if (highValue !== null && lowValue !== null) {
+      const normHigh = Math.max(highValue, lowValue);
+      const normLow = Math.min(highValue, lowValue);
+      const hl = normHigh - normLow;
+      if (prevCloseValue === null) {
+        out[i] = hl;
+        continue;
+      }
+
+      out[i] = Math.max(hl, Math.abs(normHigh - prevCloseValue), Math.abs(normLow - prevCloseValue));
       continue;
     }
 
-    const hl = high - low;
-    if (!isFiniteNumber(prevClose)) {
-      out[i] = hl;
+    if (prevCloseValue !== null && highValue !== null) {
+      out[i] = Math.abs(highValue - prevCloseValue);
       continue;
     }
 
-    out[i] = Math.max(hl, Math.abs(high - prevClose), Math.abs(low - prevClose));
+    if (prevCloseValue !== null && lowValue !== null) {
+      out[i] = Math.abs(lowValue - prevCloseValue);
+    }
   }
 
   return out;
