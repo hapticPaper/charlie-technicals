@@ -552,6 +552,7 @@ export function ReportChart(props: {
             return base;
           }
 
+          // Only apply additional padding when trades extend beyond the base candle range.
           const span = maxValue - minValue;
           let pad: number;
           if (span > 0) {
