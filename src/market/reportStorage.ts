@@ -3,6 +3,7 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 
 import { formatRawDataFileDate } from "./dataConventions";
+import { parseIsoDateYmd } from "./date";
 import type {
   CnbcVideoArticle,
   MarketReport,
@@ -70,9 +71,11 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const asOfDate = /^\d{8}$/.test(date)
-    ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-    : date;
+  let asOfDate = date;
+  if (/^\d{8}$/.test(date)) {
+    asOfDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+    parseIsoDateYmd(asOfDate);
+  }
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
