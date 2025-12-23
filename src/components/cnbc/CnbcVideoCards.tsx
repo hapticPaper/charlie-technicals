@@ -128,7 +128,9 @@ export function CnbcVideoCards(props: {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
   const publishedAtMode = getPublishedAtLabelMode(
-    items.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
+    items
+      .map((video) => safeTimestamp(video.publishedAt))
+      .filter((ts): ts is number => typeof ts === "number" && Number.isFinite(ts))
   );
 
   if (items.length === 0) {
