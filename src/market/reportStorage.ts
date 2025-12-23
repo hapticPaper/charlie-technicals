@@ -51,15 +51,13 @@ export async function readJson<T>(filePath: string): Promise<T> {
   try {
     return JSON.parse(raw) as T;
   } catch (error) {
+    const baseMessage = `[market:reportStorage] Failed to parse JSON: ${filePath}`;
     if (error instanceof SyntaxError) {
-      error.message = `[market:reportStorage] Failed to parse JSON: ${filePath}: ${error.message}`;
-      throw error;
+      throw new SyntaxError(`${baseMessage}: ${error.message}`, { cause: error });
     }
 
-    const message = error instanceof Error ? `: ${error.message}` : "";
-    throw new Error(`[market:reportStorage] Failed to parse JSON: ${filePath}${message}`, {
-      cause: error
-    });
+    const message = error instanceof Error ? `${baseMessage}: ${error.message}` : baseMessage;
+    throw new Error(message, { cause: error });
   }
 }
 
