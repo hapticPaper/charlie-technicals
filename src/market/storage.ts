@@ -6,6 +6,7 @@ import type {
   AnalyzedSeries,
   CnbcVideoArticle,
   MarketInterval,
+  MarketNewsArticle,
   MarketNewsSnapshot,
   StoredCnbcVideoArticle,
   MarketReport,
@@ -90,9 +91,17 @@ async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<
 }
 
 function mergeBars(
-  existing: RawSeries["bars"],
-  incoming: RawSeries["bars"]
+  leftBars: RawSeries["bars"],
+  rightBars: RawSeries["bars"]
 ): RawSeries["bars"] {
+  // Merge + dedupe bars by timestamp.
+  //
+  // Contract:
+  // - Output is sorted by `t`.
+  // - Duplicate timestamps are resolved by preferring `rightBars` values.
+  // - Callers that want to preserve persisted bar values should pass the on-disk
+  //   bars as `rightBars`.
+  //   Example: mergeBars(fetchedBars, persistedBars) keeps persisted values.
   // `t` must be ISO-8601 so `localeCompare` keeps chronological ordering.
   const ensureSorted = (bars: RawSeries["bars"], label: string): RawSeries["bars"] => {
     for (let idx = 1; idx < bars.length; idx += 1) {
@@ -107,8 +116,8 @@ function mergeBars(
     return bars;
   };
 
-  const left = ensureSorted(existing, "existing");
-  const right = ensureSorted(incoming, "incoming");
+  const left = ensureSorted(leftBars, "leftBars");
+  const right = ensureSorted(rightBars, "rightBars");
 
   const out: RawSeries["bars"] = [];
   let i = 0;
@@ -344,6 +353,8 @@ export async function newsSnapshotExists(date: string, symbol: string): Promise<
   return fileExists(getNewsPath(date, symbol));
 }
 
+export type ExistingSnapshotMode = "skip_existing" | "fill_existing";
+
 export type WriteRawSeriesResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
@@ -351,10 +362,19 @@ export type WriteRawSeriesResult =
 /**
 * Writes a raw OHLCV snapshot for a given symbol/interval/date.
 *
-* Raw snapshots are immutable: if the target file already exists, the write is
-* skipped and the existing snapshot is left untouched.
+* Raw snapshots are immutable by default: if the target file already exists, the
+* write is skipped and the existing snapshot is left untouched.
+*
+* When `mode: "fill_existing"` is used, the write merges the incoming bars into
+* the existing file, adding only new timestamps.
 */
-export async function writeRawSeries(date: string, series: RawSeries): Promise<WriteRawSeriesResult> {
+export async function writeRawSeries(
+  date: string,
+  series: RawSeries,
+  opts: {
+    mode?: ExistingSnapshotMode;
+  } = {}
+): Promise<WriteRawSeriesResult> {
   const filePath = getRawSeriesPath(date, series.symbol, series.interval);
   const tmpPath = `${filePath}.tmp`;
 
@@ -362,7 +382,57 @@ export async function writeRawSeries(date: string, series: RawSeries): Promise<W
 
   const res = await withFileLock(filePath, async () => {
     if (await fileExists(filePath)) {
-      return { status: "skipped_existing" as const, path: filePath };
+      if (opts.mode !== "fill_existing") {
+        return { status: "skipped_existing" as const, path: filePath };
+      }
+
+      const existing = await readJson<RawSeries>(filePath);
+      if (existing.symbol !== series.symbol || existing.interval !== series.interval) {
+        throw new Error(
+          `[market:storage] Raw series metadata mismatch in ${filePath}: expected ${series.symbol}/${series.interval}, got ${existing.symbol}/${existing.interval}`
+        );
+      }
+
+      if (existing.provider !== series.provider) {
+        throw new Error(
+          `[market:storage] Raw series provider mismatch in ${filePath}: ${existing.provider} vs ${series.provider}`
+        );
+      }
+
+      // Preserve persisted bars on conflicts; only add missing timestamps.
+      const mergedBars = mergeBars(series.bars, existing.bars);
+      const isSameLength = mergedBars.length === existing.bars.length;
+      const barsUnchanged =
+        isSameLength &&
+        mergedBars.every((b, idx) => {
+          const prev = existing.bars[idx];
+          return (
+            prev !== undefined &&
+            prev.t === b.t &&
+            prev.o === b.o &&
+            prev.h === b.h &&
+            prev.l === b.l &&
+            prev.c === b.c &&
+            prev.v === b.v
+          );
+        });
+
+      if (barsUnchanged) {
+        return { status: "skipped_existing" as const, path: filePath };
+      }
+
+      const merged: RawSeries = {
+        ...existing,
+        fetchedAt:
+          existing.fetchedAt.localeCompare(series.fetchedAt) >= 0
+            ? existing.fetchedAt
+            : series.fetchedAt,
+        bars: mergedBars
+      };
+
+      await writeJson(tmpPath, merged);
+      await rename(tmpPath, filePath);
+      return { status: "written" as const, path: filePath };
     }
 
     await writeJson(tmpPath, series);
@@ -376,6 +446,43 @@ export async function writeRawSeries(date: string, series: RawSeries): Promise<W
 export type WriteNewsSnapshotResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
+
+function normalizeNewsArticleForMerge(article: MarketNewsArticle): MarketNewsArticle {
+  return {
+    ...article,
+    relatedTickers: Array.from(new Set(article.relatedTickers))
+  };
+}
+
+function mergeNewsArticles(existing: MarketNewsArticle, incoming: MarketNewsArticle): {
+  merged: MarketNewsArticle;
+  changed: boolean;
+} {
+  const normalizedIncoming = normalizeNewsArticleForMerge(incoming);
+  const merged: MarketNewsArticle = {
+    ...normalizedIncoming,
+    topic:
+      normalizedIncoming.topic && normalizedIncoming.topic.trim() !== ""
+        ? normalizedIncoming.topic
+        : existing.topic,
+    hype: normalizedIncoming.hype ?? existing.hype,
+    relatedTickers:
+      normalizedIncoming.relatedTickers.length > 0 ? normalizedIncoming.relatedTickers : existing.relatedTickers
+  };
+
+  const changed = JSON.stringify(merged) !== JSON.stringify(existing);
+  return { merged, changed };
+}
+
+function sortNewsArticles(articles: MarketNewsArticle[]): MarketNewsArticle[] {
+  return [...articles].sort((a, b) => {
+    const byDate = new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    if (byDate !== 0) {
+      return byDate;
+    }
+    return a.id.localeCompare(b.id);
+  });
+}
 
 function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
   if (snapshot.symbol !== "cnbc") {
@@ -426,7 +533,10 @@ function serializeNewsSnapshotForStorage(snapshot: MarketNewsSnapshot): unknown 
 */
 export async function writeNewsSnapshot(
   date: string,
-  snapshot: MarketNewsSnapshot
+  snapshot: MarketNewsSnapshot,
+  opts: {
+    mode?: ExistingSnapshotMode;
+  } = {}
 ): Promise<WriteNewsSnapshotResult> {
   if (snapshot.asOfDate !== date) {
     throw new Error(
@@ -441,7 +551,129 @@ export async function writeNewsSnapshot(
 
   const res = await withFileLock(filePath, async () => {
     if (await fileExists(filePath)) {
-      return { status: "skipped_existing" as const, path: filePath };
+      if (opts.mode !== "fill_existing") {
+        return { status: "skipped_existing" as const, path: filePath };
+      }
+
+      let existingSnapshot: MarketNewsSnapshot;
+      if (snapshot.symbol === "cnbc") {
+        const existingStored = await readJson<StoredCnbcVideoArticle[]>(filePath);
+        for (const article of existingStored) {
+          if (article.asOfDate !== date) {
+            throw new Error(
+              `[market:storage] News snapshot asOfDate mismatch in ${filePath}: expected ${date}, got ${article.asOfDate}`
+            );
+          }
+        }
+
+        const providers = Array.from(
+          new Set(existingStored.map((a) => a.provider).filter((p) => typeof p === "string"))
+        );
+        if (providers.length > 1) {
+          throw new Error(
+            `[market:storage] Multiple providers detected for CNBC snapshot in ${filePath}: ${providers.join(", ")}`
+          );
+        }
+
+        const existingProvider = providers[0];
+        if (existingProvider && existingProvider !== snapshot.provider) {
+          throw new Error(
+            `[market:storage] News snapshot provider mismatch in ${filePath}: ${existingProvider} vs ${snapshot.provider}`
+          );
+        }
+
+        const existingArticles: MarketNewsArticle[] = existingStored.map((a) => ({
+          id: a.id,
+          title: a.title,
+          url: a.url,
+          publisher: a.publisher,
+          publishedAt: a.publishedAt,
+          relatedTickers: a.relatedTickers,
+          topic: a.topic,
+          hype: a.hype,
+          mainIdea: a.mainIdea,
+          summary: a.summary
+        }));
+
+        const fetchedAt = existingStored
+          .map((a) => a.fetchedAt)
+          .filter((s) => typeof s === "string")
+          .sort()
+          .slice(-1)[0];
+
+        existingSnapshot = {
+          symbol: "cnbc",
+          provider: existingProvider ?? snapshot.provider,
+          fetchedAt: fetchedAt ?? snapshot.fetchedAt,
+          asOfDate: date,
+          articles: existingArticles
+        };
+      } else {
+        existingSnapshot = await readJson<MarketNewsSnapshot>(filePath);
+      }
+
+      if (existingSnapshot.symbol !== snapshot.symbol) {
+        throw new Error(
+          `[market:storage] News snapshot symbol mismatch in ${filePath}: expected ${snapshot.symbol}, got ${existingSnapshot.symbol}`
+        );
+      }
+
+      if (existingSnapshot.asOfDate !== date) {
+        throw new Error(
+          `[market:storage] News snapshot asOfDate mismatch in ${filePath}: expected ${date}, got ${existingSnapshot.asOfDate}`
+        );
+      }
+
+      if (existingSnapshot.provider !== snapshot.provider) {
+        throw new Error(
+          `[market:storage] News snapshot provider mismatch in ${filePath}: ${existingSnapshot.provider} vs ${snapshot.provider}`
+        );
+      }
+
+      const existingById = new Map(existingSnapshot.articles.map((a) => [a.id, a] as const));
+      const mergedById = new Map<string, MarketNewsArticle>();
+      let changed = false;
+
+      for (const incoming of snapshot.articles) {
+        const prev = existingById.get(incoming.id);
+        if (!prev) {
+          mergedById.set(incoming.id, normalizeNewsArticleForMerge(incoming));
+          changed = true;
+          continue;
+        }
+
+        const res = mergeNewsArticles(prev, incoming);
+        mergedById.set(incoming.id, res.merged);
+        if (res.changed) {
+          changed = true;
+        }
+      }
+
+      for (const prev of existingSnapshot.articles) {
+        if (!mergedById.has(prev.id)) {
+          mergedById.set(prev.id, prev);
+        }
+      }
+
+      const mergedArticles = sortNewsArticles(Array.from(mergedById.values()));
+      const existingArticlesSorted = sortNewsArticles(existingSnapshot.articles);
+
+      if (!changed && JSON.stringify(existingArticlesSorted) === JSON.stringify(mergedArticles)) {
+        return { status: "skipped_existing" as const, path: filePath };
+      }
+
+      const mergedSnapshot: MarketNewsSnapshot = {
+        ...existingSnapshot,
+        fetchedAt:
+          existingSnapshot.fetchedAt.localeCompare(snapshot.fetchedAt) >= 0
+            ? existingSnapshot.fetchedAt
+            : snapshot.fetchedAt,
+        articles: mergedArticles
+      };
+
+      await writeJson(tmpPath, serializeNewsSnapshotForStorage(mergedSnapshot));
+      await rename(tmpPath, filePath);
+      return { status: "written" as const, path: filePath };
     }
 
     await writeJson(tmpPath, serializeNewsSnapshotForStorage(snapshot));
