@@ -58,15 +58,34 @@ export default function ChartsPlaygroundPage() {
         design/implementation guide.
       </p>
 
-      <ul>
-        {PLUGIN_EXAMPLES.map((e) => (
-          <li key={e.url}>
+      <p>
+        <a href={PLUGIN_EXAMPLES[0].url} target="_blank" rel="noreferrer">
+          {PLUGIN_EXAMPLES[0].label}
+        </a>
+      </p>
+
+      {PLUGIN_EXAMPLES.slice(1).map((e) => (
+        <details key={e.url} style={{ marginTop: 12 }}>
+          <summary>{e.label}</summary>
+          <p className="report-muted" style={{ margin: "6px 0 10px" }}>
             <a href={e.url} target="_blank" rel="noreferrer">
-              {e.label}
+              Open in a new tab
             </a>
-          </li>
-        ))}
-      </ul>
+          </p>
+          <iframe
+            title={e.label}
+            src={e.url}
+            loading="lazy"
+            style={{
+              width: "100%",
+              height: 640,
+              border: "1px solid var(--rp-border)",
+              borderRadius: 12,
+              background: "var(--rp-surface)"
+            }}
+          />
+        </details>
+      ))}
     </>
   );
 }

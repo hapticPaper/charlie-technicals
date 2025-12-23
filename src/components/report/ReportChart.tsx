@@ -135,7 +135,7 @@ function toLineSeriesData(
 
 function toHistogramSeriesData(
   t: number[],
-  values: number[],
+  values: Array<number | null>,
   colors: string[]
 ): Array<HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
   const out: Array<HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
@@ -299,7 +299,7 @@ export function ReportChart(props: {
       const hasVolume =
         Array.isArray(series.volume) &&
         series.volume.length === series.t.length &&
-        series.volume.some((v) => typeof v === "number" && Number.isFinite(v) && v > 0);
+        series.volume.some((v) => typeof v === "number" && Number.isFinite(v));
 
       const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;

@@ -1,4 +1,5 @@
 .pick {
+  background: var(--rp-surface);
   background: color-mix(in srgb, var(--rp-surface) 55%, transparent);
   border-radius: 14px;
   padding: 16px;

@@ -65,6 +65,10 @@ body {
   gap: 16px;
 }
 
+.rpAppContent {
+  min-width: 0;
+}
+
 .rpAppSidebar {
   display: none;
 }
