@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const PLUGIN_EXAMPLES = [
   {
@@ -56,6 +56,29 @@ const PLUGIN_EXAMPLES = [
 function ChartsExampleEmbed(props: { label: string; url: string }) {
   const { label, url } = props;
   const [failed, setFailed] = useState(false);
+  const loadedRef = useRef(false);
+  const timeoutIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    loadedRef.current = false;
+    setFailed(false);
+
+    if (timeoutIdRef.current !== null) {
+      window.clearTimeout(timeoutIdRef.current);
+    }
+
+    timeoutIdRef.current = window.setTimeout(() => {
+      if (!loadedRef.current) {
+        setFailed(true);
+      }
+    }, 2500);
+
+    return () => {
+      if (timeoutIdRef.current !== null) {
+        window.clearTimeout(timeoutIdRef.current);
+      }
+    };
+  }, [url]);
 
   return (
     <details style={{ marginTop: 12 }}>
@@ -72,10 +95,19 @@ function ChartsExampleEmbed(props: { label: string; url: string }) {
           title={label}
           src={url}
           loading="lazy"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts"
           referrerPolicy="no-referrer"
+          onLoad={() => {
+            loadedRef.current = true;
+            if (timeoutIdRef.current !== null) {
+              window.clearTimeout(timeoutIdRef.current);
+            }
+          }}
           onError={() => {
             setFailed(true);
+            if (timeoutIdRef.current !== null) {
+              window.clearTimeout(timeoutIdRef.current);
+            }
           }}
           style={{
             width: "100%",
