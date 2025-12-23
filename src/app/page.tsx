@@ -120,7 +120,13 @@ export default async function HomePage() {
     );
   }
 
-  const sortedCards = cards.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const toCardTs = (d: string): number => {
+    const isYYYYMMDD = /^\d{4}-\d{2}-\d{2}$/.test(d);
+    const ts = Date.parse(isYYYYMMDD ? `${d}T00:00:00Z` : d);
+    return Number.isFinite(ts) ? ts : 0;
+  };
+
+  const sortedCards = cards.slice().sort((a, b) => toCardTs(b.date) - toCardTs(a.date));
   const latestCard = sortedCards[0] ?? null;
   const historyCards = sortedCards.slice(1);
 
