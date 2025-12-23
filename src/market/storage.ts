@@ -341,10 +341,30 @@ export async function listCnbcVideoDates(): Promise<string[]> {
     throw error;
   }
 
+  function isValidYYYYMMDD(value: string): boolean {
+    if (!/^\d{8}$/.test(value)) {
+      return false;
+    }
+
+    const yyyy = Number(value.slice(0, 4));
+    const mm = Number(value.slice(4, 6));
+    const dd = Number(value.slice(6, 8));
+    if (!Number.isInteger(yyyy) || !Number.isInteger(mm) || !Number.isInteger(dd)) {
+      return false;
+    }
+
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) {
+      return false;
+    }
+
+    const utc = new Date(Date.UTC(yyyy, mm - 1, dd));
+    return utc.getUTCFullYear() === yyyy && utc.getUTCMonth() === mm - 1 && utc.getUTCDate() === dd;
+  }
+
   return entries
     .filter((e) => e.endsWith(".json"))
     .map((e) => e.replace(/\.json$/, ""))
-    .filter((name) => /^\d{8}$/.test(name))
+    .filter((name) => isValidYYYYMMDD(name))
     .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`)
     .sort();
 }

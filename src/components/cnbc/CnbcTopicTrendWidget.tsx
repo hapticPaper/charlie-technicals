@@ -101,29 +101,28 @@ export async function CnbcTopicTrendWidget() {
   let hasOther = false;
 
   for (const { date, articles } of dayArticles) {
-    const row: CnbcTopicTrendDatum = { date };
+    const values: Record<string, number> = {};
     let other = 0;
 
     for (const article of articles) {
       const topic = normalizeTopic(article.topic);
       if (includedTopics.has(topic)) {
-        const prev = typeof row[topic] === "number" ? row[topic] : 0;
-        row[topic] = prev + 1;
+        values[topic] = (values[topic] ?? 0) + 1;
       } else {
         other += 1;
       }
     }
 
     if (other > 0) {
-      row.other = other;
+      values.other = other;
       hasOther = true;
     }
 
     for (const topic of topTopics) {
-      row[topic] ??= 0;
+      values[topic] ??= 0;
     }
 
-    data.push(row);
+    data.push({ date, values });
 
     videosByDate[date] = articles
       .slice()

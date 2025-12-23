@@ -18,8 +18,14 @@ import type { CnbcVideoCard } from "./types";
 
 export type CnbcTopicTrendDatum = {
   date: string;
-  [topic: string]: number | string;
+  values: Record<string, number>;
 };
+
+type CnbcTopicTrendChartRow = Record<string, number | string>;
+
+function toChartTopicKey(topic: string): string {
+  return topic === "date" ? "topic_date" : topic;
+}
 
 const SERIES_COLORS = [
   "#38bdf8",
@@ -58,6 +64,20 @@ export function CnbcTopicTrendWidgetClient(props: {
 
   const [activeDate, setActiveDate] = useState<string | null>(null);
 
+  const chartTopics = useMemo(() => {
+    return props.topics.map((topic) => ({ topic, chartKey: toChartTopicKey(topic) }));
+  }, [props.topics]);
+
+  const chartData = useMemo<CnbcTopicTrendChartRow[]>(() => {
+    return props.data.map((row) => {
+      const chartRow: CnbcTopicTrendChartRow = { date: row.date };
+      for (const { topic, chartKey } of chartTopics) {
+        chartRow[chartKey] = row.values[topic] ?? 0;
+      }
+      return chartRow;
+    });
+  }, [chartTopics, props.data]);
+
   const activeVideos = useMemo(() => {
     if (!activeDate) {
       return [];
@@ -88,7 +108,7 @@ export function CnbcTopicTrendWidgetClient(props: {
       <div style={{ width: "100%", height: 320 }}>
         <ResponsiveContainer minWidth={0}>
           <AreaChart
-            data={props.data}
+            data={chartData}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
               const label = evt?.activeLabel;
@@ -110,11 +130,12 @@ export function CnbcTopicTrendWidgetClient(props: {
               labelFormatter={formatDateTick}
             />
             <Legend />
-            {props.topics.map((topic, idx) => (
+            {chartTopics.map(({ topic, chartKey }, idx) => (
               <Area
-                key={topic}
+                key={chartKey}
                 type="monotone"
-                dataKey={topic}
+                dataKey={chartKey}
+                name={topic}
                 stackId="topics"
                 stroke={SERIES_COLORS[idx % SERIES_COLORS.length]}
                 fill={SERIES_COLORS[idx % SERIES_COLORS.length]}
