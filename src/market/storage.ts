@@ -4,6 +4,7 @@ import path from "node:path";
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
 import type {
   AnalyzedSeries,
+  CnbcVideoArticle,
   MarketInterval,
   MarketNewsSnapshot,
   StoredCnbcVideoArticle,
@@ -233,13 +234,14 @@ export async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
-export async function readCnbcVideoArticles(date: string): Promise<StoredCnbcVideoArticle[]> {
-  return readJson<StoredCnbcVideoArticle[]>(getNewsPath(date, "cnbc"));
+export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
+  const stored = await readJson<StoredCnbcVideoArticle[]>(getNewsPath(date, "cnbc"));
+  return stored.map(({ symbol: _symbol, provider: _provider, ...article }) => article);
 }
 
 export type StoredNewsData =
   | { kind: "snapshot"; snapshot: MarketNewsSnapshot }
-  | { kind: "cnbc_articles"; articles: StoredCnbcVideoArticle[] };
+  | { kind: "cnbc_articles"; articles: CnbcVideoArticle[] };
 
 export async function readNewsData(date: string, symbol: string): Promise<StoredNewsData> {
   if (symbol === "cnbc") {

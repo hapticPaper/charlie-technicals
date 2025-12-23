@@ -64,6 +64,11 @@ export type StoredCnbcVideoArticle = MarketNewsArticle & {
   asOfDate: string;
 };
 
+export type CnbcVideoArticle = MarketNewsArticle & {
+  fetchedAt: string;
+  asOfDate: string;
+};
+
 export type SignalHit = {
   id: string;
   label: string;

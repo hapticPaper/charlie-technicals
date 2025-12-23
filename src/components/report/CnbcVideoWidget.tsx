@@ -1,11 +1,11 @@
 import { readCnbcVideoArticles } from "../../market/storage";
-import type { StoredCnbcVideoArticle } from "../../market/types";
+import type { CnbcVideoArticle } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 const MAX_CNBC_WIDGET_ARTICLES = 500;
 
-type CnbcVideoSnapshot = StoredCnbcVideoArticle[];
+type CnbcVideoSnapshot = CnbcVideoArticle[];
 
 function buildTopicData(articles: CnbcVideoSnapshot): CnbcTopicHypeDatum[] {
   const counts = new Map<string, { count: number; hypeSum: number }>();
