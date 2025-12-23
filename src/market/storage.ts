@@ -234,6 +234,12 @@ export async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
+/**
+* Reads CNBC video articles for a day.
+*
+* The on-disk schema includes `symbol` and `provider` on each object, but those are
+* implied by the file path and omitted from the returned in-memory objects.
+*/
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
   const stored = await readJson<StoredCnbcVideoArticle[]>(getNewsPath(date, "cnbc"));
   return stored.map(({ symbol: _symbol, provider: _provider, ...article }) => article);
