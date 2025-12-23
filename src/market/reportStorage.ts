@@ -15,6 +15,22 @@ const CONTENT_DIR = path.join(process.cwd(), "content");
 const REPORTS_DIR = path.join(CONTENT_DIR, "reports");
 const CNBC_NEWS_DIR = path.join(CONTENT_DIR, "data", "cnbc", "news");
 
+function normalizeCnbcAsOfDate(date: string): string {
+  const asOfDate = /^\d{8}$/.test(date)
+    ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+    : date;
+
+  try {
+    parseIsoDateYmd(asOfDate);
+  } catch (error) {
+    throw new Error(`[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date})`, {
+      cause: error
+    });
+  }
+
+  return asOfDate;
+}
+
 export function getReportJsonPath(date: string): string {
   return path.join(REPORTS_DIR, `${date}.json`);
 }
@@ -71,27 +87,14 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  let asOfDate = date;
-  if (/^\d{8}$/.test(date)) {
-    asOfDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
-  }
-
-  try {
-    parseIsoDateYmd(asOfDate);
-  } catch (error) {
-    throw new Error(`[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date})`, {
-      cause: error
-    });
-  }
+  const asOfDate = normalizeCnbcAsOfDate(date);
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    const articleAsOfDate = /^\d{8}$/.test(article.asOfDate)
-      ? `${article.asOfDate.slice(0, 4)}-${article.asOfDate.slice(4, 6)}-${article.asOfDate.slice(6, 8)}`
-      : article.asOfDate;
+    const articleAsOfDate = normalizeCnbcAsOfDate(article.asOfDate);
 
     if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
       throw new Error(
