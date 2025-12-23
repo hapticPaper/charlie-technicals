@@ -76,14 +76,24 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
     asOfDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
   }
 
-  parseIsoDateYmd(asOfDate);
+  try {
+    parseIsoDateYmd(asOfDate);
+  } catch (error) {
+    throw new Error(`[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date})`, {
+      cause: error
+    });
+  }
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    if (article.provider !== "cnbc" || article.asOfDate !== asOfDate) {
+    const articleAsOfDate = /^\d{8}$/.test(article.asOfDate)
+      ? `${article.asOfDate.slice(0, 4)}-${article.asOfDate.slice(4, 6)}-${article.asOfDate.slice(6, 8)}`
+      : article.asOfDate;
+
+    if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
       throw new Error(
         `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
           provider: article.provider,
