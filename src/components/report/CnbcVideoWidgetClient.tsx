@@ -32,6 +32,8 @@ function getActiveBarTopic(evt: unknown): string | null {
 
   // Recharts can emit multiple payload entries; pick the first one that carries a topic label.
   for (const entry of activePayload) {
+    // `activePayload` can contain multiple series entries for the same hovered bar;
+    // we just need a stable topic label.
     const topic = (entry as BarHoverPayload | undefined)?.payload?.topic;
     if (typeof topic === "string") {
       return topic;

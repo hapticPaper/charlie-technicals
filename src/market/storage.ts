@@ -326,7 +326,10 @@ export async function listReportDates(): Promise<string[]> {
 const MIN_CNBC_VIDEO_YEAR = 2000;
 const MAX_FUTURE_YEAR_OFFSET = 1;
 
-let warnedInvalidCnbcVideoDates = false;
+// Avoid noisy per-request warnings in production when the CNBC data directory contains junk files.
+// We still log a sample once per directory per process to keep it debuggable (subsequent calls won't warn again until restart).
+// Note: `listCnbcVideoDates` uses a fixed CNBC directory, so this Set should remain tiny.
+const warnedInvalidCnbcVideoDateDirs = new Set<string>();
 
 function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
@@ -384,6 +387,7 @@ function isValidIsoDateYmd(value: string, now = new Date()): boolean {
 
 export async function listCnbcVideoDates(): Promise<string[]> {
   const dir = getNewsDir("cnbc");
+  const dirKey = path.resolve(dir);
   let entries: string[] = [];
   try {
     entries = await readdir(dir);
@@ -427,8 +431,8 @@ export async function listCnbcVideoDates(): Promise<string[]> {
     const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${dir} (expected YYYYMMDD.json)`;
     if (process.env.NODE_ENV !== "production") {
       console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
-    } else if (!warnedInvalidCnbcVideoDates) {
-      warnedInvalidCnbcVideoDates = true;
+    } else if (!warnedInvalidCnbcVideoDateDirs.has(dirKey)) {
+      warnedInvalidCnbcVideoDateDirs.add(dirKey);
       const sample = invalidDatesSample[0];
       console.warn(sample ? `${message}: e.g. ${sample}` : message);
     }
