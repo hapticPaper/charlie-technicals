@@ -1,18 +1,11 @@
 import { getNewsPath, readJson } from "../../market/storage";
-import type { MarketNewsArticle } from "../../market/types";
+import type { StoredCnbcVideoArticle } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 const MAX_CNBC_WIDGET_ARTICLES = 500;
 
-type CnbcVideoArticle = MarketNewsArticle & {
-  symbol: string;
-  provider: string;
-  fetchedAt: string;
-  asOfDate: string;
-};
-
-type CnbcVideoSnapshot = CnbcVideoArticle[];
+type CnbcVideoSnapshot = StoredCnbcVideoArticle[];
 
 function buildTopicData(articles: CnbcVideoSnapshot): CnbcTopicHypeDatum[] {
   const counts = new Map<string, { count: number; hypeSum: number }>();
@@ -60,7 +53,8 @@ export async function CnbcVideoWidget(props: { date: string }) {
     return null;
   }
 
-  const asOfDate = articles.find((a) => a.asOfDate)?.asOfDate ?? props.date;
+  const articleDates = Array.from(new Set(articles.map((a) => a.asOfDate).filter(Boolean)));
+  const asOfDate = articleDates.length === 1 ? articleDates[0]! : props.date;
   const data = buildTopicData(articles);
   if (data.length === 0) {
     return null;

@@ -52,6 +52,16 @@ export type MarketNewsSnapshot = {
   articles: MarketNewsArticle[];
 };
 
+/**
+* On-disk schema for CNBC video snapshots under content/data/cnbc/news/<YYYYMMDD>.json.
+*/
+export type StoredCnbcVideoArticle = MarketNewsArticle & {
+  symbol: string;
+  provider: string;
+  fetchedAt: string;
+  asOfDate: string;
+};
+
 export type SignalHit = {
   id: string;
   label: string;

@@ -6,6 +6,7 @@ import type {
   AnalyzedSeries,
   MarketInterval,
   MarketNewsSnapshot,
+  StoredCnbcVideoArticle,
   MarketReport,
   MarketReportHighlights,
   RawSeries
@@ -320,13 +321,6 @@ export type WriteNewsSnapshotResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
 
-type StoredCnbcVideoArticle = MarketNewsSnapshot["articles"][number] & {
-  symbol: string;
-  provider: string;
-  fetchedAt: string;
-  asOfDate: string;
-};
-
 function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
   return snapshot.articles.map((article) => ({
     ...article,
@@ -335,6 +329,14 @@ function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArti
     fetchedAt: snapshot.fetchedAt,
     asOfDate: snapshot.asOfDate
   }));
+}
+
+function serializeNewsSnapshotForStorage(snapshot: MarketNewsSnapshot): unknown {
+  if (snapshot.symbol === "cnbc") {
+    return toStoredCnbcArticles(snapshot);
+  }
+
+  return snapshot;
 }
 
 /**
@@ -363,12 +365,7 @@ export async function writeNewsSnapshot(
       return { status: "skipped_existing" as const, path: filePath };
     }
 
-    if (snapshot.symbol === "cnbc") {
-      // Stored as a flat list of articles (with repeated metadata) for easier consumption.
-      await writeJson(tmpPath, toStoredCnbcArticles(snapshot));
-    } else {
-      await writeJson(tmpPath, snapshot);
-    }
+    await writeJson(tmpPath, serializeNewsSnapshotForStorage(snapshot));
     await rename(tmpPath, filePath);
     return { status: "written" as const, path: filePath };
   });
