@@ -1083,6 +1083,7 @@ function buildSummaries(
 
   let breadthUp = 0;
   let breadthDown = 0;
+  let breadthFlat = 0;
   let breadthTotal = 0;
   let breakoutsUp = 0;
   let breakoutsDown = 0;
@@ -1103,6 +1104,8 @@ function buildSummaries(
         breadthUp += 1;
       } else if (ret < 0) {
         breadthDown += 1;
+      } else {
+        breadthFlat += 1;
       }
     }
 
@@ -1124,7 +1127,6 @@ function buildSummaries(
   }
 
   const breadthPct = breadthTotal > 0 ? breadthUp / breadthTotal : null;
-  const breadthFlat = breadthTotal - breadthUp - breadthDown;
 
   dollarVolumes.sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || a.symbol.localeCompare(b.symbol));
   const totalDollarVolume = dollarVolumes.reduce((sum, v) => sum + v.dollarVolume1d, 0);
