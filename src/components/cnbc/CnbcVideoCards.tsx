@@ -7,6 +7,11 @@ import type { CnbcVideoCard } from "./types";
 const CNBC_TIME_ZONE = "America/New_York";
 
 function safeTimestamp(value: string): number | null {
+  // CNBC `publishedAt` is expected to be an ISO-like timestamp.
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return null;
+  }
+
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : null;
 }
@@ -122,7 +127,7 @@ export function CnbcVideoCards(props: {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
   const publishedAtMode = getPublishedAtLabelMode(
-    items.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
+    props.videos.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
   );
 
   if (items.length === 0) {
