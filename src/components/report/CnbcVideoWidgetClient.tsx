@@ -20,7 +20,6 @@ import { getRechartsInitialDimension } from "./rechartsConfig";
 type BarHoverPayload = {
   payload?: { topic?: unknown };
 };
-
 function getActiveBarTopic(evt: unknown): string | null {
   if (!evt || typeof evt !== "object") {
     return null;
