@@ -320,6 +320,23 @@ export type WriteNewsSnapshotResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
 
+type StoredCnbcVideoArticle = MarketNewsSnapshot["articles"][number] & {
+  symbol: string;
+  provider: string;
+  fetchedAt: string;
+  asOfDate: string;
+};
+
+function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
+  return snapshot.articles.map((article) => ({
+    ...article,
+    symbol: snapshot.symbol,
+    provider: snapshot.provider,
+    fetchedAt: snapshot.fetchedAt,
+    asOfDate: snapshot.asOfDate
+  }));
+}
+
 /**
 * Writes a news snapshot for a given symbol/date.
 *
@@ -347,15 +364,8 @@ export async function writeNewsSnapshot(
     }
 
     if (snapshot.symbol === "cnbc") {
-      const articles = snapshot.articles.map((article) => ({
-        ...article,
-        symbol: snapshot.symbol,
-        provider: snapshot.provider,
-        fetchedAt: snapshot.fetchedAt,
-        asOfDate: snapshot.asOfDate
-      }));
-
-      await writeJson(tmpPath, articles);
+      // Stored as a flat list of articles (with repeated metadata) for easier consumption.
+      await writeJson(tmpPath, toStoredCnbcArticles(snapshot));
     } else {
       await writeJson(tmpPath, snapshot);
     }

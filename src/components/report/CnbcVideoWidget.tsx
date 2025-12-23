@@ -60,7 +60,7 @@ export async function CnbcVideoWidget(props: { date: string }) {
     return null;
   }
 
-  const asOfDate = articles[0]?.asOfDate ?? props.date;
+  const asOfDate = articles.find((a) => a.asOfDate)?.asOfDate ?? props.date;
   const data = buildTopicData(articles);
   if (data.length === 0) {
     return null;
