@@ -22,6 +22,7 @@ Generate a daily MDX report (plus supporting JSON artifacts) for the configured 
 - Guardrails:
   - Do not modify existing report files for previous dates.
   - Do not change `config/**` or any source code in this playbook.
+  - Trade ideas / setups should be based on tradeable symbols. Market internals (breadth/volume) and regime indicators (e.g., `^VIX`) can be referenced for context, but shouldn't be the sole basis for a trade.
 
 ## No-op when
 
