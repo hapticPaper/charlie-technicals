@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  CandlestickData,
   HistogramData,
   LineData,
   SeriesMarker,
@@ -61,6 +62,7 @@ function formatMaybeNumber(value: unknown): string {
 function extractSeriesValue(
   point:
     | LineData<UTCTimestamp>
+    | CandlestickData<UTCTimestamp>
     | HistogramData<UTCTimestamp>
     | WhitespaceData<UTCTimestamp>
     | undefined
@@ -71,6 +73,10 @@ function extractSeriesValue(
 
   if ("value" in point) {
     return point.value;
+  }
+
+  if ("close" in point) {
+    return point.close;
   }
 
   return undefined;
@@ -106,6 +112,130 @@ function toUtcTimestamp(t: number): UTCTimestamp | null {
 
   const seconds = t > 10_000_000_000 ? t / 1000 : t;
   return Math.floor(seconds) as UTCTimestamp;
+}
+
+function formatUtcDateKey(seconds: number): string {
+  const millis = seconds * 1000;
+  if (!Number.isFinite(millis)) {
+    return "";
+  }
+
+  const dt = new Date(millis);
+  const year = dt.getUTCFullYear();
+  const month = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(dt.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startIndexForLastUtcDays(t: number[], distinctDays: number): number {
+  if (distinctDays <= 0 || t.length === 0) {
+    return 0;
+  }
+
+  const seen = new Set<string>();
+  for (let i = t.length - 1; i >= 0; i -= 1) {
+    const key = formatUtcDateKey(t[i]);
+    if (!key) {
+      continue;
+    }
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      if (seen.size > distinctDays) {
+        return i + 1;
+      }
+    }
+  }
+
+  return 0;
+}
+
+function deriveOpenFromClose(close: number[]): number[] {
+  if (close.length === 0) {
+    return [];
+  }
+
+  const out = new Array<number>(close.length);
+  out[0] = close[0];
+
+  for (let i = 1; i < close.length; i += 1) {
+    out[i] = close[i - 1];
+  }
+
+  return out;
+}
+
+function toHeikinAshiCandles(args: {
+  t: number[];
+  open: number[];
+  high: number[];
+  low: number[];
+  close: number[];
+}): {
+  candles: Array<CandlestickData<UTCTimestamp> | WhitespaceData<UTCTimestamp>>;
+  haOpen: Array<number | null>;
+  haClose: Array<number | null>;
+} {
+  const len = Math.min(args.t.length, args.open.length, args.high.length, args.low.length, args.close.length);
+  const candles: Array<CandlestickData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
+  const haOpen = new Array<number | null>(len).fill(null);
+  const haClose = new Array<number | null>(len).fill(null);
+
+  let prevHaOpen: number | null = null;
+  let prevHaClose: number | null = null;
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(args.t[i]);
+    if (time === null) {
+      continue;
+    }
+
+    const o = args.open[i];
+    const h = args.high[i];
+    const l = args.low[i];
+    const c = args.close[i];
+    if (![o, h, l, c].every((v) => typeof v === "number" && Number.isFinite(v))) {
+      candles.push({ time });
+      continue;
+    }
+
+    const curHaClose: number = (o + h + l + c) / 4;
+    const curHaOpen: number =
+      prevHaOpen !== null && prevHaClose !== null ? (prevHaOpen + prevHaClose) / 2 : (o + c) / 2;
+    const curHaHigh = Math.max(h, curHaOpen, curHaClose);
+    const curHaLow = Math.min(l, curHaOpen, curHaClose);
+
+    haOpen[i] = curHaOpen;
+    haClose[i] = curHaClose;
+    prevHaOpen = curHaOpen;
+    prevHaClose = curHaClose;
+
+    candles.push({ time, open: curHaOpen, high: curHaHigh, low: curHaLow, close: curHaClose });
+  }
+
+  return { candles, haOpen, haClose };
+}
+
+function defaultVisibleRange(series: ReportIntervalSeries): { from: number; to: number } | null {
+  const len = series.t.length;
+  if (len <= 1) {
+    return null;
+  }
+
+  if (series.interval === "1d") {
+    const points = Math.min(5, len);
+    const rightBuffer = 1;
+    const from = Math.max(0, len - points);
+    return { from, to: len - 1 + rightBuffer };
+  }
+
+  if (series.interval === "15m") {
+    const from = startIndexForLastUtcDays(series.t, 3);
+    const rightBuffer = 8;
+    return { from, to: len - 1 + rightBuffer };
+  }
+
+  return null;
 }
 
 function toLineSeriesData(
@@ -268,6 +398,7 @@ export function ReportChart(props: {
     async function run() {
       const {
         ColorType,
+        CandlestickSeries,
         CrosshairMode,
         HistogramSeries,
         LineSeries,
@@ -285,7 +416,6 @@ export function ReportChart(props: {
       const text = readCssVar("--rp-text", "#e5e7eb");
       const muted = readCssVar("--rp-muted", "#a1a1aa");
 
-      const priceColor = readCssVar("--rp-price", "#e5e7eb");
       const smaColor = readCssVar("--rp-sma", "#38bdf8");
       const emaColor = readCssVar("--rp-ema", "#a78bfa");
       const rsiColor = readCssVar("--rp-rsi", "#34d399");
@@ -326,16 +456,19 @@ export function ReportChart(props: {
           borderColor: border,
           timeVisible: true,
           secondsVisible: false,
-          rightOffset: 10
+          rightOffset: 0
         },
         crosshair: {
           mode: CrosshairMode.Magnet
         }
       });
 
-      const closeSeries = chart.addSeries(LineSeries, {
-        color: priceColor,
-        lineWidth: 2,
+      const priceSeries = chart.addSeries(CandlestickSeries, {
+        upColor: bull,
+        downColor: bear,
+        wickUpColor: bull,
+        wickDownColor: bear,
+        borderVisible: false,
         priceLineVisible: false,
         lastValueVisible: false
       });
@@ -418,7 +551,13 @@ export function ReportChart(props: {
         });
       }
 
-      closeSeries.setData(toLineSeriesData(series.t, series.close));
+      const open =
+        Array.isArray(series.open) && series.open.length === series.t.length
+          ? series.open
+          : deriveOpenFromClose(series.close);
+      const ha = toHeikinAshiCandles({ t: series.t, open, high: series.high, low: series.low, close: series.close });
+
+      priceSeries.setData(ha.candles);
       smaSeries.setData(toLineSeriesData(series.t, series.sma20));
       emaSeries.setData(toLineSeriesData(series.t, series.ema20));
       bbUpperSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.upper ?? []));
@@ -430,45 +569,38 @@ export function ReportChart(props: {
       if (volumeSeries && hasVolume && series.volume) {
         volumeSeries.setData(
           toHistogramSeriesData(series.t, series.volume, (idx) => {
-            const close = series.close[idx];
-            const closeOk = typeof close === "number" && Number.isFinite(close);
+            const haO = ha.haOpen[idx];
+            const haC = ha.haClose[idx];
+            const ok = typeof haO === "number" && Number.isFinite(haO) && typeof haC === "number" && Number.isFinite(haC);
 
             if (idx === 0) {
-              // First bar has no prior close: treat finite close as "up" and missing data as muted.
-              return promoteAlpha(closeOk ? bull : muted, 0.65);
+              // First bar has no prior Heikin Ashi state: treat finite candles as "up" and missing data as muted.
+              return promoteAlpha(ok ? bull : muted, 0.65);
             }
 
-            const prev = series.close[idx - 1];
-            const prevOk = typeof prev === "number" && Number.isFinite(prev);
-
-            if (!closeOk) {
+            if (!ok) {
               return promoteAlpha(muted, 0.65);
             }
 
-            if (!prevOk) {
-              // Missing previous close: default to bullish rather than guessing down.
-              return promoteAlpha(bull, 0.65);
-            }
-
-            return promoteAlpha(close >= prev ? bull : bear, 0.65);
+            return promoteAlpha(haC >= haO ? bull : bear, 0.65);
           })
         );
       }
 
       const squeezeMarkerPlugin =
         squeezeMarkers.length > 0
-          ? createSeriesMarkers(closeSeries, squeezeMarkers, { autoScale: false, zOrder: "aboveSeries" })
+          ? createSeriesMarkers(priceSeries, squeezeMarkers, { autoScale: false, zOrder: "aboveSeries" })
           : null;
 
       if (trade) {
-        closeSeries.createPriceLine({
+        priceSeries.createPriceLine({
           price: trade.entry,
           color: isBuy ? bull : bear,
           lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           title: `Entry ${trade.entry.toFixed(2)}`
         });
-        closeSeries.createPriceLine({
+        priceSeries.createPriceLine({
           price: trade.stop,
           color: warn,
           lineWidth: 1,
@@ -476,7 +608,7 @@ export function ReportChart(props: {
           title: `Stop ${trade.stop.toFixed(2)}`
         });
         trade.targets?.forEach((t, idx) => {
-          closeSeries.createPriceLine({
+          priceSeries.createPriceLine({
             price: t,
             color: target,
             lineWidth: 1,
@@ -489,8 +621,12 @@ export function ReportChart(props: {
       rsiSeries.createPriceLine({ price: 70, color: border, lineStyle: LineStyle.Dotted, lineWidth: 1, title: "70" });
       rsiSeries.createPriceLine({ price: 30, color: border, lineStyle: LineStyle.Dotted, lineWidth: 1, title: "30" });
 
-      chart.timeScale().fitContent();
-      chart.timeScale().applyOptions({ rightOffset: 10 });
+      const range = defaultVisibleRange(series);
+      if (range) {
+        chart.timeScale().setVisibleLogicalRange(range);
+      } else {
+        chart.timeScale().fitContent();
+      }
 
       if (tooltip) {
         tooltip.style.whiteSpace = "pre";
@@ -515,8 +651,8 @@ export function ReportChart(props: {
           return;
         }
 
-        const close = param.seriesData.get(closeSeries) as
-          | LineData<UTCTimestamp>
+        const price = param.seriesData.get(priceSeries) as
+          | CandlestickData<UTCTimestamp>
           | WhitespaceData<UTCTimestamp>
           | undefined;
         const sma = param.seriesData.get(smaSeries) as
@@ -562,9 +698,15 @@ export function ReportChart(props: {
               | undefined)
           : undefined;
 
+        const haOhlc =
+          price && "close" in price
+            ? `${formatMaybeNumber(price.open)} / ${formatMaybeNumber(price.high)} / ${formatMaybeNumber(price.low)} / ${formatMaybeNumber(price.close)}`
+            : "—";
+
         const lines = [
           timeLabel,
-          `Close: ${formatMaybeNumber(extractSeriesValue(close))}`,
+          `HA close: ${formatMaybeNumber(extractSeriesValue(price))}`,
+          `HA O/H/L/C: ${haOhlc}`,
           `SMA 20: ${formatMaybeNumber(extractSeriesValue(sma))}`,
           `EMA 20: ${formatMaybeNumber(extractSeriesValue(ema))}`,
           `RSI 14: ${formatMaybeNumber(extractSeriesValue(rsi))}`
