@@ -209,6 +209,7 @@ export function highest(values: Array<number | null>, period: number): Array<num
   }
 
   // O(n * period) is acceptable here because the configured periods are small.
+  // Non-strict: ignores missing values. If no values are present in the window, emits null.
   const out: Array<number | null> = new Array(values.length).fill(null);
   for (let i = period - 1; i < values.length; i += 1) {
     let max = -Infinity;
@@ -223,7 +224,7 @@ export function highest(values: Array<number | null>, period: number): Array<num
       max = Math.max(max, v);
     }
 
-    out[i] = count === period ? max : null;
+    out[i] = count > 0 ? max : null;
   }
 
   return out;
@@ -235,6 +236,7 @@ export function lowest(values: Array<number | null>, period: number): Array<numb
   }
 
   // O(n * period) is acceptable here because the configured periods are small.
+  // Non-strict: ignores missing values. If no values are present in the window, emits null.
   const out: Array<number | null> = new Array(values.length).fill(null);
   for (let i = period - 1; i < values.length; i += 1) {
     let min = Infinity;
@@ -249,7 +251,7 @@ export function lowest(values: Array<number | null>, period: number): Array<numb
       min = Math.min(min, v);
     }
 
-    out[i] = count === period ? min : null;
+    out[i] = count > 0 ? min : null;
   }
 
   return out;
