@@ -74,8 +74,9 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   let asOfDate = date;
   if (/^\d{8}$/.test(date)) {
     asOfDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
-    parseIsoDateYmd(asOfDate);
   }
+
+  parseIsoDateYmd(asOfDate);
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
