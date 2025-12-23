@@ -107,6 +107,7 @@ function extractTickersFromTitle(title: string): string[] {
     out.push(trimmed);
   };
 
+  // Strong signals: explicit ticker markup.
   for (const match of title.matchAll(/\$([A-Z]{2,5})\b/g)) {
     push(match[1] ?? "");
   }
@@ -115,6 +116,8 @@ function extractTickersFromTitle(title: string): string[] {
     push(match[1] ?? "");
   }
 
+  // Segment-style titles sometimes include explicit ticker lists after a colon
+  // (e.g. "Final Trade: AAPL, MSFT, NVDA").
   const colonIdx = title.indexOf(":");
   if (colonIdx >= 0) {
     const tail = title.slice(colonIdx + 1);
@@ -126,11 +129,13 @@ function extractTickersFromTitle(title: string): string[] {
     }
   }
 
+  // Headlines occasionally start with a ticker-like all-caps company name.
   const leadingCompany = title.match(/^([A-Z]{2,5})\s+(CEO|CFO|CTO|COO|chair|chairman|president)\b/);
   if (leadingCompany) {
     push(leadingCompany[1] ?? "");
   }
 
+  // Broader fallback: when "shares"/"stock(s)" is in the title, allow ticker-like tokens.
   if (/\bshares\b|\bstock\b|\bstocks\b/i.test(title)) {
     const tokens = title.match(/\b[A-Z]{2,5}\b/g) ?? [];
     for (const token of tokens) {

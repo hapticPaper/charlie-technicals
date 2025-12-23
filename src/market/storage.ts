@@ -257,6 +257,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
     }
   }
 
+  // Legacy snapshots persisted `symbol: "cnbc"` on each record; normalize that to `null`.
   return stored.map(({ provider: _provider, symbol, ...article }) => ({
     ...article,
     symbol: typeof symbol === "string" && symbol.toLowerCase() === "cnbc" ? null : symbol ?? null

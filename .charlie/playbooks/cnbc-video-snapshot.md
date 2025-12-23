@@ -15,8 +15,8 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 ## Limits
 
 - Guardrails:
-  - Do not modify existing historical snapshot files for past dates unless you are explicitly regenerating a known-bad snapshot.
-    In that case, delete the file first and re-run the command for that date.
+  - Do not modify existing historical snapshot files for past dates unless you are explicitly regenerating a known-bad snapshot (e.g. a parsing bug).
+    In that case, delete the file first and re-run the command for that date, and reference the incident in the PR description.
 
 ## Steps
 
@@ -36,6 +36,7 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 - Within each saved video object:
   - `topic` is best-effort and should reflect what the video is about (not the show/segment name).
   - `symbol` is best-effort and should be the primary ticker symbol when one can be inferred (otherwise `null`).
+  - If both a specific ticker and a broader theme are present, prefer the ticker for `symbol` and capture the theme in `topic`.
 
 ## Verify
 
