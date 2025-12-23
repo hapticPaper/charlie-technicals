@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 type PluginExample = {
   label: string;
@@ -65,6 +65,8 @@ const PLUGIN_EXAMPLES: ReadonlyArray<PluginExample> = [
 
 function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: string }) {
   const { label, url, sandbox } = props;
+  const statusId = useId();
+  const [timedOut, setTimedOut] = useState(false);
   const [failed, setFailed] = useState(false);
   const loadedRef = useRef(false);
   const timeoutIdRef = useRef<number | null>(null);
@@ -79,12 +81,13 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   useEffect(() => {
     loadedRef.current = false;
     setFailed(false);
+    setTimedOut(false);
 
     clearLoadTimeout();
 
     timeoutIdRef.current = window.setTimeout(() => {
       if (!loadedRef.current) {
-        setFailed(true);
+        setTimedOut(true);
       }
 
       timeoutIdRef.current = null;
@@ -98,15 +101,16 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   return (
     <details style={{ marginTop: 12 }}>
       <summary>{label}</summary>
-      <p className="report-muted" style={{ margin: "6px 0 10px" }}>
+      <p id={statusId} className="report-muted" style={{ margin: "6px 0 10px" }}>
         <a href={url} target="_blank" rel="noreferrer">
           Open in a new tab
         </a>
-        {failed ? " · Embedding may be blocked" : ""}
+        {failed ? " · Embedding failed" : timedOut ? " · Still loading (may be blocked)" : ""}
       </p>
 
       <iframe
         title={label}
+        aria-describedby={statusId}
         src={url}
         loading="lazy"
         sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
@@ -114,10 +118,12 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
         onLoad={() => {
           loadedRef.current = true;
           setFailed(false);
+          setTimedOut(false);
           clearLoadTimeout();
         }}
         onError={() => {
           setFailed(true);
+          setTimedOut(false);
           clearLoadTimeout();
         }}
         style={{
