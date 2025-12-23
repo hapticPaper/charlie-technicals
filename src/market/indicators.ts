@@ -282,12 +282,18 @@ function trueRange(bars: MarketBar[]): Array<number | null> {
       continue;
     }
 
-    if (prevCloseValue !== null && highValue !== null) {
+    // If the feed only provides one bound (high or low), fall back to
+    // comparing it to the previous close instead of dropping the bar.
+    if (prevCloseValue === null) {
+      continue;
+    }
+
+    if (highValue !== null) {
       out[i] = Math.abs(highValue - prevCloseValue);
       continue;
     }
 
-    if (prevCloseValue !== null && lowValue !== null) {
+    if (lowValue !== null) {
       out[i] = Math.abs(lowValue - prevCloseValue);
     }
   }
