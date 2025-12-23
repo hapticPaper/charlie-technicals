@@ -8,7 +8,7 @@ import { CnbcTopicTrendWidgetClient, type CnbcTopicTrendDatum } from "./CnbcTopi
 // not the last N calendar days. This avoids long flat runs with zero data.
 const MAX_NON_EMPTY_DAYS = 30;
 // Cap how far back we scan, to keep the chart "recent" and avoid unbounded reads.
-const MAX_SCAN_DAYS = 90;
+const MAX_SCAN_DAYS = MAX_NON_EMPTY_DAYS * 3;
 const MAX_TOPICS = 8;
 const MAX_VIDEOS_PER_DAY = 10;
 
@@ -37,7 +37,7 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
   Array<{ date: string; articles: CnbcVideoArticle[] }>
 > {
   const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
-  const scanDates = allDates.slice(-MAX_SCAN_DAYS);
+  const scanDates = [...allDates].sort().slice(-MAX_SCAN_DAYS);
 
   // Scan newest-to-oldest until we have N non-empty days. Fetch in small concurrent batches.
   const BATCH_SIZE = 10;
