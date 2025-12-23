@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
+import { getRechartsInitialDimension } from "./rechartsConfig";
 type SqueezeShade = {
   x1: number;
   x2: number;
@@ -93,6 +94,9 @@ export function ReportChart(props: {
   annotations?: ChartAnnotations;
   showSignals?: boolean;
 }) {
+  const priceChartInitialDimension = useMemo(getRechartsInitialDimension, []);
+  const rsiChartInitialDimension = useMemo(getRechartsInitialDimension, []);
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -172,7 +176,7 @@ export function ReportChart(props: {
       ) : null}
 
       <div style={{ width: "100%", height: 260 }}>
-        <ResponsiveContainer minWidth={0}>
+        <ResponsiveContainer minWidth={0} initialDimension={priceChartInitialDimension}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
             {squeezeShades.map((s, idx) => (
               <ReferenceArea
@@ -277,7 +281,7 @@ export function ReportChart(props: {
       </p>
 
       <div style={{ width: "100%", height: 200 }}>
-        <ResponsiveContainer minWidth={0}>
+        <ResponsiveContainer minWidth={0} initialDimension={rsiChartInitialDimension}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis hide dataKey="t" tickFormatter={formatEpochSeconds} tick={{ fill: "var(--rp-muted)" }} />
