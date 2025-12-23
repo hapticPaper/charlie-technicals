@@ -8,9 +8,10 @@ const MAX_CNBC_WIDGET_ARTICLES = 500;
 type CnbcVideoSnapshot = CnbcVideoArticle[];
 
 function buildTopicData(articles: CnbcVideoSnapshot): CnbcTopicHypeDatum[] {
+  const sorted = [...articles].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   const counts = new Map<string, { count: number; hypeSum: number }>();
 
-  for (const article of articles.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
+  for (const article of sorted.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
     const topic = (article.topic ?? "other").trim().toLowerCase();
     if (topic === "") {
       continue;
@@ -58,6 +59,13 @@ export async function CnbcVideoWidget(props: { date: string }) {
     console.error("[CnbcVideoWidget] inconsistent asOfDate values", {
       requestedDate: props.date,
       articleDates
+    });
+    return null;
+  }
+  if (articleDates[0] !== props.date) {
+    console.error("[CnbcVideoWidget] asOfDate mismatch", {
+      requestedDate: props.date,
+      asOfDate: articleDates[0]
     });
     return null;
   }
