@@ -31,29 +31,27 @@ function toVideoCard(article: CnbcVideoArticle): CnbcVideoCard {
 
 export async function CnbcTopicTrendWidget() {
   const allDates = await listCnbcVideoDates();
-  const dates = allDates.slice(-MAX_DAYS);
-  if (dates.length === 0) {
+  if (allDates.length === 0) {
     return null;
   }
 
-  const results = await Promise.allSettled(dates.map((date) => readCnbcVideoArticles(date)));
   const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
 
-  for (const [idx, result] of results.entries()) {
-    const date = dates[idx];
+  for (let idx = allDates.length - 1; idx >= 0 && dayArticles.length < MAX_DAYS; idx -= 1) {
+    const date = allDates[idx];
     if (!date) {
       continue;
     }
 
-    if (result.status === "fulfilled") {
-      if (result.value.length > 0) {
-        dayArticles.push({ date, articles: result.value });
+    try {
+      const articles = await readCnbcVideoArticles(date);
+      if (articles.length > 0) {
+        dayArticles.push({ date, articles });
       }
-      continue;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[home:cnbc] Failed reading CNBC videos for ${date}: ${message}`);
     }
-
-    const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
-    console.error(`[home:cnbc] Failed reading CNBC videos for ${date}: ${message}`);
   }
 
   if (dayArticles.length === 0) {
