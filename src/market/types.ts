@@ -57,6 +57,9 @@ export type MarketNewsSnapshot = {
 *
 * Stored as a flat JSON array of `StoredCnbcVideoArticle` (no wrapper object).
 *
+* Historically, snapshots stored `symbol: "cnbc"` on every record; the read path
+* normalizes that to `null`.
+*
 * `symbol` is the primary ticker symbol for the video when exactly one can be inferred;
 * otherwise it's `null`.
 *
