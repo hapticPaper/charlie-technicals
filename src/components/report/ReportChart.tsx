@@ -545,7 +545,7 @@ export function ReportChart(props: {
 
           const span = maxValue - minValue;
           const pad =
-            span > 0 ? span * 0.02 : Math.max(0.01, Math.max(1, Math.abs(maxValue)) * 0.002);
+            span > 0 ? span * 0.02 : Math.min(10, Math.max(0.001, Math.abs(maxValue) * 0.002));
 
           return {
             ...base,
