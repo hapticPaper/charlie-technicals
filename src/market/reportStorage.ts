@@ -90,15 +90,7 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  let asOfDate: string;
-  try {
-    asOfDate = normalizeCnbcAsOfDate(date);
-  } catch (error) {
-    throw new Error(
-      `[market:reportStorage] Failed to normalize CNBC asOfDate for readCnbcVideoArticles. input=${date}`,
-      { cause: error }
-    );
-  }
+  const asOfDate = normalizeCnbcAsOfDate(date);
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
@@ -106,7 +98,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
 
   for (const article of stored) {
     const articleAsOfDate =
-      article.asOfDate === asOfDate ? article.asOfDate : normalizeCnbcAsOfDate(article.asOfDate);
+      /^\d{8}$/.test(article.asOfDate) ? normalizeCnbcAsOfDate(article.asOfDate) : article.asOfDate;
 
     if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
       throw new Error(
