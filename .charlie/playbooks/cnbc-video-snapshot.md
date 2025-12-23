@@ -30,6 +30,15 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 
 3. Confirm the file exists: `content/data/cnbc/news/<YYYYMMDD>.json`.
 
+4. Enrich the snapshot by reading headlines and doing the dimensionality reduction:
+
+   - For each saved video, read `title` and set:
+     - `topic` to a short, low-dimensional theme (avoid show/segment names).
+     - `relatedTickers` to the tickers you are confident the video is primarily about.
+     - `symbol` to the primary ticker when exactly one is clearly implied; otherwise `null`.
+   - Prefer leaving `topic`, `relatedTickers`, and `symbol` empty over adding false positives.
+   - Normalize tickers to uppercase.
+
 ## Notes
 
 - The folder name `cnbc` is the data namespace (provider), not a ticker symbol.

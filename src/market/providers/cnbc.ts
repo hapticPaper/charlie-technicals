@@ -3,7 +3,6 @@ import type { MarketNewsArticle, MarketNewsSnapshot } from "../types";
 import {
   buildNewsMainIdea,
   buildNewsSummary,
-  inferNewsTopic,
   scoreNewsHype
 } from "../news";
 
@@ -62,96 +61,6 @@ function buildCnbcVideoId(url: string): string {
   }
 
   return `cnbc:${url}`;
-}
-
-function extractTickersFromTitle(title: string): string[] {
-  const drop = new Set(
-    [
-      "AI",
-      "CEO",
-      "CFO",
-      "CPI",
-      "CNBC",
-      "DJIA",
-      "EPS",
-      "ETF",
-      "ETFS",
-      "ECB",
-      "FED",
-      "FOMC",
-      "GDP",
-      "IPO",
-      "IMF",
-      "NATO",
-      "OPEC",
-      "PCE",
-      "SEC",
-      "SPX",
-      "UN",
-      "UK",
-      "US",
-      "USA",
-      "VIX"
-    ].map((t) => t.toUpperCase())
-  );
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-
-  const push = (candidate: string) => {
-    const trimmed = candidate.trim();
-    if (trimmed === "") {
-      return;
-    }
-
-    const upper = trimmed.toUpperCase();
-    if (drop.has(upper)) {
-      return;
-    }
-    if (seen.has(upper)) {
-      return;
-    }
-    seen.add(upper);
-    out.push(upper);
-  };
-
-  // Strong signals: explicit ticker markup.
-  for (const match of title.matchAll(/\$([A-Z]{2,5})\b/g)) {
-    push(match[1] ?? "");
-  }
-
-  for (const match of title.matchAll(/\(([A-Z]{2,5})\)/g)) {
-    push(match[1] ?? "");
-  }
-
-  // Segment-style titles sometimes include explicit ticker lists after a colon
-  // (e.g. "Final Trade: AAPL, MSFT, NVDA").
-  const colonIdx = title.indexOf(":");
-  if (colonIdx >= 0) {
-    const tail = title.slice(colonIdx + 1);
-    const tokens = tail.match(/\b[A-Z]{2,5}\b/g) ?? [];
-    if (tokens.length >= 2) {
-      for (const token of tokens) {
-        push(token);
-      }
-    }
-  }
-
-  // Headlines occasionally start with a ticker-like all-caps company name.
-  const leadingCompany = title.match(/^([A-Z]{2,5})\s+(CEO|CFO|CTO|COO|chair|chairman|president)\b/);
-  if (leadingCompany) {
-    push(leadingCompany[1] ?? "");
-  }
-
-  // Broader fallback: when "shares"/"stock(s)" is in the title, allow ticker-like tokens.
-  if (/\bshares\b|\bstock\b|\bstocks\b/i.test(title)) {
-    const tokens = title.match(/\b[A-Z]{2,5}\b/g) ?? [];
-    for (const token of tokens) {
-      push(token);
-    }
-  }
-
-  return out.sort();
 }
 
 async function fetchJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
@@ -297,15 +206,12 @@ export class CnbcVideoProvider {
         continue;
       }
 
-      const relatedTickers = extractTickersFromTitle(title);
+      const relatedTickers: string[] = [];
 
       const tags = (asset.contentClassification ?? []).filter(
         (tag): tag is string => typeof tag === "string" && tag.trim() !== ""
       );
 
-      const topic =
-        inferNewsTopic({ title, tags }) ??
-        (relatedTickers.length === 1 ? relatedTickers[0]?.toLowerCase() : undefined);
       const hype = scoreNewsHype(title);
       const mainIdea = buildNewsMainIdea(title);
       const summary = buildNewsSummary({
@@ -322,7 +228,6 @@ export class CnbcVideoProvider {
         publisher: CNBC_PUBLISHER,
         publishedAt: publishedAtDate.toISOString(),
         relatedTickers,
-        topic,
         hype,
         mainIdea,
         summary
