@@ -24,7 +24,7 @@ export type CnbcTopicHypeDatum = {
 export function CnbcVideoWidgetClient(props: {
   data: CnbcTopicHypeDatum[];
 }) {
-  const initialDimension = useMemo(() => getRechartsInitialDimension(), []);
+  const initialDimension = useMemo(getRechartsInitialDimension, []);
 
   // Recharts hydration workaround: render a placeholder until client mount.
   const [mounted, setMounted] = useState(false);

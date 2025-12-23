@@ -36,8 +36,8 @@ export function ReportChart(props: {
   annotations?: ChartAnnotations;
   showSignals?: boolean;
 }) {
-  const priceChartInitialDimension = useMemo(() => getRechartsInitialDimension(), []);
-  const rsiChartInitialDimension = useMemo(() => getRechartsInitialDimension(), []);
+  const priceChartInitialDimension = useMemo(getRechartsInitialDimension, []);
+  const rsiChartInitialDimension = useMemo(getRechartsInitialDimension, []);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
