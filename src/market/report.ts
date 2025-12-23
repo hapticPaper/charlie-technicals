@@ -138,180 +138,132 @@ function buildTradePlan(series15m: AnalyzedSeries, side: TradeSide): TradePlan {
   return { side, entry, stop, targets };
 }
 
-function toNullableNumber(value: number | null | undefined): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+function toNullableNumber(value: unknown, context: string): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  throw new Error(`Invalid ${context} value: expected number|null, got ${typeof value}`);
+}
+
+function toNullableBoolean(value: unknown, context: string): boolean | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  throw new Error(`Invalid ${context} value: expected boolean|null, got ${typeof value}`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isNumberSeries(value: unknown): value is Array<number | null> {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-
-  const sample = Math.min(10, value.length);
-  for (let i = 0; i < sample; i += 1) {
-    const v = value[i];
-    if (v === null) {
-      continue;
-    }
-    if (typeof v !== "number" || !Number.isFinite(v)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function isBoolSeries(value: unknown): value is Array<boolean | null> {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-
-  const sample = Math.min(10, value.length);
-  for (let i = 0; i < sample; i += 1) {
-    const v = value[i];
-    if (v === null) {
-      continue;
-    }
-    if (typeof v !== "boolean") {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function isChannelSeries(value: unknown): value is BollingerBandsSeries | KeltnerChannelsSeries {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const { middle, upper, lower } = value as { middle?: unknown; upper?: unknown; lower?: unknown };
-  return (
-    isNumberSeries(middle) &&
-    isNumberSeries(upper) &&
-    isNumberSeries(lower) &&
-    middle.length === upper.length &&
-    upper.length === lower.length
-  );
-}
-
-function isTtmSqueezeSeries(value: unknown): value is TtmSqueezeSeries {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const { momentum, squeezeOn, squeezeOff, bollinger, keltner } = value as {
-    momentum?: unknown;
-    squeezeOn?: unknown;
-    squeezeOff?: unknown;
-    bollinger?: unknown;
-    keltner?: unknown;
-  };
-
-  if (!isNumberSeries(momentum) || !isBoolSeries(squeezeOn) || !isBoolSeries(squeezeOff)) {
-    return false;
-  }
-  if (momentum.length !== squeezeOn.length || squeezeOn.length !== squeezeOff.length) {
-    return false;
-  }
-  if (!isChannelSeries(bollinger) || !isChannelSeries(keltner)) {
-    return false;
-  }
-
-  return (
-    bollinger.middle.length === momentum.length &&
-    keltner.middle.length === momentum.length
-  );
-}
-
 function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportIntervalSeries {
-  const sma20 = Array.isArray(analyzed.indicators.sma20) ? analyzed.indicators.sma20 : undefined;
-  const ema20 = Array.isArray(analyzed.indicators.ema20) ? analyzed.indicators.ema20 : undefined;
-  const rsi14 = Array.isArray(analyzed.indicators.rsi14) ? analyzed.indicators.rsi14 : undefined;
-  const atr14 = Array.isArray(analyzed.indicators.atr14) ? analyzed.indicators.atr14 : undefined;
-
-  const bollinger20 = isChannelSeries(analyzed.indicators.bollinger20)
-    ? (analyzed.indicators.bollinger20 as BollingerBandsSeries)
-    : undefined;
-  const keltner20 = isChannelSeries(analyzed.indicators.keltner20)
-    ? (analyzed.indicators.keltner20 as KeltnerChannelsSeries)
-    : undefined;
-  const ttmSqueeze20 = isTtmSqueezeSeries(analyzed.indicators.ttmSqueeze20)
-    ? analyzed.indicators.ttmSqueeze20
-    : undefined;
-
   const bars = analyzed.bars;
   const startIndex = Math.max(0, bars.length - maxPoints);
   const slicedBars = bars.slice(startIndex);
+  const sliceLength = slicedBars.length;
+
+  function sliceNullableNumberSeries(value: unknown, context: string): Array<number | null> {
+    if (!Array.isArray(value)) {
+      throw new Error(`Invalid ${context} series: expected array`);
+    }
+    if (value.length !== bars.length) {
+      throw new Error(
+        `Invalid ${context} series length: expected ${bars.length}, got ${value.length}`
+      );
+    }
+
+    return slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      return toNullableNumber(value[i], `${context}[${i}]`);
+    });
+  }
+
+  function sliceNullableBoolSeries(value: unknown, context: string): Array<boolean | null> {
+    if (!Array.isArray(value)) {
+      throw new Error(`Invalid ${context} series: expected array`);
+    }
+    if (value.length !== bars.length) {
+      throw new Error(
+        `Invalid ${context} series length: expected ${bars.length}, got ${value.length}`
+      );
+    }
+
+    return slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      return toNullableBoolean(value[i], `${context}[${i}]`);
+    });
+  }
+
+  type ChannelSeries = { middle: Array<number | null>; upper: Array<number | null>; lower: Array<number | null> };
+
+  function sliceChannelSeries(value: unknown, context: string): ChannelSeries {
+    if (!isRecord(value)) {
+      throw new Error(`Invalid ${context} series: expected object`);
+    }
+
+    return {
+      middle: sliceNullableNumberSeries(value.middle, `${context}.middle`),
+      upper: sliceNullableNumberSeries(value.upper, `${context}.upper`),
+      lower: sliceNullableNumberSeries(value.lower, `${context}.lower`)
+    };
+  }
+
+  function sliceTtmSqueezeSeries(value: unknown, context: string): TtmSqueezeSeries {
+    if (!isRecord(value)) {
+      throw new Error(`Invalid ${context} series: expected object`);
+    }
+
+    return {
+      bollinger: sliceChannelSeries(value.bollinger, `${context}.bollinger`),
+      keltner: sliceChannelSeries(value.keltner, `${context}.keltner`),
+      squeezeOn: sliceNullableBoolSeries(value.squeezeOn, `${context}.squeezeOn`),
+      squeezeOff: sliceNullableBoolSeries(value.squeezeOff, `${context}.squeezeOff`),
+      momentum: sliceNullableNumberSeries(value.momentum, `${context}.momentum`)
+    };
+  }
+
+  const sma =
+    analyzed.indicators.sma20 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.sma20, "sma20");
+  const ema =
+    analyzed.indicators.ema20 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.ema20, "ema20");
+  const rsi =
+    analyzed.indicators.rsi14 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.rsi14, "rsi14");
+  const atr =
+    analyzed.indicators.atr14 === undefined
+      ? new Array(sliceLength).fill(null)
+      : sliceNullableNumberSeries(analyzed.indicators.atr14, "atr14");
+
+  const bollingerOut =
+    analyzed.indicators.bollinger20 === undefined
+      ? undefined
+      : (sliceChannelSeries(analyzed.indicators.bollinger20, "bollinger20") as BollingerBandsSeries);
+  const keltnerOut =
+    analyzed.indicators.keltner20 === undefined
+      ? undefined
+      : (sliceChannelSeries(analyzed.indicators.keltner20, "keltner20") as KeltnerChannelsSeries);
+  const ttmOut =
+    analyzed.indicators.ttmSqueeze20 === undefined
+      ? undefined
+      : sliceTtmSqueezeSeries(analyzed.indicators.ttmSqueeze20, "ttmSqueeze20");
 
   const t = slicedBars.map((b) => Math.floor(new Date(b.t).getTime() / 1000));
   const close = slicedBars.map((b) => b.c);
   const high = slicedBars.map((b) => b.h);
   const low = slicedBars.map((b) => b.l);
-  const sma = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return sma20 ? toNullableNumber(sma20[i]) : null;
-  });
-  const ema = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return ema20 ? toNullableNumber(ema20[i]) : null;
-  });
-  const rsi = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return rsi14 ? toNullableNumber(rsi14[i]) : null;
-  });
-
-  const atr = slicedBars.map((_, idx) => {
-    const i = startIndex + idx;
-    return atr14 ? toNullableNumber(atr14[i]) : null;
-  });
-
-  type ChannelSeries = { middle: Array<number | null>; upper: Array<number | null>; lower: Array<number | null> };
-
-  function sliceChannel(src: ChannelSeries): ChannelSeries {
-    return {
-      middle: slicedBars.map((_, idx) => {
-        const i = startIndex + idx;
-        return toNullableNumber(src.middle[i]);
-      }),
-      upper: slicedBars.map((_, idx) => {
-        const i = startIndex + idx;
-        return toNullableNumber(src.upper[i]);
-      }),
-      lower: slicedBars.map((_, idx) => {
-        const i = startIndex + idx;
-        return toNullableNumber(src.lower[i]);
-      })
-    };
-  }
-
-  function sliceBool(values: Array<boolean | null>): Array<boolean | null> {
-    return slicedBars.map((_, idx) => {
-      const i = startIndex + idx;
-      const v = values[i];
-      return typeof v === "boolean" ? v : null;
-    });
-  }
-
-  const bollingerOut = bollinger20 ? sliceChannel(bollinger20) : undefined;
-  const keltnerOut = keltner20 ? sliceChannel(keltner20) : undefined;
-  const ttmOut =
-    ttmSqueeze20
-      ? {
-          bollinger: sliceChannel(ttmSqueeze20.bollinger),
-          keltner: sliceChannel(ttmSqueeze20.keltner),
-          squeezeOn: sliceBool(ttmSqueeze20.squeezeOn),
-          squeezeOff: sliceBool(ttmSqueeze20.squeezeOff),
-          momentum: slicedBars.map((_, idx) => {
-            const i = startIndex + idx;
-            return toNullableNumber(ttmSqueeze20.momentum[i]);
-          })
-        }
-      : undefined;
 
   return {
     symbol: analyzed.symbol,
