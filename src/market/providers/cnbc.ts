@@ -208,10 +208,6 @@ export class CnbcVideoProvider {
 
       const relatedTickers: string[] = [];
 
-      const tags = (asset.contentClassification ?? []).filter(
-        (tag): tag is string => typeof tag === "string" && tag.trim() !== ""
-      );
-
       const hype = scoreNewsHype(title);
       const mainIdea = buildNewsMainIdea(title);
       const summary = buildNewsSummary({
