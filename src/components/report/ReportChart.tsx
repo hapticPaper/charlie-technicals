@@ -431,7 +431,7 @@ export function ReportChart(props: {
         volumeSeries.setData(
           toHistogramSeriesData(series.t, series.volume, (idx) => {
             const close = series.close[idx];
-            const prev = idx > 0 ? series.close[idx - 1] : null;
+            const prev = idx > 0 ? series.close[idx - 1] : close;
             const closeOk = typeof close === "number" && Number.isFinite(close);
             const prevOk = typeof prev === "number" && Number.isFinite(prev);
             const up = closeOk && prevOk ? close >= prev : true;
