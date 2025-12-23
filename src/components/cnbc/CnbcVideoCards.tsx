@@ -14,7 +14,6 @@ function safeTimestamp(value: string): number | null {
 type PublishedAtLabelMode = "time" | "day" | "dayWithYear";
 
 function ymdKeyInTz(ts: number): string | null {
-  // Assumes `month` and `day` are emitted as 2-digit values by Intl for this locale.
   if (!Number.isFinite(ts)) {
     return null;
   }
@@ -34,7 +33,7 @@ function ymdKeyInTz(ts: number): string | null {
     return null;
   }
 
-  return `${year}-${month}-${day}`;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
 function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
@@ -92,6 +91,7 @@ function formatPublishedAt(value: string, mode: PublishedAtLabelMode): string {
 }
 
 function topicBadgeLabel(topic: string): string {
+  // `CnbcVideoCard.topic` is expected to already be user-presentable via `normalizeCnbcTopic`.
   return topic.trim();
 }
 
