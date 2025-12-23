@@ -59,29 +59,9 @@ body {
   padding: 20px;
 }
 
-.rpAppGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-
 .rpAppContent {
+  width: 100%;
   min-width: 0;
-}
-
-.rpAppSidebar {
-  display: none;
-}
-
-@media (min-width: 1200px) {
-  .rpAppGrid {
-    grid-template-columns: minmax(0, 1fr) 340px;
-    align-items: start;
-  }
-
-  .rpAppSidebar {
-    display: block;
-  }
 }
 
 @media (max-width: 640px) {
