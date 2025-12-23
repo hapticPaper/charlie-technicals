@@ -57,22 +57,32 @@ export type MarketNewsSnapshot = {
 *
 * Stored as a flat JSON array of `StoredCnbcVideoArticle` (no wrapper object).
 *
+* Historically, snapshots stored `symbol: "cnbc"` on every record; the read path
+* normalizes that to `null`.
+*
+* `symbol` is the primary ticker symbol for the video when exactly one can be inferred;
+* otherwise it's `null`.
+*
 * Changes here are backwards-incompatible with existing snapshot files.
 */
 export type StoredCnbcVideoArticle = MarketNewsArticle & {
-  symbol: string;
   provider: string;
   fetchedAt: string;
   asOfDate: string;
+  symbol: string | null;
 };
 
 /**
-* In-memory shape for CNBC video articles. `symbol` and `provider` are implied by the
-* file path and are omitted here.
+* In-memory shape for CNBC video articles.
+*
+* `provider` is implied by the file path and omitted here.
+* `symbol` is the primary ticker symbol for the video when exactly one can be inferred;
+* otherwise it's `null`.
 */
 export type CnbcVideoArticle = MarketNewsArticle & {
   fetchedAt: string;
   asOfDate: string;
+  symbol: string | null;
 };
 
 export type SignalHit = {

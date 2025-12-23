@@ -3,7 +3,6 @@ import type { MarketNewsArticle, MarketNewsSnapshot } from "../types";
 import {
   buildNewsMainIdea,
   buildNewsSummary,
-  inferNewsTopic,
   scoreNewsHype
 } from "../news";
 
@@ -207,14 +206,9 @@ export class CnbcVideoProvider {
         continue;
       }
 
+      // CNBC videos are enriched via the snapshot playbook; keep these fields conservative here.
       const relatedTickers: string[] = [];
-      const tags = [
-        asset.section?.title,
-        asset.section?.eyebrow,
-        ...(asset.contentClassification ?? [])
-      ].filter((tag): tag is string => typeof tag === "string" && tag.trim() !== "");
 
-      const topic = inferNewsTopic({ title, tags });
       const hype = scoreNewsHype(title);
       const mainIdea = buildNewsMainIdea(title);
       const summary = buildNewsSummary({
@@ -231,7 +225,6 @@ export class CnbcVideoProvider {
         publisher: CNBC_PUBLISHER,
         publishedAt: publishedAtDate.toISOString(),
         relatedTickers,
-        topic,
         hype,
         mainIdea,
         summary
