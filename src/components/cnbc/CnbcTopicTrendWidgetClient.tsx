@@ -51,6 +51,142 @@ function formatDateTick(value: unknown): string {
   return value;
 }
 
+type TooltipEntry = {
+  name?: unknown;
+  value?: unknown;
+  color?: unknown;
+};
+
+function parseTooltipCount(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  return 0;
+}
+
+function parseTooltipTopic(value: unknown): string | null {
+  if (typeof value === "string" && value.trim() !== "") {
+    return value;
+  }
+
+  return null;
+}
+
+function TopicTooltip(props: {
+  active?: boolean;
+  label?: unknown;
+  payload?: readonly TooltipEntry[];
+  selectedTopic: string | null;
+  pinnedTopic: string | null;
+  onSelect: (args: { date: string; topic: string }) => void;
+}) {
+  const date = typeof props.label === "string" ? props.label : null;
+
+  const entries = (props.payload ?? [])
+    .map((entry) => {
+      const topic = parseTooltipTopic(entry.name);
+      if (!topic) {
+        return null;
+      }
+
+      const count = parseTooltipCount(entry.value);
+      return {
+        topic,
+        count,
+        color: typeof entry.color === "string" ? entry.color : undefined
+      };
+    })
+    .filter(
+      (entry): entry is { topic: string; count: number; color: string | undefined } =>
+        entry !== null && entry.count > 0
+    );
+
+  useEffect(() => {
+    if (!props.active || !date) {
+      return;
+    }
+    if (props.selectedTopic || props.pinnedTopic) {
+      return;
+    }
+
+    const best = entries.reduce<{ topic: string; count: number } | null>((acc, entry) => {
+      if (!acc || entry.count > acc.count) {
+        return { topic: entry.topic, count: entry.count };
+      }
+      return acc;
+    }, null);
+
+    if (best) {
+      props.onSelect({ date, topic: best.topic });
+    }
+  }, [date, entries, props.active, props.onSelect, props.pinnedTopic, props.selectedTopic]);
+
+  if (!props.active || !date || entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        background: "var(--rp-surface)",
+        border: "1px solid var(--rp-border)",
+        color: "var(--rp-text)",
+        padding: 10,
+        borderRadius: 12
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>{formatDateTick(date)}</div>
+      <div style={{ display: "grid", gap: 4 }}>
+        {entries.map((entry) => {
+          const isSelected = props.selectedTopic === entry.topic;
+
+          return (
+            <button
+              key={entry.topic}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                props.onSelect({ date, topic: entry.topic });
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "4px 6px",
+                borderRadius: 10,
+                border: `1px solid ${isSelected ? "var(--rp-price)" : "transparent"}`,
+                background: "transparent",
+                color: "var(--rp-text)",
+                cursor: "pointer",
+                textAlign: "left"
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 999,
+                  background: entry.color ?? "var(--rp-muted)"
+                }}
+              />
+              <span style={{ flex: "1 1 auto" }}>{entry.topic}</span>
+              <span style={{ color: "var(--rp-muted)" }}>{entry.count}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function CnbcTopicTrendWidgetClient(props: {
   data: CnbcTopicTrendDatum[];
   topics: string[];
@@ -62,19 +198,18 @@ export function CnbcTopicTrendWidgetClient(props: {
     setMounted(true);
   }, []);
 
-  const [activeDate, setActiveDate] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ date: string | null; topic: string | null }>({
+    date: null,
+    topic: null
+  });
+  const [pinned, setPinned] = useState<{ date: string | null; topic: string | null }>({
+    date: null,
+    topic: null
+  });
 
   const chartTopics = useMemo(() => {
     return props.topics.map((topic) => ({ topic, chartKey: toChartTopicKey(topic) }));
   }, [props.topics]);
-
-  const topicByChartKey = useMemo(() => {
-    const mapping: Record<string, string> = {};
-    for (const { topic, chartKey } of chartTopics) {
-      mapping[chartKey] = topic;
-    }
-    return mapping;
-  }, [chartTopics]);
 
   const chartData = useMemo<CnbcTopicTrendChartRow[]>(() => {
     return props.data.map((row) => {
@@ -86,13 +221,17 @@ export function CnbcTopicTrendWidgetClient(props: {
     });
   }, [chartTopics, props.data]);
 
+  const selectedDate = pinned.date ?? preview.date;
+  const selectedTopic = pinned.topic ?? preview.topic;
+
   const activeVideos = useMemo(() => {
-    if (!activeDate) {
+    if (!selectedDate || !selectedTopic) {
       return [];
     }
 
-    return props.videosByDate[activeDate] ?? [];
-  }, [activeDate, props.videosByDate]);
+    const videos = props.videosByDate[selectedDate] ?? [];
+    return videos.filter((video) => video.topic === selectedTopic);
+  }, [props.videosByDate, selectedDate, selectedTopic]);
 
   if (!mounted) {
     return (
@@ -118,30 +257,38 @@ export function CnbcTopicTrendWidgetClient(props: {
           <AreaChart
             data={chartData}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
-            onMouseMove={(evt) => {
-              const label = evt?.activeLabel;
+            onMouseMove={(state) => {
+              const label = state.activeLabel;
               if (typeof label !== "string") {
                 return;
               }
 
-              setActiveDate((prev) => (prev === label ? prev : label));
+              setPreview((prev) => (prev.date === label ? prev : { ...prev, date: label }));
             }}
-            onMouseLeave={() => setActiveDate((prev) => (prev === null ? prev : null))}
           >
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fill: "var(--rp-muted)" }} />
             <YAxis tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
             <Tooltip
-              contentStyle={{
-                background: "var(--rp-surface)",
-                border: "1px solid var(--rp-border)",
-                color: "var(--rp-text)"
-              }}
-              labelFormatter={formatDateTick}
-              formatter={(value, name) => {
-                const key = typeof name === "string" ? name : String(name);
-                return [value, topicByChartKey[key] ?? key];
-              }}
+              content={(tooltipProps: unknown) => (
+                <TopicTooltip
+                  active={typeof tooltipProps === "object" && tooltipProps !== null && "active" in tooltipProps ? (tooltipProps as { active?: boolean }).active : undefined}
+                  label={typeof tooltipProps === "object" && tooltipProps !== null && "label" in tooltipProps ? (tooltipProps as { label?: unknown }).label : undefined}
+                  payload={
+                    typeof tooltipProps === "object" &&
+                    tooltipProps !== null &&
+                    "payload" in tooltipProps &&
+                    Array.isArray((tooltipProps as { payload?: unknown }).payload)
+                      ? ((tooltipProps as { payload?: unknown }).payload as readonly TooltipEntry[])
+                      : undefined
+                  }
+                  selectedTopic={selectedTopic}
+                  pinnedTopic={pinned.topic}
+                  onSelect={({ date, topic }) => {
+                    setPreview((prev) => ({ ...prev, date, topic }));
+                  }}
+                />
+              )}
             />
             <Legend />
             {chartTopics.map(({ topic, chartKey }, idx) => (
@@ -172,20 +319,86 @@ export function CnbcTopicTrendWidgetClient(props: {
         }}
       >
         <p className="report-muted" style={{ marginTop: 0 }}>
-          <strong>Hover a day</strong> to see the CNBC videos.
+          <strong>Hover</strong> a day, then <strong>click</strong> a topic in the tooltip to filter videos.
         </p>
 
-        {activeDate ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setPinned((prev) => {
+                if (prev.date) {
+                  return { ...prev, date: null };
+                }
+
+                return preview.date ? { ...prev, date: preview.date } : prev;
+              });
+            }}
+            disabled={!preview.date && !pinned.date}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface-2)",
+              color: "var(--rp-text)",
+              cursor: !preview.date && !pinned.date ? "not-allowed" : "pointer"
+            }}
+          >
+            {pinned.date ? "Unpin date" : "Pin date"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPinned((prev) => {
+                if (prev.topic) {
+                  return { ...prev, topic: null };
+                }
+
+                return preview.topic ? { ...prev, topic: preview.topic } : prev;
+              });
+            }}
+            disabled={!preview.topic && !pinned.topic}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface-2)",
+              color: "var(--rp-text)",
+              cursor: !preview.topic && !pinned.topic ? "not-allowed" : "pointer"
+            }}
+          >
+            {pinned.topic ? "Unpin topic" : "Pin topic"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPinned({ date: null, topic: null });
+              setPreview({ date: null, topic: null });
+            }}
+            disabled={!preview.date && !preview.topic && !pinned.date && !pinned.topic}
+            style={{
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid var(--rp-border)",
+              background: "transparent",
+              color: "var(--rp-muted)",
+              cursor: !preview.date && !preview.topic && !pinned.date && !pinned.topic ? "not-allowed" : "pointer"
+            }}
+          >
+            Clear
+          </button>
+        </div>
+
+        {selectedDate && selectedTopic ? (
           <p className="report-muted">
-            <strong>Videos:</strong> {activeVideos.length} (on {activeDate})
+            <strong>Videos:</strong> {activeVideos.length} ({selectedDate} · {selectedTopic})
+            {pinned.date || pinned.topic ? " (pinned)" : null}
           </p>
         ) : null}
 
-        {activeDate ? (
-          <CnbcVideoCards videos={activeVideos} showTopic />
-        ) : (
-          <p className="report-muted">No day selected.</p>
-        )}
+        {selectedDate && selectedTopic ? <CnbcVideoCards videos={activeVideos} /> : <p className="report-muted">No selection.</p>}
       </div>
     </div>
   );
