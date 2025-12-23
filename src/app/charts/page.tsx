@@ -105,30 +105,29 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
         {failed ? " · Embedding may be blocked" : ""}
       </p>
 
-      {failed ? null : (
-        <iframe
-          title={label}
-          src={url}
-          loading="lazy"
-          sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
-          referrerPolicy="no-referrer"
-          onLoad={() => {
-            loadedRef.current = true;
-            clearLoadTimeout();
-          }}
-          onError={() => {
-            setFailed(true);
-            clearLoadTimeout();
-          }}
-          style={{
-            width: "100%",
-            height: 640,
-            border: "1px solid var(--rp-border)",
-            borderRadius: 12,
-            background: "var(--rp-surface)"
-          }}
-        />
-      )}
+      <iframe
+        title={label}
+        src={url}
+        loading="lazy"
+        sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
+        referrerPolicy="no-referrer"
+        onLoad={() => {
+          loadedRef.current = true;
+          setFailed(false);
+          clearLoadTimeout();
+        }}
+        onError={() => {
+          setFailed(true);
+          clearLoadTimeout();
+        }}
+        style={{
+          width: "100%",
+          height: 640,
+          border: "1px solid var(--rp-border)",
+          borderRadius: 12,
+          background: "var(--rp-surface)"
+        }}
+      />
 
       <p className="report-muted" style={{ margin: "10px 0 0" }}>
         Some upstream examples may block embedding or load slowly. If the chart doesn’t load, use the “Open in a new tab”
