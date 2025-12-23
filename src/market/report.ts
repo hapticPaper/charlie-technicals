@@ -873,6 +873,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
   const close = slicedBars.map((b) => b.c);
   const high = slicedBars.map((b) => b.h);
   const low = slicedBars.map((b) => b.l);
+  const volume = slicedBars.map((b) => (Number.isFinite(b.v) && b.v >= 0 ? b.v : null));
 
   return {
     symbol: analyzed.symbol,
@@ -881,6 +882,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     close,
     high,
     low,
+    volume,
     sma20: sma,
     ema20: ema,
     rsi14: rsi,

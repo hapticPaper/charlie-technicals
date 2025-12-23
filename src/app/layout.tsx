@@ -11,7 +11,12 @@ export default function RootLayout(props: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="rpAppShell">
-        <main className="rpAppMain">{props.children}</main>
+        <main className="rpAppMain">
+          <div className="rpAppGrid">
+            <div className="rpAppContent">{props.children}</div>
+            <aside className="rpAppSidebar" />
+          </div>
+        </main>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 .pick {
-  border: 1px solid var(--rp-border);
   background: var(--rp-surface);
+  background: color-mix(in srgb, var(--rp-surface) 55%, transparent);
   border-radius: 14px;
   padding: 16px;
   margin: 16px 0;
@@ -57,7 +57,6 @@
 }
 
 .kv {
-  border: 1px solid var(--rp-border);
   background: var(--rp-surface-2);
   border-radius: 12px;
   padding: 10px 12px;
