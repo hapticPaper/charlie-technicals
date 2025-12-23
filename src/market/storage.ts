@@ -351,6 +351,12 @@ export type WriteNewsSnapshotResult =
   | { status: "skipped_existing"; path: string };
 
 function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
+  if (snapshot.symbol !== "cnbc") {
+    throw new Error(
+      `[market:storage] toStoredCnbcArticles called with non-CNBC symbol: ${snapshot.symbol}`
+    );
+  }
+
   return snapshot.articles.map((article) => ({
     // Intentional explicit mapping to keep the persisted CNBC schema stable and obvious.
     id: article.id,

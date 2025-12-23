@@ -8,8 +8,16 @@ const MAX_CNBC_WIDGET_ARTICLES = 500;
 type CnbcVideoArticles = CnbcVideoArticle[];
 
 function buildTopicData(articles: CnbcVideoArticles): CnbcTopicHypeDatum[] {
+  function safePublishedTs(value: string): number {
+    const ts = Date.parse(value);
+    return Number.isFinite(ts) ? ts : 0;
+  }
+
   // Sort newest-first so we only consider the most recent CNBC videos.
-  const sorted = [...articles].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+  const sorted = articles
+    .map((article) => ({ article, ts: safePublishedTs(article.publishedAt) }))
+    .sort((a, b) => b.ts - a.ts)
+    .map((entry) => entry.article);
   const counts = new Map<string, { count: number; hypeSum: number }>();
 
   for (const article of sorted.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
@@ -70,7 +78,10 @@ export async function CnbcVideoWidget(props: { date: string }) {
     });
     return null;
   }
-  const asOfDate = articleDates[0]!;
+  const [asOfDate] = articleDates;
+  if (!asOfDate) {
+    return null;
+  }
   const data = buildTopicData(articles);
   if (data.length === 0) {
     return null;
