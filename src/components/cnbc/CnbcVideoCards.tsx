@@ -9,7 +9,7 @@ const CNBC_TIME_ZONE = "America/New_York";
 
 function safeTimestamp(value: string): number | null {
   // CNBC `publishedAt` is expected to be an ISO-like timestamp.
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+  if (!/^\d{4}-\d{2}-\d{2}[T ]/.test(value)) {
     return null;
   }
 
@@ -130,7 +130,7 @@ export function CnbcVideoCards(props: {
   const publishedAtMode = getPublishedAtLabelMode(
     items
       .map((video) => safeTimestamp(video.publishedAt))
-      .filter((ts): ts is number => typeof ts === "number" && Number.isFinite(ts))
+      .filter((ts): ts is number => ts !== null && Number.isFinite(ts))
   );
 
   if (items.length === 0) {
