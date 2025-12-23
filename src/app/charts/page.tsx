@@ -86,6 +86,10 @@ function ChartsExampleEmbed(props: { label: string; url: string }) {
           }}
         />
       )}
+
+      <p className="report-muted" style={{ margin: "10px 0 0" }}>
+        Some upstream examples may block embedding. If the chart doesn’t load, use the “Open in a new tab” link above.
+      </p>
     </details>
   );
 }

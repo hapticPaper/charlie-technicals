@@ -434,8 +434,16 @@ export function ReportChart(props: {
             const prev = idx > 0 ? series.close[idx - 1] : close;
             const closeOk = typeof close === "number" && Number.isFinite(close);
             const prevOk = typeof prev === "number" && Number.isFinite(prev);
-            const up = closeOk && prevOk ? close >= prev : true;
-            return promoteAlpha(up ? bull : bear, 0.65);
+
+            if (!closeOk) {
+              return promoteAlpha(muted, 0.65);
+            }
+
+            if (!prevOk) {
+              return promoteAlpha(bull, 0.65);
+            }
+
+            return promoteAlpha(close >= prev ? bull : bear, 0.65);
           })
         );
       }
