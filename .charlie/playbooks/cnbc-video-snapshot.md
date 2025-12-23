@@ -58,6 +58,14 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
   jq -r '.[].topic // "other"' content/data/cnbc/news/<YYYYMMDD>.json | sort | uniq -c | sort -nr | head
   ```
 
+  This command treats missing topics as `"other"` for display only. If you ever see `topic == "other"` in the raw JSON, that's a data bug and the snapshot should be fixed.
+
+- Spot-check missing topics:
+
+  ```bash
+  jq '[.[] | select(.topic == null or .topic == "")] | length' content/data/cnbc/news/<YYYYMMDD>.json
+  ```
+
 ## Rollback
 
 - Delete `content/data/cnbc/news/<YYYYMMDD>.json` if you want to discard the fetched snapshot.
