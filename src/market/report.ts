@@ -4,6 +4,7 @@ import type {
   KeltnerChannelsSeries,
   MarketInterval,
   MarketReport,
+  MostActiveEntry,
   ReportPick,
   ReportIntervalSeries,
   SqueezeState,
@@ -102,7 +103,7 @@ function clampToValidStop(entry: number, side: TradeSide, stop: number): number 
   return stop;
 }
 
-function buildTradePlan(series15m: AnalyzedSeries, side: TradeSide): TradePlan {
+function buildTradePlan(series15m: AnalyzedSeries, side: TradeSide, atr1d: number | null): TradePlan {
   const last = series15m.bars.at(-1);
   if (!last) {
     throw new Error(`Missing bars for ${series15m.symbol} 15m`);
@@ -136,9 +137,97 @@ function buildTradePlan(series15m: AnalyzedSeries, side: TradeSide): TradePlan {
   stop = clampToValidStop(entry, side, stop);
   const risk = Math.abs(entry - stop);
   const dir = side === "buy" ? 1 : -1;
-  const targets = [entry + dir * risk * 2, entry + dir * risk * 3];
+
+  const atrMove1 = typeof atr1d === "number" && Number.isFinite(atr1d) && atr1d > 0 ? atr1d * 2 : null;
+  const atrMove2 = typeof atr1d === "number" && Number.isFinite(atr1d) && atr1d > 0 ? atr1d * 3 : null;
+  const move1 = Math.max(risk * 2, atrMove1 ?? 0);
+  const move2 = Math.max(risk * 3, atrMove2 ?? 0);
+  const targets = [entry + dir * move1, entry + dir * move2];
 
   return { side, entry, stop, targets };
+}
+
+function safeDollarVolume(bar: { c: number; v: number } | undefined): number | null {
+  if (!bar) {
+    return null;
+  }
+
+  if (!(Number.isFinite(bar.c) && Number.isFinite(bar.v))) {
+    return null;
+  }
+
+  const dv = bar.c * bar.v;
+  return Number.isFinite(dv) ? dv : null;
+}
+
+function buildMostActive(args: {
+  analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
+}): MarketReport["mostActive"] {
+  const entries: MostActiveEntry[] = [];
+
+  for (const symbol of Object.keys(args.analyzedBySymbol)) {
+    const series1d = args.analyzedBySymbol[symbol]?.["1d"];
+    if (!series1d) {
+      continue;
+    }
+
+    const last = series1d.bars.at(-1);
+    const prev = series1d.bars.at(-2);
+    if (!last || !Number.isFinite(last.c)) {
+      continue;
+    }
+
+    const dollarVolume1d = safeDollarVolume(last);
+    if (dollarVolume1d === null) {
+      continue;
+    }
+
+    const weekBars = series1d.bars.slice(-5);
+    const dvWeek = weekBars.map((b) => safeDollarVolume(b)).filter((v): v is number => typeof v === "number");
+    if (dvWeek.length < 3) {
+      continue;
+    }
+    const dollarVolume5d = dvWeek.reduce((sum, v) => sum + v, 0);
+
+    const idx = series1d.bars.length - 1;
+    const atr14 = Array.isArray(series1d.indicators.atr14)
+      ? lastFiniteNumber(series1d.indicators.atr14, idx)
+      : null;
+
+    const change1d = prev && Number.isFinite(prev.c) ? last.c - prev.c : null;
+    const change1dPct =
+      change1d !== null && prev && Number.isFinite(prev.c) && prev.c !== 0 ? change1d / prev.c : null;
+    const change1dAtr14 = atr14 !== null && change1d !== null && atr14 !== 0 ? change1d / atr14 : null;
+
+    entries.push({
+      symbol,
+      dollarVolume1d,
+      dollarVolume5d,
+      close: last.c,
+      change1d,
+      change1dPct,
+      atr14,
+      change1dAtr14,
+      trendBias1d: inferTradeSideFromTrend(series1d),
+      signals1d: activeSignalLabels(series1d)
+    });
+  }
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const byDollarVolume1d = entries
+    .slice()
+    .sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || a.symbol.localeCompare(b.symbol))
+    .slice(0, 12);
+
+  const byDollarVolume5d = entries
+    .slice()
+    .sort((a, b) => b.dollarVolume5d - a.dollarVolume5d || a.symbol.localeCompare(b.symbol))
+    .slice(0, 12);
+
+  return { byDollarVolume1d, byDollarVolume5d };
 }
 
 function toNullableNumber(value: unknown): number | null {
@@ -460,6 +549,19 @@ function buildPicks(args: {
     const signals15 = activeSignalLabels(series15m);
     const signals1d = activeSignalLabels(series1d);
 
+    const idx1d = series1d.bars.length - 1;
+    const atr1d = Array.isArray(series1d.indicators.atr14)
+      ? lastFiniteNumber(series1d.indicators.atr14, idx1d)
+      : null;
+
+    const last1d = series1d.bars.at(-1);
+    const prev1d = series1d.bars.at(-2);
+    const move1d =
+      last1d && prev1d && Number.isFinite(last1d.c) && Number.isFinite(prev1d.c)
+        ? last1d.c - prev1d.c
+        : null;
+    const move1dAtr14 = atr1d !== null && move1d !== null && atr1d !== 0 ? move1d / atr1d : null;
+
     const close15 = series15m.bars.at(-1)?.c;
     const ema15 = Array.isArray(series15m.indicators.ema20)
       ? lastFiniteNumber(series15m.indicators.ema20, series15m.bars.length - 1)
@@ -493,7 +595,20 @@ function buildPicks(args: {
       score += Math.round(Math.min(10, Math.abs(rsi15 - 50) / 5));
     }
 
+    if (move1dAtr14 !== null) {
+      const baseBonus = Math.abs(move1dAtr14) * 5;
+      const bigMoveBonus = Math.abs(move1dAtr14) >= 2 ? 20 : 0;
+      score += Math.round(Math.min(45, baseBonus + bigMoveBonus));
+    }
+
     const rationale: string[] = [];
+    if (atr1d !== null) {
+      const moveLabel =
+        move1d !== null && move1dAtr14 !== null
+          ? `; 1d move ${move1d >= 0 ? "+" : ""}${move1d.toFixed(2)} (${Math.abs(move1dAtr14).toFixed(1)} ATR)`
+          : "";
+      rationale.push(`1d ATR14: ${atr1d.toFixed(2)}${moveLabel}`);
+    }
     if (signals1d.length > 0) {
       rationale.push(`1d signals: ${signals1d.slice(0, 3).join("; ")}`);
     }
@@ -510,7 +625,10 @@ function buildPicks(args: {
     candidates.push({
       symbol,
       score,
-      trade: buildTradePlan(series15m, side),
+      trade: buildTradePlan(series15m, side, atr1d),
+      atr14_1d: atr1d,
+      move1d,
+      move1dAtr14,
       rationale,
       signals: {
         "15m": signals15,
@@ -647,6 +765,7 @@ export function buildMarketReport(args: {
   }
 
   const picks = buildPicks({ analyzedBySymbol });
+  const mostActive = buildMostActive({ analyzedBySymbol });
   const summaries = buildSummaries(args.date, picks, seriesBySymbol, args.missingSymbols);
 
   return {
@@ -657,6 +776,7 @@ export function buildMarketReport(args: {
     missingSymbols: args.missingSymbols,
     picks,
     series: seriesBySymbol,
+    mostActive,
     summaries
   };
 }

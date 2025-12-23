@@ -168,8 +168,24 @@ export type ReportPick = {
   symbol: string;
   score: number;
   trade: TradePlan;
+  atr14_1d?: number | null;
+  move1d?: number | null;
+  move1dAtr14?: number | null;
   rationale: string[];
   signals: Partial<Record<MarketInterval, string[]>>;
+};
+
+export type MostActiveEntry = {
+  symbol: string;
+  dollarVolume1d: number;
+  dollarVolume5d: number;
+  close: number;
+  change1d: number | null;
+  change1dPct: number | null;
+  atr14: number | null;
+  change1dAtr14: number | null;
+  trendBias1d: TradeSide | null;
+  signals1d: string[];
 };
 
 export type MarketReport = {
@@ -180,6 +196,10 @@ export type MarketReport = {
   missingSymbols: string[];
   picks: ReportPick[];
   series: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>;
+  mostActive?: {
+    byDollarVolume1d: MostActiveEntry[];
+    byDollarVolume5d: MostActiveEntry[];
+  };
   summaries: {
     veryShort: string;
     mainIdea: string;
