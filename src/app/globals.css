@@ -24,6 +24,10 @@ body {
   --rp-sma: #38bdf8;
   --rp-ema: #a78bfa;
   --rp-rsi: #34d399;
+  --rp-bollinger: #60a5fa;
+  --rp-keltner: #f472b6;
+  --rp-squeeze-on: rgba(245, 158, 11, 0.12);
+  --rp-squeeze-off: rgba(34, 197, 94, 0.12);
   --rp-grid: rgba(255, 255, 255, 0.08);
 }
 

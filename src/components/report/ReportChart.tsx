@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -11,9 +12,15 @@ import {
   YAxis
 } from "recharts";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
+
+type SqueezeShade = {
+  x1: number;
+  x2: number;
+  fill: string;
+};
 
 type ChartAnnotations = {
   trade?: TradePlan;
@@ -26,6 +33,58 @@ function formatEpochSeconds(value: unknown): string {
 
   const dt = new Date(value * 1000);
   return dt.toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function buildSqueezeShades(series: ReportIntervalSeries): SqueezeShade[] {
+  const squeezeShades: SqueezeShade[] = [];
+  if (!series.ttmSqueeze20?.squeezeState || series.ttmSqueeze20.squeezeState.length !== series.t.length) {
+    return squeezeShades;
+  }
+
+  let activeState: "on" | "off" | null = null;
+  let activeStart: number | null = null;
+
+  for (let i = 0; i < series.t.length; i += 1) {
+    const t = series.t[i];
+    const stateRaw = series.ttmSqueeze20.squeezeState[i];
+    const state = stateRaw === "on" ? "on" : stateRaw === "off" ? "off" : null;
+
+    if (activeState === null) {
+      if (state) {
+        activeState = state;
+        activeStart = t;
+      }
+      continue;
+    }
+
+    if (state !== activeState) {
+      const end = series.t[i - 1] ?? t;
+      // Single-tick segments are intentionally ignored because `ReferenceArea` doesn't render meaningfully when x1 == x2.
+      if (activeStart !== null && end > activeStart) {
+        squeezeShades.push({
+          x1: activeStart,
+          x2: end,
+          fill: activeState === "on" ? "var(--rp-squeeze-on)" : "var(--rp-squeeze-off)"
+        });
+      }
+
+      activeState = state;
+      activeStart = state ? t : null;
+    }
+  }
+
+  if (activeState && activeStart !== null) {
+    const end = series.t[series.t.length - 1];
+    if (typeof end === "number" && end > activeStart) {
+      squeezeShades.push({
+        x1: activeStart,
+        x2: end,
+        fill: activeState === "on" ? "var(--rp-squeeze-on)" : "var(--rp-squeeze-off)"
+      });
+    }
+  }
+
+  return squeezeShades;
 }
 
 export function ReportChart(props: {
@@ -41,17 +100,33 @@ export function ReportChart(props: {
 
   const { series, annotations } = props;
 
+  const squeezeShades = useMemo(() => buildSqueezeShades(series), [series]);
+
   const data = series.t.map((t, i) => ({
     t,
     close: series.close[i],
     sma20: series.sma20[i] ?? undefined,
     ema20: series.ema20[i] ?? undefined,
-    rsi14: series.rsi14[i] ?? undefined
+    rsi14: series.rsi14[i] ?? undefined,
+    bbUpper: series.bollinger20?.upper[i] ?? undefined,
+    bbLower: series.bollinger20?.lower[i] ?? undefined,
+    kcUpper: series.keltner20?.upper[i] ?? undefined,
+    kcLower: series.keltner20?.lower[i] ?? undefined
   }));
 
   const active = series.signals.filter((s) => s.active).map((s) => s.label);
   const trade = annotations?.trade;
   const isBuy = trade?.side === "buy";
+  const legendItems = ["Price", "SMA 20", "EMA 20"];
+  if (series.bollinger20) {
+    legendItems.push("Bollinger Bands (20)");
+  }
+  if (series.keltner20) {
+    legendItems.push("Keltner Channels (20)");
+  }
+  if (squeezeShades.length > 0) {
+    legendItems.push("TTM Squeeze shading");
+  }
 
   if (!mounted) {
     return (
@@ -99,6 +174,16 @@ export function ReportChart(props: {
       <div style={{ width: "100%", height: 260 }}>
         <ResponsiveContainer minWidth={0}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+            {squeezeShades.map((s, idx) => (
+              <ReferenceArea
+                key={`sq-${idx}`}
+                x1={s.x1}
+                x2={s.x2}
+                strokeOpacity={0}
+                fill={s.fill}
+                ifOverflow="hidden"
+              />
+            ))}
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis
               hide
@@ -119,6 +204,44 @@ export function ReportChart(props: {
             <Line type="monotone" dataKey="close" stroke="var(--rp-price)" dot={false} />
             <Line type="monotone" dataKey="sma20" stroke="var(--rp-sma)" dot={false} />
             <Line type="monotone" dataKey="ema20" stroke="var(--rp-ema)" dot={false} />
+
+            {series.bollinger20 ? (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="bbUpper"
+                  stroke="var(--rp-bollinger)"
+                  strokeDasharray="4 2"
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="bbLower"
+                  stroke="var(--rp-bollinger)"
+                  strokeDasharray="4 2"
+                  dot={false}
+                />
+              </>
+            ) : null}
+
+            {series.keltner20 ? (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="kcUpper"
+                  stroke="var(--rp-keltner)"
+                  strokeDasharray="2 2"
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="kcLower"
+                  stroke="var(--rp-keltner)"
+                  strokeDasharray="2 2"
+                  dot={false}
+                />
+              </>
+            ) : null}
 
             {trade ? (
               <ReferenceLine
@@ -148,6 +271,10 @@ export function ReportChart(props: {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      <p className="report-muted" style={{ margin: "8px 0 0" }}>
+        <strong>Legend:</strong> {legendItems.join(" / ")}
+      </p>
 
       <div style={{ width: "100%", height: 200 }}>
         <ResponsiveContainer minWidth={0}>
