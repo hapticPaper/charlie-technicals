@@ -98,16 +98,11 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
 
   for (const article of stored) {
     const articleAsOfDate =
-      /^\d{8}$/.test(article.asOfDate) ? normalizeCnbcAsOfDate(article.asOfDate) : article.asOfDate;
+      article.asOfDate === asOfDate ? article.asOfDate : normalizeCnbcAsOfDate(article.asOfDate);
 
     if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
       throw new Error(
-        `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
-          provider: article.provider,
-          asOfDate: article.asOfDate,
-          normalizedAsOfDate: articleAsOfDate,
-          expectedAsOfDate: asOfDate
-        })}`
+        `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: provider=${article.provider}, asOfDate=${article.asOfDate}, normalizedAsOfDate=${articleAsOfDate}, expectedAsOfDate=${asOfDate}`
       );
     }
 
