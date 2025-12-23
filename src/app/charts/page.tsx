@@ -68,7 +68,6 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   const statusId = useId();
   const [timedOut, setTimedOut] = useState(false);
   const [failed, setFailed] = useState(false);
-  const loadedRef = useRef(false);
   const timeoutIdRef = useRef<number | null>(null);
 
   const clearLoadTimeout = () => {
@@ -79,17 +78,14 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   };
 
   useEffect(() => {
-    loadedRef.current = false;
     setFailed(false);
     setTimedOut(false);
 
     clearLoadTimeout();
 
     timeoutIdRef.current = window.setTimeout(() => {
-      if (!loadedRef.current) {
-        setTimedOut(true);
-        setFailed(true);
-      }
+      setTimedOut(true);
+      setFailed(true);
 
       timeoutIdRef.current = null;
     }, IFRAME_LOAD_TIMEOUT_MS);
@@ -102,7 +98,12 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   return (
     <details style={{ marginTop: 12 }}>
       <summary>{label}</summary>
-      <p id={statusId} role="status" className="report-muted" style={{ margin: "6px 0 10px" }}>
+      <p
+        id={statusId}
+        role={failed ? "status" : undefined}
+        className="report-muted"
+        style={{ margin: "6px 0 10px" }}
+      >
         <a href={url} target="_blank" rel="noreferrer">
           Open in a new tab
         </a>
@@ -121,7 +122,6 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
         sandbox={sandbox ?? DEFAULT_IFRAME_SANDBOX}
         referrerPolicy="no-referrer"
         onLoad={() => {
-          loadedRef.current = true;
           setFailed(false);
           setTimedOut(false);
           clearLoadTimeout();
