@@ -136,10 +136,10 @@ function toLineSeriesData(
 function toHistogramSeriesData(
   t: number[],
   values: Array<number | null>,
-  colors: string[]
+  colorForIndex: (idx: number) => string
 ): Array<HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
   const out: Array<HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
-  const len = Math.min(t.length, values.length, colors.length);
+  const len = Math.min(t.length, values.length);
 
   for (let i = 0; i < len; i += 1) {
     const time = toUtcTimestamp(t[i]);
@@ -153,7 +153,7 @@ function toHistogramSeriesData(
       continue;
     }
 
-    out.push({ time, value, color: colors[i] });
+    out.push({ time, value, color: colorForIndex(i) });
   }
 
   return out;
@@ -428,13 +428,16 @@ export function ReportChart(props: {
       rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
 
       if (volumeSeries && hasVolume && series.volume) {
-        const colors = series.close.map((close, idx) => {
-          const prev = idx > 0 ? series.close[idx - 1] : close;
-          const up = typeof prev === "number" && Number.isFinite(prev) ? close >= prev : true;
-          const base = up ? bull : bear;
-          return promoteAlpha(base, 0.65);
-        });
-        volumeSeries.setData(toHistogramSeriesData(series.t, series.volume, colors));
+        volumeSeries.setData(
+          toHistogramSeriesData(series.t, series.volume, (idx) => {
+            const close = series.close[idx];
+            const prev = idx > 0 ? series.close[idx - 1] : null;
+            const closeOk = typeof close === "number" && Number.isFinite(close);
+            const prevOk = typeof prev === "number" && Number.isFinite(prev);
+            const up = closeOk && prevOk ? close >= prev : true;
+            return promoteAlpha(up ? bull : bear, 0.65);
+          })
+        );
       }
 
       const squeezeMarkerPlugin =
