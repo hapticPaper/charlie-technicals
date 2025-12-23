@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 
+import { DEFAULT_CNBC_TOPIC_LABEL } from "./transform";
 import type { CnbcVideoCard } from "./types";
 
 const CNBC_TIME_ZONE = "America/New_York";
@@ -97,7 +98,7 @@ function formatPublishedAt(value: string, mode: PublishedAtLabelMode): string {
 
 function topicBadgeLabel(topic: string): string {
   // `CnbcVideoCard.topic` is expected to already be user-presentable via `normalizeCnbcTopic`.
-  return topic.trim();
+  return topic.trim() || DEFAULT_CNBC_TOPIC_LABEL;
 }
 
 const cardStyle: CSSProperties = {
@@ -127,7 +128,7 @@ export function CnbcVideoCards(props: {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
   const publishedAtMode = getPublishedAtLabelMode(
-    props.videos.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
+    items.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
   );
 
   if (items.length === 0) {
