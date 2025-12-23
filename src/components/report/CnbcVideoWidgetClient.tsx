@@ -43,6 +43,7 @@ function getActiveTopic(evt: unknown): string | null {
   const { topic } = payload as { topic?: unknown };
   return typeof topic === "string" ? topic : null;
 }
+import { getRechartsInitialDimension } from "./rechartsConfig";
 
 export type CnbcTopicHypeDatum = {
   topic: string;
@@ -54,6 +55,8 @@ export type CnbcTopicHypeDatum = {
 export function CnbcVideoWidgetClient(props: {
   data: CnbcTopicHypeDatum[];
 }) {
+  const initialDimension = useMemo(getRechartsInitialDimension, []);
+
   // Recharts hydration workaround: render a placeholder until client mount.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -100,6 +103,18 @@ export function CnbcVideoWidgetClient(props: {
                 return;
               }
               setActiveTopic((prev) => (prev === nextTopic ? prev : nextTopic));
+    <div style={{ width: "100%", height: 260 }}>
+      <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
+        <BarChart data={props.data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+          <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
+          <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />
+          <YAxis yAxisId="left" tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fill: "var(--rp-muted)" }} />
+          <Tooltip
+            contentStyle={{
+              background: "var(--rp-surface)",
+              border: "1px solid var(--rp-border)",
+              color: "var(--rp-text)"
             }}
             onMouseLeave={() => setActiveTopic((prev) => (prev === null ? prev : null))}
           >
