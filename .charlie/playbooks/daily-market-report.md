@@ -12,8 +12,8 @@ The rendered report is split into:
 
 ### Selection rules (current)
 
-- *Technical trades* (`report.picks`): signal-based (RSI/MACD) setups, with scoring that favors 15m/1h/1d confluence. If ATR14 is available, names with a sub-1-ATR daily move are filtered out; if ATR14 is missing, the filter falls back to signals.
-- *Watchlist* (`report.watchlist`): trend-only setups or signal-based setups with a sub-1-ATR daily move.
+- *Technical trades* (`report.picks`): momentum/breakout/levels setups, scored using multi-timeframe momentum (15m/1h/1d), daily breakouts (close above/below prior 20d/55d/252d highs/lows), pivot support/resistance proximity, and a simple supply/demand proxy (range expansion + volume confirmation). If ATR14 is available, names with a sub-1-ATR daily move are filtered out unless they are in a 20d/55d/252d breakout/breakdown.
+- *Watchlist* (`report.watchlist`): trend-following setups, or explicit setups with a sub-1-ATR daily move.
 
 ## Creates
 
