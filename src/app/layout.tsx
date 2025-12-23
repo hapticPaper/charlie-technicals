@@ -14,7 +14,7 @@ export default function RootLayout(props: { children: ReactNode }) {
         <main className="rpAppMain">
           <div className="rpAppGrid">
             <div className="rpAppContent">{props.children}</div>
-            <aside className="rpAppSidebar" aria-hidden />
+            <aside className="rpAppSidebar" />
           </div>
         </main>
       </body>
