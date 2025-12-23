@@ -528,6 +528,11 @@ export function ReportChart(props: {
             return base;
           }
 
+          const SPAN_PAD_RATIO = 0.02;
+          const ZERO_SPAN_PAD_RATIO = 0.002;
+          const ZERO_SPAN_MIN_PAD = 0.001;
+          const ZERO_SPAN_MAX_PAD = 10;
+
           const baseMin = base.priceRange.minValue;
           const baseMax = base.priceRange.maxValue;
 
@@ -540,12 +545,15 @@ export function ReportChart(props: {
           }
 
           if (minValue === baseMin && maxValue === baseMax) {
+            // Only adjust the y-range when trade levels extend beyond the candle range.
             return base;
           }
 
           const span = maxValue - minValue;
           const pad =
-            span > 0 ? span * 0.02 : Math.min(10, Math.max(0.001, Math.abs(maxValue) * 0.002));
+            span > 0
+              ? span * SPAN_PAD_RATIO
+              : Math.min(ZERO_SPAN_MAX_PAD, Math.max(ZERO_SPAN_MIN_PAD, Math.abs(maxValue) * ZERO_SPAN_PAD_RATIO));
 
           return {
             ...base,
