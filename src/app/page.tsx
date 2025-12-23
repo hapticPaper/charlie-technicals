@@ -120,6 +120,10 @@ export default async function HomePage() {
     );
   }
 
+  const sortedCards = cards.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const latestCard = sortedCards[0] ?? null;
+  const historyCards = sortedCards.slice(1);
+
   return (
     <>
       <h1>Charlie technicals</h1>
@@ -128,14 +132,51 @@ export default async function HomePage() {
         <Link href="/charts">Charts playground</Link>
       </p>
 
-      <CnbcTopicTrendWidget />
+      {latestCard ? (
+        <>
+          <h2>Today ({latestCard.date})</h2>
+          <p className="report-muted">Market summary from the latest generated report.</p>
 
-      {failedCards > 0 ? (
-        <p className="report-muted">{failedCards} report cards failed to load.</p>
+          <Link className={`${styles.card} ${styles.latestCard}`} href={`/reports/${latestCard.date}`}>
+            <div className={styles.cardHeader}>
+              <div className={styles.date}>{latestCard.date}</div>
+              <div className={styles.meta}>
+                {latestCard.status === "ok" ? `${latestCard.highlights.picks.length} picks` : "Highlights unavailable"}
+              </div>
+            </div>
+
+            <p className={styles.mainIdea}>
+              {latestCard.status === "ok" ? latestCard.highlights.summaries.mainIdea : "Click through for the full report."}
+            </p>
+            {latestCard.status === "ok" ? (
+              <p className={styles.veryShort}>{latestCard.highlights.summaries.veryShort}</p>
+            ) : null}
+
+            {latestCard.status === "ok" && latestCard.highlights.picks.length > 0 ? (
+              <ul className={styles.picks}>
+                {latestCard.highlights.picks.map((p) => (
+                  <li key={p.symbol} className={styles.pickRow}>
+                    <span className={badgeClassForSide(p.trade.side)}>{labelForSide(p.trade.side)}</span>
+                    <span className={styles.pickText}>
+                      <strong>{p.symbol}</strong>{" "}
+                      <span className={styles.pickEntry}>Entry {p.trade.entry.toFixed(2)}</span>
+                    </span>
+                    <span className={styles.pickStop}>Stop {p.trade.stop.toFixed(2)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </Link>
+        </>
       ) : null}
 
+      <CnbcTopicTrendWidget />
+
+      {historyCards.length > 0 ? <h2>History</h2> : null}
+      {failedCards > 0 ? <p className="report-muted">{failedCards} report card(s) failed to load.</p> : null}
+
       <div className={styles.grid}>
-        {cards.map((card) => {
+        {historyCards.map((card) => {
           const highlights = card.status === "ok" ? card.highlights : undefined;
 
           return (

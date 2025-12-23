@@ -79,143 +79,174 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
 
   if (!mounted) {
     return (
-      <div
-        aria-busy="true"
-        aria-label="Loading CNBC video topics chart"
-        role="status"
-        style={{
-          width: "100%",
-          height: 260,
-          borderRadius: 12,
-          border: "1px solid var(--rp-border)",
-          background: "var(--rp-surface)"
-        }}
-      />
+      <div className="rpSplitLayout">
+        <div className="rpSplitMain">
+          <div
+            aria-busy="true"
+            aria-label="Loading CNBC video topics chart"
+            role="status"
+            style={{
+              width: "100%",
+              height: 260,
+              borderRadius: 12,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface)"
+            }}
+          />
+        </div>
+        <div className="rpSplitSide">
+          <div
+            aria-busy="true"
+            aria-label="Loading CNBC video topics"
+            role="status"
+            style={{
+              width: "100%",
+              height: 260,
+              borderRadius: 12,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface)"
+            }}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <div>
-      <div style={{ width: "100%", height: 260 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
-          <BarChart
-            data={props.data}
-            margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
-            onMouseMove={(evt) => {
-              const nextTopic = getActiveBarTopic(evt);
-              if (nextTopic) {
-                setPreviewTopic(nextTopic);
-              }
-            }}
-          >
-            <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
-            <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />
-            <YAxis yAxisId="left" tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
-            <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fill: "var(--rp-muted)" }} />
-            <Tooltip
-              contentStyle={{
-                background: "var(--rp-surface)",
-                border: "1px solid var(--rp-border)",
-                color: "var(--rp-text)"
-              }}
-            />
-            <Legend />
-            <Bar
-              yAxisId="left"
-              dataKey="count"
-              name="videos"
-              fill="var(--rp-price)"
-              onClick={(payload) => {
-                const topic = getClickedBarTopic(payload);
-                if (!topic) {
-                  return;
-                }
-                setPinnedTopic((prev) => (prev === topic ? null : topic));
-              }}
-            />
-            <Bar
-              yAxisId="right"
-              dataKey="avgHype"
-              name="avg hype"
-              fill="var(--rp-warn)"
-              onClick={(payload) => {
-                const topic = getClickedBarTopic(payload);
-                if (!topic) {
-                  return;
-                }
-                setPinnedTopic((prev) => (prev === topic ? null : topic));
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+    <div className="rpSplitLayout">
+      <div className="rpSplitMain">
+        <div
+          style={{
+            width: "100%",
+            borderRadius: 12,
+            border: "1px solid var(--rp-border)",
+            background: "var(--rp-surface)",
+            padding: 12
+          }}
+        >
+          <div style={{ width: "100%", height: 260 }}>
+            <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
+              <BarChart
+                data={props.data}
+                margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
+                onMouseMove={(evt) => {
+                  const nextTopic = getActiveBarTopic(evt);
+                  if (nextTopic) {
+                    setPreviewTopic(nextTopic);
+                  }
+                }}
+              >
+                <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
+                <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />
+                <YAxis yAxisId="left" tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
+                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fill: "var(--rp-muted)" }} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--rp-surface)",
+                    border: "1px solid var(--rp-border)",
+                    color: "var(--rp-text)"
+                  }}
+                />
+                <Legend />
+                <Bar
+                  yAxisId="left"
+                  dataKey="count"
+                  name="videos"
+                  fill="var(--rp-price)"
+                  onClick={(payload) => {
+                    const topic = getClickedBarTopic(payload);
+                    if (!topic) {
+                      return;
+                    }
+                    setPinnedTopic((prev) => (prev === topic ? null : topic));
+                  }}
+                />
+                <Bar
+                  yAxisId="right"
+                  dataKey="avgHype"
+                  name="avg hype"
+                  fill="var(--rp-warn)"
+                  onClick={(payload) => {
+                    const topic = getClickedBarTopic(payload);
+                    if (!topic) {
+                      return;
+                    }
+                    setPinnedTopic((prev) => (prev === topic ? null : topic));
+                  }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          padding: 14,
-          borderRadius: 12,
-          border: "1px solid var(--rp-border)",
-          background: "var(--rp-surface)"
-        }}
-      >
-        <p className="report-muted" style={{ marginTop: 0 }}>
-          <strong>Hover</strong> a topic to preview videos, then <strong>click</strong> to pin.
-        </p>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          <button
-            type="button"
-            onClick={() => {
-              setPinnedTopic((prev) => {
-                if (prev) {
-                  return null;
-                }
-
-                return previewTopic;
-              });
-            }}
-            disabled={!previewTopic && !pinnedTopic}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 10,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface-2)",
-              color: "var(--rp-text)",
-              cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
-            }}
-          >
-            {pinnedTopic ? "Unpin topic" : "Pin topic"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setPinnedTopic(null);
-              setPreviewTopic(null);
-            }}
-            disabled={!previewTopic && !pinnedTopic}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 10,
-              border: "1px solid var(--rp-border)",
-              background: "transparent",
-              color: "var(--rp-muted)",
-              cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
-            }}
-          >
-            Clear
-          </button>
-        </div>
-
-        {activeDatum ? (
-          <p className="report-muted">
-            <strong>Videos:</strong> {activeDatum.videos.length} (topic: {activeDatum.topic})
-            {pinnedTopic ? " (pinned)" : null}
+      <div className="rpSplitSide">
+        <div
+          style={{
+            padding: 14,
+            borderRadius: 12,
+            border: "1px solid var(--rp-border)",
+            background: "var(--rp-surface)"
+          }}
+        >
+          <p className="report-muted" style={{ marginTop: 0 }}>
+            <strong>Hover</strong> a topic to preview videos, then <strong>click</strong> to pin.
           </p>
-        ) : null}
 
-        {activeDatum ? <CnbcVideoCards videos={activeDatum.videos} /> : <p className="report-muted">No topic selected.</p>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setPinnedTopic((prev) => {
+                  if (prev) {
+                    return null;
+                  }
+
+                  return previewTopic;
+                });
+              }}
+              disabled={!previewTopic && !pinnedTopic}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid var(--rp-border)",
+                background: "var(--rp-surface-2)",
+                color: "var(--rp-text)",
+                cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
+              }}
+            >
+              {pinnedTopic ? "Unpin topic" : "Pin topic"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPinnedTopic(null);
+                setPreviewTopic(null);
+              }}
+              disabled={!previewTopic && !pinnedTopic}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid var(--rp-border)",
+                background: "transparent",
+                color: "var(--rp-muted)",
+                cursor: !previewTopic && !pinnedTopic ? "not-allowed" : "pointer"
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          {activeDatum ? (
+            <p className="report-muted">
+              <strong>Videos:</strong> {activeDatum.videos.length} (topic: {activeDatum.topic})
+              {pinnedTopic ? " (pinned)" : null}
+            </p>
+          ) : null}
+
+          {activeDatum ? <CnbcVideoCards videos={activeDatum.videos} /> : <p className="report-muted">No topic selected.</p>}
+        </div>
       </div>
     </div>
   );

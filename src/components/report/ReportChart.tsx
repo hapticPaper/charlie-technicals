@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  AutoscaleInfo,
   CandlestickData,
   HistogramData,
   LineData,
@@ -474,9 +475,15 @@ export function ReportChart(props: {
         series.volume.length === series.t.length &&
         series.volume.some((v) => typeof v === "number" && Number.isFinite(v));
 
-      const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
+      const priceScaleMargins = hasVolume ? { top: 0.05, bottom: 0.38 } : { top: 0.05, bottom: 0.3 };
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
       const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
+
+      const tradePrices = trade
+        ? [trade.entry, trade.stop, ...(trade.targets ?? [])].filter(
+            (value): value is number => typeof value === "number" && Number.isFinite(value)
+          )
+        : [];
 
       const chart = createChart(chartElement, {
         autoSize: true,
@@ -514,7 +521,33 @@ export function ReportChart(props: {
         borderVisible: false,
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
-        lastValueVisible: false
+        lastValueVisible: false,
+        autoscaleInfoProvider: (baseImplementation: () => AutoscaleInfo | null) => {
+          const base = baseImplementation();
+          if (!base || !base.priceRange || tradePrices.length === 0) {
+            return base;
+          }
+
+          let minValue = base.priceRange.minValue;
+          let maxValue = base.priceRange.maxValue;
+
+          for (const value of tradePrices) {
+            minValue = Math.min(minValue, value);
+            maxValue = Math.max(maxValue, value);
+          }
+
+          if (minValue === base.priceRange.minValue && maxValue === base.priceRange.maxValue) {
+            return base;
+          }
+
+          return {
+            ...base,
+            priceRange: {
+              minValue,
+              maxValue
+            }
+          };
+        }
       });
       const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,

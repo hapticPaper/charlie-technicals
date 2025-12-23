@@ -272,163 +272,194 @@ export function CnbcTopicTrendWidgetClient(props: {
 
   if (!mounted) {
     return (
-      <div
-        aria-busy="true"
-        aria-label="Loading CNBC topic trend chart"
-        role="status"
-        style={{
-          width: "100%",
-          height: 320,
-          borderRadius: 12,
-          border: "1px solid var(--rp-border)",
-          background: "var(--rp-surface)"
-        }}
-      />
+      <div className="rpSplitLayout">
+        <div className="rpSplitMain">
+          <div
+            aria-busy="true"
+            aria-label="Loading CNBC topic trend chart"
+            role="status"
+            style={{
+              width: "100%",
+              height: 320,
+              borderRadius: 12,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface)"
+            }}
+          />
+        </div>
+        <div className="rpSplitSide">
+          <div
+            aria-busy="true"
+            aria-label="Loading CNBC topic videos"
+            role="status"
+            style={{
+              width: "100%",
+              height: 320,
+              borderRadius: 12,
+              border: "1px solid var(--rp-border)",
+              background: "var(--rp-surface)"
+            }}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <div>
-      <div style={{ width: "100%", height: 320 }}>
-        <ResponsiveContainer minWidth={0}>
-          <AreaChart
-            data={chartData}
-            margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
-            onMouseMove={(state) => {
-              const label = state.activeLabel;
-              if (typeof label !== "string") {
-                return;
-              }
+    <div className="rpSplitLayout">
+      <div className="rpSplitMain">
+        <div
+          style={{
+            width: "100%",
+            borderRadius: 12,
+            border: "1px solid var(--rp-border)",
+            background: "var(--rp-surface)",
+            padding: 12
+          }}
+        >
+          <div style={{ width: "100%", height: 320 }}>
+            <ResponsiveContainer minWidth={0}>
+              <AreaChart
+                data={chartData}
+                margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
+                onMouseMove={(state) => {
+                  const label = state.activeLabel;
+                  if (typeof label !== "string") {
+                    return;
+                  }
 
-              setPreview((prev) => (prev.date === label ? prev : { ...prev, date: label }));
-            }}
-          >
-            <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fill: "var(--rp-muted)" }} />
-            <YAxis tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
-            <Tooltip
-              content={(tooltipProps: TooltipContentProps<number, string>) => (
-                <TopicTooltip
-                  active={tooltipProps.active}
-                  label={tooltipProps.label}
-                  payload={tooltipProps.payload as unknown as readonly TooltipEntry[] | undefined}
-                  selectedTopic={selectedTopic}
-                  pinnedTopic={pinned.topic}
-                  onSelect={({ date, topic }) => {
-                    setPreview((prev) => ({ ...prev, date, topic }));
-                  }}
+                  setPreview((prev) => (prev.date === label ? prev : { ...prev, date: label }));
+                }}
+              >
+                <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fill: "var(--rp-muted)" }} />
+                <YAxis tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
+                <Tooltip
+                  content={(tooltipProps: TooltipContentProps<number, string>) => (
+                    <TopicTooltip
+                      active={tooltipProps.active}
+                      label={tooltipProps.label}
+                      payload={tooltipProps.payload as unknown as readonly TooltipEntry[] | undefined}
+                      selectedTopic={selectedTopic}
+                      pinnedTopic={pinned.topic}
+                      onSelect={({ date, topic }) => {
+                        setPreview((prev) => ({ ...prev, date, topic }));
+                      }}
+                    />
+                  )}
                 />
-              )}
-            />
-            <Legend />
-            {chartTopics.map(({ topic, chartKey }, idx) => (
-              <Area
-                key={chartKey}
-                type="monotone"
-                dataKey={chartKey}
-                name={topic}
-                stackId="topics"
-                stroke={SERIES_COLORS[idx % SERIES_COLORS.length]}
-                fill={SERIES_COLORS[idx % SERIES_COLORS.length]}
-                fillOpacity={0.35}
-                dot={false}
-                isAnimationActive={false}
-              />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
+                <Legend />
+                {chartTopics.map(({ topic, chartKey }, idx) => (
+                  <Area
+                    key={chartKey}
+                    type="monotone"
+                    dataKey={chartKey}
+                    name={topic}
+                    stackId="topics"
+                    stroke={SERIES_COLORS[idx % SERIES_COLORS.length]}
+                    fill={SERIES_COLORS[idx % SERIES_COLORS.length]}
+                    fillOpacity={0.35}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
-      <div
-        style={{
-          marginTop: 12,
-          padding: 14,
-          borderRadius: 12,
-          border: "1px solid var(--rp-border)",
-          background: "var(--rp-surface)"
-        }}
-      >
-        <p className="report-muted" style={{ marginTop: 0 }}>
-          <strong>Hover</strong> a day, then <strong>click</strong> a topic in the tooltip to filter videos.
-        </p>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          <button
-            type="button"
-            onClick={() => {
-              setPinned((prev) => {
-                if (prev.date) {
-                  return { ...prev, date: null };
-                }
-
-                return preview.date ? { ...prev, date: preview.date } : prev;
-              });
-            }}
-            disabled={!preview.date && !pinned.date}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 10,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface-2)",
-              color: "var(--rp-text)",
-              cursor: !preview.date && !pinned.date ? "not-allowed" : "pointer"
-            }}
-          >
-            {pinned.date ? "Unpin date" : "Pin date"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setPinned((prev) => {
-                if (prev.topic) {
-                  return { ...prev, topic: null };
-                }
-
-                return preview.topic ? { ...prev, topic: preview.topic } : prev;
-              });
-            }}
-            disabled={!preview.topic && !pinned.topic}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 10,
-              border: "1px solid var(--rp-border)",
-              background: "var(--rp-surface-2)",
-              color: "var(--rp-text)",
-              cursor: !preview.topic && !pinned.topic ? "not-allowed" : "pointer"
-            }}
-          >
-            {pinned.topic ? "Unpin topic" : "Pin topic"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setPinned({ date: null, topic: null });
-              setPreview({ date: null, topic: null });
-            }}
-            disabled={!preview.date && !preview.topic && !pinned.date && !pinned.topic}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 10,
-              border: "1px solid var(--rp-border)",
-              background: "transparent",
-              color: "var(--rp-muted)",
-              cursor: !preview.date && !preview.topic && !pinned.date && !pinned.topic ? "not-allowed" : "pointer"
-            }}
-          >
-            Clear
-          </button>
-        </div>
-
-        {selectedDate && selectedTopic ? (
-          <p className="report-muted">
-            <strong>Videos:</strong> {videoCountLabel} ({selectedDate} · {selectedTopic})
-            {pinned.date || pinned.topic ? " (pinned)" : null}
+      <div className="rpSplitSide">
+        <div
+          style={{
+            padding: 14,
+            borderRadius: 12,
+            border: "1px solid var(--rp-border)",
+            background: "var(--rp-surface)"
+          }}
+        >
+          <p className="report-muted" style={{ marginTop: 0 }}>
+            <strong>Hover</strong> a day, then <strong>click</strong> a topic in the tooltip to filter videos.
           </p>
-        ) : null}
 
-        {selectedDate && selectedTopic ? <CnbcVideoCards videos={activeVideos} /> : <p className="report-muted">No selection.</p>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setPinned((prev) => {
+                  if (prev.date) {
+                    return { ...prev, date: null };
+                  }
+
+                  return preview.date ? { ...prev, date: preview.date } : prev;
+                });
+              }}
+              disabled={!preview.date && !pinned.date}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid var(--rp-border)",
+                background: "var(--rp-surface-2)",
+                color: "var(--rp-text)",
+                cursor: !preview.date && !pinned.date ? "not-allowed" : "pointer"
+              }}
+            >
+              {pinned.date ? "Unpin date" : "Pin date"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPinned((prev) => {
+                  if (prev.topic) {
+                    return { ...prev, topic: null };
+                  }
+
+                  return preview.topic ? { ...prev, topic: preview.topic } : prev;
+                });
+              }}
+              disabled={!preview.topic && !pinned.topic}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid var(--rp-border)",
+                background: "var(--rp-surface-2)",
+                color: "var(--rp-text)",
+                cursor: !preview.topic && !pinned.topic ? "not-allowed" : "pointer"
+              }}
+            >
+              {pinned.topic ? "Unpin topic" : "Pin topic"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPinned({ date: null, topic: null });
+                setPreview({ date: null, topic: null });
+              }}
+              disabled={!preview.date && !preview.topic && !pinned.date && !pinned.topic}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                border: "1px solid var(--rp-border)",
+                background: "transparent",
+                color: "var(--rp-muted)",
+                cursor: !preview.date && !preview.topic && !pinned.date && !pinned.topic ? "not-allowed" : "pointer"
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          {selectedDate && selectedTopic ? (
+            <p className="report-muted">
+              <strong>Videos:</strong> {videoCountLabel} ({selectedDate} · {selectedTopic})
+              {pinned.date || pinned.topic ? " (pinned)" : null}
+            </p>
+          ) : null}
+
+          {selectedDate && selectedTopic ? <CnbcVideoCards videos={activeVideos} /> : <p className="report-muted">No selection.</p>}
+        </div>
       </div>
     </div>
   );
