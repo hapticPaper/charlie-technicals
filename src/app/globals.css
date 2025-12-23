@@ -82,12 +82,7 @@ body {
   min-width: 0;
 }
 
-.rpPanelSurface {
-  border-radius: 12px;
-  border: 1px solid var(--rp-border);
-  background: var(--rp-surface);
-}
-
+.rpPanelSurface,
 .rpPanelSkeleton {
   width: 100%;
   border-radius: 12px;
@@ -111,7 +106,7 @@ body {
   cursor: pointer;
 }
 
-.rpToolbarButton:disabled {
+.rpToolbarButton[disabled] {
   cursor: not-allowed;
 }
 
@@ -120,7 +115,7 @@ body {
   outline-offset: 2px;
 }
 
-.rpToolbarButtonSecondary {
+.rpToolbarButton.rpToolbarButtonSecondary {
   background: transparent;
   color: var(--rp-muted);
 }
