@@ -15,7 +15,7 @@ const CONTENT_DIR = path.join(process.cwd(), "content");
 const REPORTS_DIR = path.join(CONTENT_DIR, "reports");
 const CNBC_NEWS_DIR = path.join(CONTENT_DIR, "data", "cnbc", "news");
 
-function normalizeCnbcAsOfDate(date: string): string {
+function normalizeAndValidateCnbcAsOfDate(date: string): string {
   const asOfDate = /^\d{8}$/.test(date)
     ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
     : date;
@@ -90,7 +90,7 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const asOfDate = normalizeCnbcAsOfDate(date);
+  const asOfDate = normalizeAndValidateCnbcAsOfDate(date);
 
   const fileDate = formatRawDataFileDate(asOfDate);
   const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
