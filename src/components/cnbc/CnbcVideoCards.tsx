@@ -107,12 +107,9 @@ function formatThumbnailSrc(url: string, width: number, height: number): string 
     if (u.hostname !== "image.cnbcfm.com" || !u.pathname.startsWith("/api/v1/image/")) {
       return url;
     }
-    if (!u.searchParams.has("w")) {
-      u.searchParams.set("w", String(width));
-    }
-    if (!u.searchParams.has("h")) {
-      u.searchParams.set("h", String(height));
-    }
+    // Force list thumbnails to predictable dimensions even if the upstream URL includes a larger size.
+    u.searchParams.set("w", String(width));
+    u.searchParams.set("h", String(height));
     return u.toString();
   } catch {
     return url;
