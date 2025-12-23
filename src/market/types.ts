@@ -64,12 +64,39 @@ export type MacdSeries = {
   histogram: Array<number | null>;
 };
 
+export type BollingerBandsSeries = {
+  middle: Array<number | null>;
+  upper: Array<number | null>;
+  lower: Array<number | null>;
+};
+
+export type KeltnerChannelsSeries = {
+  middle: Array<number | null>;
+  upper: Array<number | null>;
+  lower: Array<number | null>;
+};
+
+export type TtmSqueezeSeries = {
+  bollinger: BollingerBandsSeries;
+  keltner: KeltnerChannelsSeries;
+  squeezeOn: Array<boolean | null>;
+  squeezeOff: Array<boolean | null>;
+  momentum: Array<number | null>;
+};
+
+export type IndicatorSeries =
+  | Array<number | null>
+  | MacdSeries
+  | BollingerBandsSeries
+  | KeltnerChannelsSeries
+  | TtmSqueezeSeries;
+
 export type AnalyzedSeries = {
   symbol: string;
   interval: MarketInterval;
   analyzedAt: string;
   bars: MarketBar[];
-  indicators: Record<string, Array<number | null> | MacdSeries>;
+  indicators: Record<string, IndicatorSeries>;
   signals: SignalHit[];
 };
 
@@ -83,6 +110,10 @@ export type ReportIntervalSeries = {
   sma20: Array<number | null>;
   ema20: Array<number | null>;
   rsi14: Array<number | null>;
+  atr14?: Array<number | null>;
+  bollinger20?: BollingerBandsSeries;
+  keltner20?: KeltnerChannelsSeries;
+  ttmSqueeze20?: TtmSqueezeSeries;
   signals: SignalHit[];
 };
 

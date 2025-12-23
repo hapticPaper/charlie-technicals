@@ -1,5 +1,5 @@
 import type { AnalysisConfig, IndicatorDefinition, SignalDefinition } from "./config";
-import { macd, rsi, sma, ema } from "./indicators";
+import { atr, bollingerBands, ema, keltnerChannels, macd, rsi, sma, stdev, ttmSqueeze } from "./indicators";
 import type { AnalyzedSeries, MacdSeries, MarketBar, MarketInterval, SignalHit } from "./types";
 
 function getCloseSeries(bars: MarketBar[]): Array<number | null> {
@@ -19,6 +19,18 @@ function getMacdField(series: MacdSeries, field: string): Array<number | null> {
   }
 }
 
+function isMacdSeries(value: unknown): value is MacdSeries {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  if (!("macd" in value && "signal" in value && "histogram" in value)) {
+    return false;
+  }
+
+  const { macd: m, signal: s, histogram: h } = value as MacdSeries;
+  return Array.isArray(m) && Array.isArray(s) && Array.isArray(h) && m.length === s.length && s.length === h.length;
+}
+
 function getValueAt(values: Array<number | null>, index: number): number | null {
   const v = values[index];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -29,10 +41,6 @@ function computeIndicators(bars: MarketBar[], indicators: IndicatorDefinition[])
   const out: AnalyzedSeries["indicators"] = {};
 
   for (const def of indicators) {
-    if (def.source !== "close") {
-      throw new Error(`Unsupported indicator source: ${def.source}`);
-    }
-
     switch (def.type) {
       case "sma":
         out[def.id] = sma(close, def.period);
@@ -42,6 +50,21 @@ function computeIndicators(bars: MarketBar[], indicators: IndicatorDefinition[])
         break;
       case "rsi":
         out[def.id] = rsi(close, def.period);
+        break;
+      case "stdev":
+        out[def.id] = stdev(close, def.period);
+        break;
+      case "atr":
+        out[def.id] = atr(bars, def.period);
+        break;
+      case "bollingerBands":
+        out[def.id] = bollingerBands(close, def.period, def.stdevMult);
+        break;
+      case "keltnerChannels":
+        out[def.id] = keltnerChannels(bars, def.period, def.atrMult);
+        break;
+      case "ttmSqueeze":
+        out[def.id] = ttmSqueeze(bars, def.period, def.bbMult, def.kcMult);
         break;
       case "macd":
         out[def.id] = macd(close, def.fastPeriod, def.slowPeriod, def.signalPeriod);
@@ -80,6 +103,10 @@ function evalSignal(def: SignalDefinition, indicators: AnalyzedSeries["indicator
   if (when.op === "crossAbove" || when.op === "crossBelow") {
     if (Array.isArray(series)) {
       return false;
+    }
+
+    if (!isMacdSeries(series)) {
+      throw new Error(`Signal ${def.id} expected MACD series in indicators.${when.indicator}`);
     }
 
     const leftSeries = getMacdField(series, when.left);

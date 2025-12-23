@@ -1,9 +1,12 @@
 import type {
   AnalyzedSeries,
+  BollingerBandsSeries,
+  KeltnerChannelsSeries,
   MarketInterval,
   MarketReport,
   ReportPick,
-  ReportIntervalSeries
+  ReportIntervalSeries,
+  TtmSqueezeSeries
 } from "./types";
 
 import type { TradePlan, TradeSide } from "./types";
@@ -139,10 +142,107 @@ function toNullableNumber(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNumberSeries(value: unknown): value is Array<number | null> {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  const sample = Math.min(10, value.length);
+  for (let i = 0; i < sample; i += 1) {
+    const v = value[i];
+    if (v === null) {
+      continue;
+    }
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isBoolSeries(value: unknown): value is Array<boolean | null> {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  const sample = Math.min(10, value.length);
+  for (let i = 0; i < sample; i += 1) {
+    const v = value[i];
+    if (v === null) {
+      continue;
+    }
+    if (typeof v !== "boolean") {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isChannelSeries(value: unknown): value is BollingerBandsSeries | KeltnerChannelsSeries {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { middle, upper, lower } = value as { middle?: unknown; upper?: unknown; lower?: unknown };
+  return (
+    isNumberSeries(middle) &&
+    isNumberSeries(upper) &&
+    isNumberSeries(lower) &&
+    middle.length === upper.length &&
+    upper.length === lower.length
+  );
+}
+
+function isTtmSqueezeSeries(value: unknown): value is TtmSqueezeSeries {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { momentum, squeezeOn, squeezeOff, bollinger, keltner } = value as {
+    momentum?: unknown;
+    squeezeOn?: unknown;
+    squeezeOff?: unknown;
+    bollinger?: unknown;
+    keltner?: unknown;
+  };
+
+  if (!isNumberSeries(momentum) || !isBoolSeries(squeezeOn) || !isBoolSeries(squeezeOff)) {
+    return false;
+  }
+  if (momentum.length !== squeezeOn.length || squeezeOn.length !== squeezeOff.length) {
+    return false;
+  }
+  if (!isChannelSeries(bollinger) || !isChannelSeries(keltner)) {
+    return false;
+  }
+
+  return (
+    bollinger.middle.length === momentum.length &&
+    keltner.middle.length === momentum.length
+  );
+}
+
 function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportIntervalSeries {
   const sma20 = Array.isArray(analyzed.indicators.sma20) ? analyzed.indicators.sma20 : undefined;
   const ema20 = Array.isArray(analyzed.indicators.ema20) ? analyzed.indicators.ema20 : undefined;
   const rsi14 = Array.isArray(analyzed.indicators.rsi14) ? analyzed.indicators.rsi14 : undefined;
+  const atr14 = Array.isArray(analyzed.indicators.atr14) ? analyzed.indicators.atr14 : undefined;
+
+  const bollinger20 = isChannelSeries(analyzed.indicators.bollinger20)
+    ? (analyzed.indicators.bollinger20 as BollingerBandsSeries)
+    : undefined;
+  const keltner20 = isChannelSeries(analyzed.indicators.keltner20)
+    ? (analyzed.indicators.keltner20 as KeltnerChannelsSeries)
+    : undefined;
+  const ttmSqueeze20 = isTtmSqueezeSeries(analyzed.indicators.ttmSqueeze20)
+    ? analyzed.indicators.ttmSqueeze20
+    : undefined;
 
   const bars = analyzed.bars;
   const startIndex = Math.max(0, bars.length - maxPoints);
@@ -165,6 +265,54 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     return rsi14 ? toNullableNumber(rsi14[i]) : null;
   });
 
+  const atr = slicedBars.map((_, idx) => {
+    const i = startIndex + idx;
+    return atr14 ? toNullableNumber(atr14[i]) : null;
+  });
+
+  type ChannelSeries = { middle: Array<number | null>; upper: Array<number | null>; lower: Array<number | null> };
+
+  function sliceChannel(src: ChannelSeries): ChannelSeries {
+    return {
+      middle: slicedBars.map((_, idx) => {
+        const i = startIndex + idx;
+        return toNullableNumber(src.middle[i]);
+      }),
+      upper: slicedBars.map((_, idx) => {
+        const i = startIndex + idx;
+        return toNullableNumber(src.upper[i]);
+      }),
+      lower: slicedBars.map((_, idx) => {
+        const i = startIndex + idx;
+        return toNullableNumber(src.lower[i]);
+      })
+    };
+  }
+
+  function sliceBool(values: Array<boolean | null>): Array<boolean | null> {
+    return slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = values[i];
+      return typeof v === "boolean" ? v : null;
+    });
+  }
+
+  const bollingerOut = bollinger20 ? sliceChannel(bollinger20) : undefined;
+  const keltnerOut = keltner20 ? sliceChannel(keltner20) : undefined;
+  const ttmOut =
+    ttmSqueeze20
+      ? {
+          bollinger: sliceChannel(ttmSqueeze20.bollinger),
+          keltner: sliceChannel(ttmSqueeze20.keltner),
+          squeezeOn: sliceBool(ttmSqueeze20.squeezeOn),
+          squeezeOff: sliceBool(ttmSqueeze20.squeezeOff),
+          momentum: slicedBars.map((_, idx) => {
+            const i = startIndex + idx;
+            return toNullableNumber(ttmSqueeze20.momentum[i]);
+          })
+        }
+      : undefined;
+
   return {
     symbol: analyzed.symbol,
     interval: analyzed.interval,
@@ -175,6 +323,10 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     sma20: sma,
     ema20: ema,
     rsi14: rsi,
+    atr14: atr,
+    bollinger20: bollingerOut,
+    keltner20: keltnerOut,
+    ttmSqueeze20: ttmOut,
     signals: analyzed.signals
   };
 }
