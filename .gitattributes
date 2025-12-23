@@ -1,1 +1,2 @@
 content/reports/*.json -diff
+content/data/cnbc/news/*.json -diff

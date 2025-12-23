@@ -4,8 +4,10 @@ import path from "node:path";
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
 import type {
   AnalyzedSeries,
+  CnbcVideoArticle,
   MarketInterval,
   MarketNewsSnapshot,
+  StoredCnbcVideoArticle,
   MarketReport,
   MarketReportHighlights,
   RawSeries
@@ -232,6 +234,48 @@ export async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
+/**
+* Reads CNBC video articles for a day.
+*
+* The on-disk schema includes `symbol` and `provider` on each object, but those are
+* implied by the file path and omitted from the returned in-memory objects.
+*/
+export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
+  const filePath = getNewsPath(date, "cnbc");
+  const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
+
+  for (const article of stored) {
+    if (article.symbol !== "cnbc" || article.provider !== "cnbc" || article.asOfDate !== date) {
+      throw new Error(
+        `[market:storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+          symbol: article.symbol,
+          provider: article.provider,
+          asOfDate: article.asOfDate
+        })}`
+      );
+    }
+  }
+
+  return stored.map(({ symbol: _symbol, provider: _provider, ...article }) => article);
+}
+
+export type StoredNewsData =
+  | { kind: "snapshot"; snapshot: MarketNewsSnapshot }
+  | { kind: "cnbc_articles"; articles: CnbcVideoArticle[] };
+
+/**
+* Preferred read API for news data.
+*
+* Note: `symbol === "cnbc"` is stored on disk as a flat array (not a `MarketNewsSnapshot`).
+*/
+export async function readNewsData(date: string, symbol: string): Promise<StoredNewsData> {
+  if (symbol === "cnbc") {
+    return { kind: "cnbc_articles", articles: await readCnbcVideoArticles(date) };
+  }
+
+  return { kind: "snapshot", snapshot: await readJson<MarketNewsSnapshot>(getNewsPath(date, symbol)) };
+}
+
 export async function listReportDates(): Promise<string[]> {
   const dir = getReportsDir();
   let entries: string[] = [];
@@ -320,8 +364,45 @@ export type WriteNewsSnapshotResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
 
+function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
+  if (snapshot.symbol !== "cnbc") {
+    throw new Error(
+      `[market:storage] toStoredCnbcArticles called with non-CNBC symbol: ${snapshot.symbol}`
+    );
+  }
+
+  return snapshot.articles.map((article) => ({
+    // Intentional explicit mapping to keep the persisted CNBC schema stable and obvious.
+    id: article.id,
+    title: article.title,
+    url: article.url,
+    publisher: article.publisher,
+    publishedAt: article.publishedAt,
+    relatedTickers: article.relatedTickers,
+    topic: article.topic,
+    hype: article.hype,
+    mainIdea: article.mainIdea,
+    summary: article.summary,
+    symbol: snapshot.symbol,
+    provider: snapshot.provider,
+    fetchedAt: snapshot.fetchedAt,
+    asOfDate: snapshot.asOfDate
+  }));
+}
+
+function serializeNewsSnapshotForStorage(snapshot: MarketNewsSnapshot): unknown {
+  if (snapshot.symbol === "cnbc") {
+    return toStoredCnbcArticles(snapshot);
+  }
+
+  return snapshot;
+}
+
 /**
 * Writes a news snapshot for a given symbol/date.
+*
+* Note: `symbol === "cnbc"` snapshots are stored on disk as a flat array of
+* `StoredCnbcVideoArticle` instead of a `MarketNewsSnapshot`.
 *
 * News snapshots are immutable: if the target file already exists, the write is
 * skipped and the existing snapshot is left untouched.
@@ -346,7 +427,7 @@ export async function writeNewsSnapshot(
       return { status: "skipped_existing" as const, path: filePath };
     }
 
-    await writeJson(tmpPath, snapshot);
+    await writeJson(tmpPath, serializeNewsSnapshotForStorage(snapshot));
     await rename(tmpPath, filePath);
     return { status: "written" as const, path: filePath };
   });

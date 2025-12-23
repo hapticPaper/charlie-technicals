@@ -1,14 +1,26 @@
-import { getNewsPath, readJson } from "../../market/storage";
-import type { MarketNewsSnapshot } from "../../market/types";
+import { readCnbcVideoArticles } from "../../market/storage";
+import type { CnbcVideoArticle } from "../../market/types";
 
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 const MAX_CNBC_WIDGET_ARTICLES = 500;
 
-function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
+type CnbcVideoArticles = CnbcVideoArticle[];
+
+function buildTopicData(articles: CnbcVideoArticles): CnbcTopicHypeDatum[] {
+  function safePublishedTs(value: string): number {
+    const ts = Date.parse(value);
+    return Number.isFinite(ts) ? ts : 0;
+  }
+
+  // Sort newest-first so we only consider the most recent CNBC videos.
+  const sorted = articles
+    .map((article) => ({ article, ts: safePublishedTs(article.publishedAt) }))
+    .sort((a, b) => b.ts - a.ts)
+    .map((entry) => entry.article);
   const counts = new Map<string, { count: number; hypeSum: number }>();
 
-  for (const article of snapshot.articles.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
+  for (const article of sorted.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
     const topic = (article.topic ?? "other").trim().toLowerCase();
     if (topic === "") {
       continue;
@@ -32,9 +44,9 @@ function buildTopicData(snapshot: MarketNewsSnapshot): CnbcTopicHypeDatum[] {
 }
 
 export async function CnbcVideoWidget(props: { date: string }) {
-  let snapshot: MarketNewsSnapshot;
+  let articles: CnbcVideoArticles;
   try {
-    snapshot = await readJson<MarketNewsSnapshot>(getNewsPath(props.date, "cnbc"));
+    articles = await readCnbcVideoArticles(props.date);
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error
@@ -47,11 +59,30 @@ export async function CnbcVideoWidget(props: { date: string }) {
     throw error;
   }
 
-  if (snapshot.articles.length === 0) {
+  if (articles.length === 0) {
     return null;
   }
 
-  const data = buildTopicData(snapshot);
+  const articleDates = Array.from(new Set(articles.map((a) => a.asOfDate).filter(Boolean)));
+  if (articleDates.length !== 1) {
+    console.error("[CnbcVideoWidget] inconsistent asOfDate values", {
+      requestedDate: props.date,
+      articleDates
+    });
+    return null;
+  }
+  if (articleDates[0] !== props.date) {
+    console.error("[CnbcVideoWidget] asOfDate mismatch", {
+      requestedDate: props.date,
+      asOfDate: articleDates[0]
+    });
+    return null;
+  }
+  const [asOfDate] = articleDates;
+  if (!asOfDate) {
+    return null;
+  }
+  const data = buildTopicData(articles);
   if (data.length === 0) {
     return null;
   }
@@ -60,7 +91,7 @@ export async function CnbcVideoWidget(props: { date: string }) {
     <section>
       <h2>CNBC video topics</h2>
       <p className="report-muted">
-        <strong>Videos:</strong> {snapshot.articles.length} (as of {snapshot.asOfDate})
+        <strong>Videos:</strong> {articles.length} (as of {asOfDate})
       </p>
       <CnbcVideoWidgetClient data={data} />
     </section>
