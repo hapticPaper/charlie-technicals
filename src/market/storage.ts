@@ -323,6 +323,63 @@ export async function listReportDates(): Promise<string[]> {
     .sort();
 }
 
+const MIN_CNBC_VIDEO_YEAR = 2000;
+const MAX_FUTURE_YEAR_OFFSET = 1;
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function isValidIsoDateYmd(value: string, now = new Date()): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return false;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return false;
+  }
+
+  const currentYear = now.getUTCFullYear();
+  if (year < MIN_CNBC_VIDEO_YEAR || year > currentYear + MAX_FUTURE_YEAR_OFFSET) {
+    return false;
+  }
+
+  if (month < 1 || month > 12) {
+    return false;
+  }
+
+  if (day < 1 || day > 31) {
+    return false;
+  }
+
+  const daysInMonth = [
+    31,
+    isLeapYear(year) ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31
+  ][month - 1];
+
+  if (typeof daysInMonth !== "number" || day > daysInMonth) {
+    return false;
+  }
+
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  return utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day;
+}
+
 export async function listCnbcVideoDates(): Promise<string[]> {
   const dir = getNewsDir("cnbc");
   let entries: string[] = [];
@@ -341,32 +398,40 @@ export async function listCnbcVideoDates(): Promise<string[]> {
     throw error;
   }
 
-  function isValidYYYYMMDD(value: string): boolean {
-    if (!/^\d{8}$/.test(value)) {
-      return false;
-    }
-
-    const yyyy = Number(value.slice(0, 4));
-    const mm = Number(value.slice(4, 6));
-    const dd = Number(value.slice(6, 8));
-    if (!Number.isInteger(yyyy) || !Number.isInteger(mm) || !Number.isInteger(dd)) {
-      return false;
-    }
-
-    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) {
-      return false;
-    }
-
-    const utc = new Date(Date.UTC(yyyy, mm - 1, dd));
-    return utc.getUTCFullYear() === yyyy && utc.getUTCMonth() === mm - 1 && utc.getUTCDate() === dd;
-  }
-
-  return entries
+  const candidates = entries
     .filter((e) => e.endsWith(".json"))
     .map((e) => e.replace(/\.json$/, ""))
-    .filter((name) => isValidYYYYMMDD(name))
-    .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`)
-    .sort();
+    .filter((name) => /^\d{8}$/.test(name))
+    .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`);
+
+  const dates: string[] = [];
+  const invalidDatesSample: string[] = [];
+  let invalidCount = 0;
+
+  for (const date of candidates) {
+    if (isValidIsoDateYmd(date)) {
+      dates.push(date);
+      continue;
+    }
+
+    invalidCount += 1;
+
+    if (invalidDatesSample.length < 5) {
+      invalidDatesSample.push(date);
+    }
+  }
+
+  if (invalidCount > 0) {
+    const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s)`;
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
+    } else {
+      const sample = invalidDatesSample[0];
+      console.warn(sample ? `${message}: e.g. ${sample}` : message);
+    }
+  }
+
+  return dates.sort();
 }
 
 async function fileExists(filePath: string): Promise<boolean> {

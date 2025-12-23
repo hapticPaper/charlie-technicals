@@ -120,10 +120,11 @@ export function CnbcTopicTrendWidgetClient(props: {
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
               const label = evt?.activeLabel;
-              if (typeof label === "string") {
-                setActiveDate((prev) => (prev === label ? prev : label));
+              if (typeof label !== "string") {
                 return;
               }
+
+              setActiveDate((prev) => (prev === label ? prev : label));
             }}
             onMouseLeave={() => setActiveDate((prev) => (prev === null ? prev : null))}
           >

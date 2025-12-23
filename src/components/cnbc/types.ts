@@ -3,6 +3,11 @@ export type CnbcVideoCard = {
   title: string;
   url: string;
   publishedAt: string;
-  topic: string | null;
+  /**
+   * Normalized, non-empty topic label used for grouping and display.
+   *
+   * Prefer constructing cards via `toCnbcVideoCard()` to keep this stable.
+   */
+  topic: string;
   symbol: string | null;
 };

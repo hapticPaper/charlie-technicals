@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 
+import { DEFAULT_CNBC_TOPIC_LABEL } from "./transform";
 import type { CnbcVideoCard } from "./types";
 
 function safeTimestamp(value: string): number {
@@ -23,13 +24,29 @@ function formatPublishedAt(value: string): string {
   });
 }
 
-function topicBadgeLabel(topic: string | null): string | null {
-  const cleaned = topic?.trim();
-  if (!cleaned) {
-    return null;
+function topicBadgeLabel(topic: string): string {
+  const cleaned = topic.trim();
+  const normalized = cleaned.toLowerCase();
+
+  const isPlaceholder =
+    !cleaned ||
+    normalized === "other" ||
+    normalized === "unknown" ||
+    normalized === "n/a" ||
+    normalized === "na" ||
+    normalized === "none" ||
+    normalized === "null" ||
+    normalized === "undefined";
+
+  if (!isPlaceholder) {
+    return cleaned;
   }
 
-  return cleaned;
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("[CnbcVideoCards] Unexpected topic label", { topic });
+  }
+
+  return DEFAULT_CNBC_TOPIC_LABEL;
 }
 
 const cardStyle: CSSProperties = {

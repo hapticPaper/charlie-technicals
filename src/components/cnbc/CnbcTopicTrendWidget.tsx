@@ -2,6 +2,7 @@ import { listCnbcVideoDates, readCnbcVideoArticles } from "../../market/storage"
 import type { CnbcVideoArticle } from "../../market/types";
 
 import type { CnbcVideoCard } from "./types";
+import { normalizeCnbcTopic, toCnbcVideoCard } from "./transform";
 import { CnbcTopicTrendWidgetClient, type CnbcTopicTrendDatum } from "./CnbcTopicTrendWidgetClient";
 
 // We intentionally show the last N non-empty days (days with at least one CNBC video),
@@ -11,53 +12,40 @@ const MAX_NON_EMPTY_DAYS = 30;
 const MAX_SCAN_DAYS = MAX_NON_EMPTY_DAYS * 3;
 const MAX_TOPICS = 8;
 const MAX_VIDEOS_PER_DAY = 10;
+const READ_BATCH_SIZE = 10;
 
 function safePublishedTs(value: string): number {
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : 0;
 }
 
-function normalizeTopic(topic: string | undefined): string {
-  const cleaned = (topic ?? "other").trim().toLowerCase();
-  return cleaned === "" ? "other" : cleaned;
-}
-
-function toVideoCard(article: CnbcVideoArticle): CnbcVideoCard {
-  return {
-    id: article.id,
-    title: article.title,
-    url: article.url,
-    publishedAt: article.publishedAt,
-    topic: article.topic ? normalizeTopic(article.topic) : null,
-    symbol: article.symbol ?? null
-  };
-}
-
 async function loadRecentNonEmptyDays(allDates: string[]): Promise<
-  Array<{ date: string; articles: CnbcVideoArticle[] }>
+  { days: Array<{ date: string; articles: CnbcVideoArticle[] }>; failedReads: number }
 > {
-  const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
+  const days: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
   const failed: Array<{ date: string; message: string }> = [];
   const scanDates = [...allDates].sort().slice(-MAX_SCAN_DAYS).reverse();
 
-  // Scan newest-to-oldest until we have N non-empty days. Fetch in small concurrent batches.
-  const BATCH_SIZE = 10;
-  for (let offset = 0; offset < scanDates.length && dayArticles.length < MAX_NON_EMPTY_DAYS; offset += BATCH_SIZE) {
-    const dates = scanDates.slice(offset, offset + BATCH_SIZE);
-    const results = await Promise.allSettled(dates.map((date) => readCnbcVideoArticles(date)));
+  for (
+    let offset = 0;
+    offset < scanDates.length && days.length < MAX_NON_EMPTY_DAYS;
+    offset += READ_BATCH_SIZE
+  ) {
+    const batch = scanDates.slice(offset, offset + READ_BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map((date) => readCnbcVideoArticles(date)));
 
-    for (let idx = 0; idx < dates.length && dayArticles.length < MAX_NON_EMPTY_DAYS; idx += 1) {
-      const date = dates[idx];
+    for (let idx = 0; idx < batch.length && days.length < MAX_NON_EMPTY_DAYS; idx += 1) {
+      const date = batch[idx];
       const result = results[idx];
 
-      if (result.status === "fulfilled") {
+      if (result?.status === "fulfilled") {
         if (result.value.length > 0) {
-          dayArticles.push({ date, articles: result.value });
+          days.push({ date, articles: result.value });
         }
         continue;
       }
 
-      const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      const message = result?.reason instanceof Error ? result.reason.message : String(result?.reason);
       failed.push({ date, message: message.length > 140 ? `${message.slice(0, 140)}…` : message });
     }
   }
@@ -71,7 +59,7 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
     console.error(`[home:cnbc] Failed reading CNBC videos for ${failed.length} day(s): ${preview}${suffix}`);
   }
 
-  return dayArticles;
+  return { days, failedReads: failed.length };
 }
 
 export async function CnbcTopicTrendWidget() {
@@ -80,19 +68,18 @@ export async function CnbcTopicTrendWidget() {
     return null;
   }
 
-  const dayArticles = await loadRecentNonEmptyDays(allDates);
-
-  if (dayArticles.length === 0) {
+  const { days, failedReads } = await loadRecentNonEmptyDays(allDates);
+  if (days.length === 0) {
     return null;
   }
 
-  dayArticles.sort((a, b) => a.date.localeCompare(b.date));
+  const dayArticles = days.sort((a, b) => a.date.localeCompare(b.date));
   const latestDate = dayArticles[dayArticles.length - 1]?.date ?? null;
 
   const totals = new Map<string, number>();
   for (const { articles } of dayArticles) {
     for (const article of articles) {
-      const topic = normalizeTopic(article.topic);
+      const topic = normalizeCnbcTopic(article);
       totals.set(topic, (totals.get(topic) ?? 0) + 1);
     }
   }
@@ -105,24 +92,15 @@ export async function CnbcTopicTrendWidget() {
 
   const data: CnbcTopicTrendDatum[] = [];
   const videosByDate: Record<string, CnbcVideoCard[]> = {};
-  let hasOther = false;
 
   for (const { date, articles } of dayArticles) {
     const values: Record<string, number> = {};
-    let other = 0;
 
     for (const article of articles) {
-      const topic = normalizeTopic(article.topic);
+      const topic = normalizeCnbcTopic(article);
       if (includedTopics.has(topic)) {
         values[topic] = (values[topic] ?? 0) + 1;
-      } else {
-        other += 1;
       }
-    }
-
-    if (other > 0) {
-      values.other = other;
-      hasOther = true;
     }
 
     for (const topic of topTopics) {
@@ -135,12 +113,11 @@ export async function CnbcTopicTrendWidget() {
       .slice()
       .map((article) => ({ article, ts: safePublishedTs(article.publishedAt) }))
       .sort((a, b) => b.ts - a.ts)
-      .map((entry) => toVideoCard(entry.article))
+      .map((entry) => toCnbcVideoCard(entry.article))
       .slice(0, MAX_VIDEOS_PER_DAY);
   }
 
-  const topics = hasOther ? [...topTopics, "other"] : topTopics;
-  if (topics.length === 0) {
+  if (topTopics.length === 0) {
     return null;
   }
 
@@ -150,9 +127,10 @@ export async function CnbcTopicTrendWidget() {
       <p className="report-muted">
         <strong>Days:</strong> {dayArticles.length}
         {latestDate ? ` (latest ${latestDate})` : null}
+        {failedReads > 0 ? ` (${failedReads} failed reads)` : null}
       </p>
 
-      <CnbcTopicTrendWidgetClient data={data} topics={topics} videosByDate={videosByDate} />
+      <CnbcTopicTrendWidgetClient data={data} topics={topTopics} videosByDate={videosByDate} />
     </section>
   );
 }

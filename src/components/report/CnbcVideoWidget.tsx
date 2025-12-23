@@ -2,28 +2,13 @@ import { readCnbcVideoArticles } from "../../market/storage";
 import type { CnbcVideoArticle } from "../../market/types";
 
 import type { CnbcVideoCard } from "../cnbc/types";
+import { normalizeCnbcTopic, toCnbcVideoCard } from "../cnbc/transform";
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 const MAX_CNBC_WIDGET_ARTICLES = 500;
 const MAX_VIDEOS_PER_TOPIC = 10;
 
 type CnbcVideoArticles = CnbcVideoArticle[];
-
-function normalizeTopic(topic: string | undefined): string {
-  const cleaned = (topic ?? "other").trim().toLowerCase();
-  return cleaned === "" ? "other" : cleaned;
-}
-
-function toVideoCard(article: CnbcVideoArticle): CnbcVideoCard {
-  return {
-    id: article.id,
-    title: article.title,
-    url: article.url,
-    publishedAt: article.publishedAt,
-    topic: article.topic ? normalizeTopic(article.topic) : null,
-    symbol: article.symbol ?? null
-  };
-}
 
 function buildTopicData(articles: CnbcVideoArticles): CnbcTopicHypeDatum[] {
   function safePublishedTs(value: string): number {
@@ -39,14 +24,14 @@ function buildTopicData(articles: CnbcVideoArticles): CnbcTopicHypeDatum[] {
   const counts = new Map<string, { count: number; hypeSum: number; videos: CnbcVideoCard[] }>();
 
   for (const article of sorted.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
-    const topic = normalizeTopic(article.topic);
+    const topic = normalizeCnbcTopic(article);
     const hype = typeof article.hype === "number" && Number.isFinite(article.hype) ? article.hype : 0;
 
     const existing = counts.get(topic) ?? { count: 0, hypeSum: 0, videos: [] };
     existing.count += 1;
     existing.hypeSum += hype;
     if (existing.videos.length < MAX_VIDEOS_PER_TOPIC) {
-      existing.videos.push(toVideoCard(article));
+      existing.videos.push(toCnbcVideoCard(article));
     }
     counts.set(topic, existing);
   }

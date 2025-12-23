@@ -17,31 +17,21 @@ import { CnbcVideoCards } from "../cnbc/CnbcVideoCards";
 import type { CnbcVideoCard } from "../cnbc/types";
 import { getRechartsInitialDimension } from "./rechartsConfig";
 
-function getActiveTopic(evt: unknown): string | null {
-  if (typeof evt !== "object" || evt === null) {
+type BarHoverEvent = {
+  activePayload?: Array<{ payload?: { topic?: unknown } }>;
+};
+
+function getActiveBarTopic(evt: unknown): string | null {
+  if (!evt || typeof evt !== "object") {
     return null;
   }
 
-  if (!("activePayload" in evt)) {
-    return null;
-  }
-
-  const { activePayload } = evt as { activePayload?: unknown };
+  const activePayload = (evt as { activePayload?: unknown }).activePayload;
   if (!Array.isArray(activePayload)) {
     return null;
   }
 
-  const first = activePayload[0];
-  if (typeof first !== "object" || first === null || !("payload" in first)) {
-    return null;
-  }
-
-  const { payload } = first as { payload?: unknown };
-  if (typeof payload !== "object" || payload === null || !("topic" in payload)) {
-    return null;
-  }
-
-  const { topic } = payload as { topic?: unknown };
+  const topic = (activePayload[0] as BarHoverEvent["activePayload"][number] | undefined)?.payload?.topic;
   return typeof topic === "string" ? topic : null;
 }
 
@@ -96,7 +86,7 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
             data={props.data}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
-              const nextTopic = getActiveTopic(evt);
+              const nextTopic = getActiveBarTopic(evt);
               if (!nextTopic) {
                 return;
               }
