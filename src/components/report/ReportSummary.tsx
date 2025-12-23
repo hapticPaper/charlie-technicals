@@ -1,5 +1,6 @@
 "use client";
 
+import { REPORT_MAX_WATCHLIST } from "../../market/types";
 import { useReport } from "./ReportProvider";
 
 function formatDollarsCompact(value: number): string {
@@ -33,13 +34,33 @@ export function ReportSummary() {
       {report.picks.length > 0 ? (
         <>
           <p className="report-muted">
-            <strong>Top setups:</strong>
+            <strong>Technical trades:</strong>
           </p>
           <ul>
             {report.picks.map((p) => (
               <li key={p.symbol}>
                 <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()} entry {p.trade.entry.toFixed(2)}, stop{" "}
                 {p.trade.stop.toFixed(2)}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      {report.watchlist?.length ? (
+        <>
+          <h3>Watchlist</h3>
+          <p className="report-muted">
+            Trend-following or low-volatility names that didn’t meet the technical-trade filter.
+          </p>
+          <ul>
+            {report.watchlist.slice(0, REPORT_MAX_WATCHLIST).map((p) => (
+              <li key={`watch-${p.symbol}`}>
+                <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()}
+                {p.basis === "trend" ? " [trend]" : p.basis === "signal" ? " [sub-ATR signal]" : ""}
+                {typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
+                  ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR`
+                  : ""}
               </li>
             ))}
           </ul>

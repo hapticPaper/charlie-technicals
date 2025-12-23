@@ -3,6 +3,18 @@
 ## Overview
 Generate a daily MDX report (plus supporting JSON artifacts) for the configured universe and time windows.
 
+The rendered report is split into:
+
+- Narrative/context (volatility context + missing symbols)
+- Most-active names (dollar volume, within the configured universe)
+- Technical trades (signal-based picks that pass the current filters)
+- Watchlist (trend/low-vol names that didn’t meet the technical-trade filter)
+
+### Selection rules (current)
+
+- *Technical trades* (`report.picks`): signal-based (RSI/MACD) setups, with scoring that favors 15m/1h/1d confluence. If ATR14 is available, names with a sub-1-ATR daily move are filtered out; if ATR14 is missing, the filter falls back to signals.
+- *Watchlist* (`report.watchlist`): trend-only setups or signal-based setups with a sub-1-ATR daily move.
+
 ## Creates
 
 - Artifact: PR

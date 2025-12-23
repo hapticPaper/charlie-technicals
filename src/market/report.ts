@@ -11,7 +11,7 @@ import type {
   TtmSqueezeSeries
 } from "./types";
 
-import { SQUEEZE_STATES } from "./types";
+import { REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHORT_MAX_WORDS, SQUEEZE_STATES } from "./types";
 
 import type { TradePlan, TradeSide } from "./types";
 
@@ -47,6 +47,25 @@ function inferTradeSideFromSignals(series: AnalyzedSeries): TradeSide | null {
 function lastFiniteNumber(values: Array<number | null> | undefined, index: number): number | null {
   const v = values?.[index];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function computeMoveAtr1d(series1d: AnalyzedSeries): {
+  atr14: number | null;
+  move1d: number | null;
+  move1dAtr14: number | null;
+  absMove1dAtr14: number | null;
+} {
+  const idx1d = series1d.bars.length - 1;
+  const atr14 = Array.isArray(series1d.indicators.atr14) ? lastFiniteNumber(series1d.indicators.atr14, idx1d) : null;
+
+  const last = series1d.bars.at(-1);
+  const prev = series1d.bars.at(-2);
+  const move1d = last && prev && Number.isFinite(last.c) && Number.isFinite(prev.c) ? last.c - prev.c : null;
+
+  const move1dAtr14 = atr14 !== null && move1d !== null && atr14 !== 0 ? move1d / atr14 : null;
+  const absMove1dAtr14 = move1dAtr14 !== null ? Math.abs(move1dAtr14) : null;
+
+  return { atr14, move1d, move1dAtr14, absMove1dAtr14 };
 }
 
 function inferTradeSideFromTrend(series: AnalyzedSeries): TradeSide | null {
@@ -526,41 +545,57 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
 
 function buildPicks(args: {
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
-}): ReportPick[] {
-  const candidates: ReportPick[] = [];
+}): { picks: ReportPick[]; watchlist: ReportPick[] } {
+  const SCORE_WEIGHTS = {
+    signals15: 3,
+    signals1h: 2,
+    signals1d: 2,
+    agree15_1h: 3,
+    agree15_1d: 4,
+    signalSidePresent: 6,
+    trendMatch: 1,
+    trendAgree: 1
+  } as const;
+
+  // Policy:
+  // - Technical trades: require an explicit signal (RSI/MACD) and a >= 1 ATR daily move when ATR is available.
+  // - Watchlist: trend-following setups, or signal-based setups with a sub-ATR daily move.
+  const MIN_TRADE_ABS_MOVE_ATR = 1;
+
+  const candidates: Array<ReportPick & { absMove1dAtr14: number | null }> = [];
 
   for (const symbol of Object.keys(args.analyzedBySymbol)) {
     const series15m = args.analyzedBySymbol[symbol]?.["15m"];
+    const series1h = args.analyzedBySymbol[symbol]?.["1h"];
     const series1d = args.analyzedBySymbol[symbol]?.["1d"];
     if (!series15m || !series1d) {
       continue;
     }
 
     const side15 = inferTradeSideFromSignals(series15m);
+    const side1h = series1h ? inferTradeSideFromSignals(series1h) : null;
     const side1d = inferTradeSideFromSignals(series1d);
-    const sideTrend1d = inferTradeSideFromTrend(series1d);
-    const sideTrend15 = inferTradeSideFromTrend(series15m);
 
-    const side = side15 ?? side1d ?? sideTrend15 ?? sideTrend1d;
+    const sideTrend15 = inferTradeSideFromTrend(series15m);
+    const sideTrend1h = series1h ? inferTradeSideFromTrend(series1h) : null;
+    const sideTrend1d = inferTradeSideFromTrend(series1d);
+
+    const signalSide = side15 ?? side1h ?? side1d;
+    const trendSide = sideTrend15 ?? sideTrend1h ?? sideTrend1d;
+    const side = signalSide ?? trendSide;
     if (!side) {
       continue;
     }
 
     const signals15 = activeSignalLabels(series15m);
+    const signals1h = series1h ? activeSignalLabels(series1h) : [];
     const signals1d = activeSignalLabels(series1d);
 
-    const idx1d = series1d.bars.length - 1;
-    const atr1d = Array.isArray(series1d.indicators.atr14)
-      ? lastFiniteNumber(series1d.indicators.atr14, idx1d)
-      : null;
-
-    const last1d = series1d.bars.at(-1);
-    const prev1d = series1d.bars.at(-2);
-    const move1d =
-      last1d && prev1d && Number.isFinite(last1d.c) && Number.isFinite(prev1d.c)
-        ? last1d.c - prev1d.c
-        : null;
-    const move1dAtr14 = atr1d !== null && move1d !== null && atr1d !== 0 ? move1d / atr1d : null;
+    const moveInfo = computeMoveAtr1d(series1d);
+    const atr1d = moveInfo.atr14;
+    const move1d = moveInfo.move1d;
+    const move1dAtr14 = moveInfo.move1dAtr14;
+    const absMove1dAtr14 = moveInfo.absMove1dAtr14;
 
     const close15 = series15m.bars.at(-1)?.c;
     const ema15 = Array.isArray(series15m.indicators.ema20)
@@ -576,41 +611,61 @@ function buildPicks(args: {
         : 0;
 
     let score = 0;
-    score += signals15.length * 3;
-    score += signals1d.length * 2;
+    score += signals15.length * SCORE_WEIGHTS.signals15;
+    score += signals1h.length * SCORE_WEIGHTS.signals1h;
+    score += signals1d.length * SCORE_WEIGHTS.signals1d;
+    if (side15 && side1h && side15 === side1h) {
+      score += SCORE_WEIGHTS.agree15_1h;
+    }
     if (side15 && side1d && side15 === side1d) {
-      score += 4;
+      score += SCORE_WEIGHTS.agree15_1d;
+    }
+    if (signalSide) {
+      score += SCORE_WEIGHTS.signalSidePresent;
     }
     if (sideTrend1d === side) {
-      score += 1;
+      score += SCORE_WEIGHTS.trendMatch;
+    }
+    if (sideTrend1h === side) {
+      score += SCORE_WEIGHTS.trendMatch;
     }
     if (sideTrend15 === side) {
-      score += 1;
+      score += SCORE_WEIGHTS.trendMatch;
+    }
+    if (sideTrend1d && sideTrend1h && sideTrend1d === sideTrend1h) {
+      score += SCORE_WEIGHTS.trendAgree;
+    }
+    if (sideTrend1h && sideTrend15 && sideTrend1h === sideTrend15) {
+      score += SCORE_WEIGHTS.trendAgree;
     }
     if (sideTrend1d && sideTrend15 && sideTrend1d === sideTrend15) {
-      score += 1;
+      score += SCORE_WEIGHTS.trendAgree;
     }
     score += Math.round(trendStrength * 1000);
     if (rsi15 !== null) {
       score += Math.round(Math.min(10, Math.abs(rsi15 - 50) / 5));
     }
 
-    if (move1dAtr14 !== null) {
-      const baseBonus = Math.abs(move1dAtr14) * 5;
-      const bigMoveBonus = Math.abs(move1dAtr14) >= 2 ? 20 : 0;
+    if (absMove1dAtr14 !== null) {
+      const baseBonus = absMove1dAtr14 * 5;
+      const bigMoveBonus = absMove1dAtr14 >= 2 ? 20 : 0;
       score += Math.round(Math.min(45, baseBonus + bigMoveBonus));
     }
 
     const rationale: string[] = [];
     if (atr1d !== null) {
-      const moveLabel =
-        move1d !== null && move1dAtr14 !== null
-          ? `; 1d move ${move1d >= 0 ? "+" : ""}${move1d.toFixed(2)} (${Math.abs(move1dAtr14).toFixed(1)} ATR)`
-          : "";
+      let moveLabel = "";
+      if (move1d !== null && absMove1dAtr14 !== null) {
+        const quiet = absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR ? " (quiet)" : "";
+        moveLabel = `; 1d move ${move1d >= 0 ? "+" : ""}${move1d.toFixed(2)} (${absMove1dAtr14.toFixed(1)} ATR)${quiet}`;
+      }
       rationale.push(`1d ATR14: ${atr1d.toFixed(2)}${moveLabel}`);
     }
     if (signals1d.length > 0) {
       rationale.push(`1d signals: ${signals1d.slice(0, 3).join("; ")}`);
+    }
+    if (signals1h.length > 0) {
+      rationale.push(`1h signals: ${signals1h.slice(0, 3).join("; ")}`);
     }
     if (signals15.length > 0) {
       rationale.push(`15m signals: ${signals15.slice(0, 3).join("; ")}`);
@@ -618,35 +673,96 @@ function buildPicks(args: {
     if (sideTrend1d) {
       rationale.push(`1d trend bias: ${sideTrend1d === "buy" ? "bullish" : "bearish"}`);
     }
+    if (!signalSide) {
+      rationale.push(
+        "Trend-following watchlist setup (no RSI/MACD signal on the latest bar; not promoted to a technical trade)."
+      );
+    } else if (absMove1dAtr14 !== null && absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR) {
+      rationale.push("Signal-based but 1d move < 1 ATR; kept on the watchlist.");
+    }
     if (rationale.length === 0) {
       rationale.push("Trend continuation setup (no explicit rule hit on the latest bar).");
     }
 
     candidates.push({
       symbol,
+      basis: signalSide ? "signal" : "trend",
       score,
       trade: buildTradePlan(series15m, side, atr1d),
       atr14_1d: atr1d,
       move1d,
       move1dAtr14,
+      absMove1dAtr14,
       rationale,
       signals: {
         "15m": signals15,
+        "1h": signals1h,
         "1d": signals1d
       }
     });
   }
 
   candidates.sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
-  return candidates.slice(0, 5);
+
+  type Candidate = ReportPick & { absMove1dAtr14: number | null };
+
+  function stripCandidate(candidate: Candidate): ReportPick {
+    const { absMove1dAtr14, ...pick } = candidate;
+    void absMove1dAtr14;
+    return pick;
+  }
+
+  function isTechnicalTrade(candidate: Candidate): boolean {
+    return (
+      candidate.basis === "signal" &&
+      (candidate.absMove1dAtr14 === null || candidate.absMove1dAtr14 >= MIN_TRADE_ABS_MOVE_ATR)
+    );
+  }
+
+  function isWatchlistEntry(candidate: Candidate, picked: Set<string>): boolean {
+    if (picked.has(candidate.symbol)) {
+      return false;
+    }
+
+    return (
+      candidate.basis === "trend" ||
+      (candidate.absMove1dAtr14 !== null && candidate.absMove1dAtr14 < MIN_TRADE_ABS_MOVE_ATR)
+    );
+  }
+
+  const picks = candidates.filter(isTechnicalTrade).slice(0, REPORT_MAX_PICKS).map(stripCandidate);
+
+  const pickSymbols = new Set(picks.map((p) => p.symbol));
+
+  const watchlist = candidates
+    .filter((c) => isWatchlistEntry(c, pickSymbols))
+    .slice(0, REPORT_MAX_WATCHLIST)
+    .map(stripCandidate);
+
+  return { picks, watchlist };
 }
 
 function buildSummaries(
   date: string,
   picks: ReportPick[],
+  watchlist: ReportPick[],
+  analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>,
   seriesBySymbol: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>,
   missingSymbols: string[]
 ): MarketReport["summaries"] {
+  function median(values: number[]): number | null {
+    const sorted = values.slice().sort((a, b) => a - b);
+    if (sorted.length === 0) {
+      return null;
+    }
+
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+      return (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    return sorted[mid];
+  }
+
   function formatList(values: string[], max: number): string {
     if (values.length <= max) {
       return values.join(", ");
@@ -690,10 +806,32 @@ function buildSummaries(
           .slice(0, 3)
           .map((p) => `${p.symbol}: ${p.trade.side.toUpperCase()} (stop ${p.trade.stop.toFixed(2)})`)
           .join(" | ") + (picks.length > 3 ? " | …" : ""),
-    30
+    REPORT_VERY_SHORT_MAX_WORDS
   );
 
+  const absMoveAtrValues: number[] = [];
+  for (const symbol of Object.keys(analyzedBySymbol)) {
+    const series1d = analyzedBySymbol[symbol]?.["1d"];
+    if (!series1d) {
+      continue;
+    }
+
+    const absMoveAtr = computeMoveAtr1d(series1d).absMove1dAtr14;
+    if (absMoveAtr !== null) {
+      absMoveAtrValues.push(absMoveAtr);
+    }
+  }
+
+  const medAbsMoveAtr = median(absMoveAtrValues);
+  const movedAtLeast1Atr = absMoveAtrValues.filter((v) => v >= 1).length;
+  const movedAtLeast2Atr = absMoveAtrValues.filter((v) => v >= 2).length;
+
   const mainIdeaParts: string[] = [];
+  if (medAbsMoveAtr !== null) {
+    mainIdeaParts.push(
+      `Volatility context: median 1d move was ${medAbsMoveAtr.toFixed(1)} ATR (≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
+    );
+  }
   if (picks.length === 0 && lines.length === 0) {
     mainIdeaParts.push(
       "Across the configured universe, the ruleset did not flag an overbought/oversold RSI or a MACD cross on the latest bar."
@@ -701,7 +839,14 @@ function buildSummaries(
   } else if (picks.length > 0) {
     mainIdeaParts.push(
       `Top setups today: ${picks
-        .slice(0, 5)
+        .slice(0, REPORT_MAX_PICKS)
+        .map((p) => `${p.symbol} ${p.trade.side}`)
+        .join(", ")}.`
+    );
+  } else if (watchlist.length > 0) {
+    mainIdeaParts.push(
+      `No high-conviction technical trades met the filter today; watchlist: ${watchlist
+        .slice(0, REPORT_MAX_PICKS)
         .map((p) => `${p.symbol} ${p.trade.side}`)
         .join(", ")}.`
     );
@@ -722,6 +867,12 @@ function buildSummaries(
       summaryParts.push(
         `- ${p.symbol}: ${p.trade.side.toUpperCase()} entry ${p.trade.entry.toFixed(2)}, stop ${p.trade.stop.toFixed(2)}`
       );
+    }
+  } else if (watchlist.length > 0) {
+    summaryParts.push("Watchlist:");
+    for (const p of watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
+      const basis = p.basis === "trend" ? "trend" : p.basis === "signal" ? "sub-ATR signal" : "watchlist";
+      summaryParts.push(`- ${p.symbol}: ${p.trade.side.toUpperCase()} (${basis})`);
     }
   } else if (lines.length > 0) {
     summaryParts.push("Top hits:");
@@ -764,9 +915,9 @@ export function buildMarketReport(args: {
     analyzedBySymbol[s.symbol][s.interval] = s;
   }
 
-  const picks = buildPicks({ analyzedBySymbol });
+  const { picks, watchlist } = buildPicks({ analyzedBySymbol });
   const mostActive = buildMostActive({ analyzedBySymbol });
-  const summaries = buildSummaries(args.date, picks, seriesBySymbol, args.missingSymbols);
+  const summaries = buildSummaries(args.date, picks, watchlist, analyzedBySymbol, seriesBySymbol, args.missingSymbols);
 
   return {
     date: args.date,
@@ -775,6 +926,7 @@ export function buildMarketReport(args: {
     intervals: args.intervals,
     missingSymbols: args.missingSymbols,
     picks,
+    watchlist: watchlist.length > 0 ? watchlist : undefined,
     series: seriesBySymbol,
     mostActive,
     summaries
@@ -803,10 +955,10 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push(`<CnbcVideoWidget date="${report.date}" />`);
   lines.push("");
 
-  lines.push("## Today's top setups");
+  lines.push("## Technical trades");
   lines.push("");
   if (report.picks.length === 0) {
-    lines.push("No clear trade setups today based on the configured rules.");
+    lines.push("No clear trade setups today based on the configured rules + filters.");
     lines.push("");
   } else {
     for (const pick of report.picks) {
@@ -815,6 +967,20 @@ export function buildReportMdx(report: MarketReport): string {
       lines.push(`<ReportPick symbol="${pick.symbol}" />`);
       lines.push("");
     }
+  }
+
+  if (report.watchlist?.length) {
+    lines.push("## Watchlist");
+    lines.push("");
+    for (const p of report.watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
+      const basis = p.basis === "trend" ? "trend" : p.basis === "signal" ? "sub-ATR signal" : "watchlist";
+      const atrLabel =
+        typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
+          ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR`
+          : "";
+      lines.push(`- ${p.symbol}: ${p.trade.side.toUpperCase()} (${basis})${atrLabel}`);
+    }
+    lines.push("");
   }
 
   lines.push("## Universe");

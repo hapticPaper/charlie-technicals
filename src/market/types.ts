@@ -8,6 +8,21 @@ export const MARKET_INTERVALS: readonly MarketInterval[] = [
   "1d"
 ];
 
+/**
+* Hard cap on the number of technical trades surfaced in the report.
+*/
+export const REPORT_MAX_PICKS = 5;
+
+/**
+* Hard cap on the number of watchlist names surfaced in the report.
+*/
+export const REPORT_MAX_WATCHLIST = 8;
+
+/**
+* Word cap for the ultra-compact summary used in the report header.
+*/
+export const REPORT_VERY_SHORT_MAX_WORDS = 30;
+
 export type MarketBar = {
   t: string;
   o: number;
@@ -167,6 +182,12 @@ export type TradePlan = {
 
 export type ReportPick = {
   symbol: string;
+  /**
+  * Indicates whether the setup is driven by explicit signals (RSI/MACD) or trend-only rules.
+  *
+  * Optional to preserve compatibility with older persisted report JSON artifacts.
+  */
+  basis?: "signal" | "trend";
   score: number;
   trade: TradePlan;
   atr14_1d?: number | null;
@@ -196,6 +217,10 @@ export type MarketReport = {
   intervals: MarketInterval[];
   missingSymbols: string[];
   picks: ReportPick[];
+  /**
+  * Trend-only or sub-ATR signal setups that did not meet the technical-trade filter.
+  */
+  watchlist?: ReportPick[];
   series: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>;
   mostActive?: {
     byDollarVolume1d: MostActiveEntry[];
