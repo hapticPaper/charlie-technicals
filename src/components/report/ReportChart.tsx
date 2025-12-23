@@ -1,91 +1,187 @@
 "use client";
 
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceArea,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useEffect, useMemo, useState } from "react";
+import type { IRange, LineData, SeriesMarker, Time, UTCTimestamp, WhitespaceData } from "lightweight-charts";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
-
-import { getRechartsInitialDimension } from "./rechartsConfig";
-type SqueezeShade = {
-  x1: number;
-  x2: number;
-  fill: string;
-};
 
 type ChartAnnotations = {
   trade?: TradePlan;
 };
 
-function formatEpochSeconds(value: unknown): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+function formatChartTime(time: Time | undefined): string {
+  if (!time) {
     return "";
   }
 
-  const dt = new Date(value * 1000);
-  return dt.toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
+  if (typeof time === "number") {
+    const millis = time * 1000;
+    if (!Number.isFinite(millis)) {
+      return "";
+    }
 
-function buildSqueezeShades(series: ReportIntervalSeries): SqueezeShade[] {
-  const squeezeShades: SqueezeShade[] = [];
-  if (!series.ttmSqueeze20?.squeezeState || series.ttmSqueeze20.squeezeState.length !== series.t.length) {
-    return squeezeShades;
+    const dt = new Date(millis);
+    return dt.toLocaleString(undefined, {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
   }
 
-  let activeState: "on" | "off" | null = null;
-  let activeStart: number | null = null;
+  if (typeof time === "object" && "year" in time && "month" in time && "day" in time) {
+    const { year, month, day } = time as { year: number; month: number; day: number };
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (!Number.isFinite(dt.getTime())) {
+      return "";
+    }
 
-  for (let i = 0; i < series.t.length; i += 1) {
-    const t = series.t[i];
-    const stateRaw = series.ttmSqueeze20.squeezeState[i];
+    return dt.toLocaleDateString(undefined, { month: "2-digit", day: "2-digit" });
+  }
+
+  return "";
+}
+
+function formatMaybeNumber(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return value.toFixed(2);
+}
+
+function extractSeriesValue(
+  point: LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp> | undefined
+): number | undefined {
+  if (!point) {
+    return undefined;
+  }
+
+  if ("value" in point) {
+    return point.value;
+  }
+
+  return undefined;
+}
+
+function readCssVar(name: string, fallback: string): string {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value.length > 0 ? value : fallback;
+}
+
+function promoteAlpha(color: string, minAlpha = 0.85): string {
+  const match = color.match(/^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/i);
+  if (!match) {
+    return color;
+  }
+
+  const alpha = Number(match[4]);
+  if (!Number.isFinite(alpha) || alpha >= minAlpha) {
+    return color;
+  }
+
+  return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${minAlpha})`;
+}
+
+function toUtcTimestamp(t: number): UTCTimestamp | null {
+  if (!Number.isFinite(t)) {
+    return null;
+  }
+
+  const seconds = t > 10_000_000_000 ? t / 1000 : t;
+  return Math.floor(seconds) as UTCTimestamp;
+}
+
+function toLineSeriesData(t: number[], values: Array<number | null>): Array<LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
+  const out: Array<LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
+  const len = Math.min(t.length, values.length);
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(t[i]);
+    if (time === null) {
+      continue;
+    }
+
+    const value = values[i];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      out.push({ time });
+      continue;
+    }
+
+    out.push({ time, value });
+  }
+
+  return out;
+}
+
+function buildSqueezeMarkers(series: ReportIntervalSeries): SeriesMarker<UTCTimestamp>[] {
+  const squeezeState = series.ttmSqueeze20?.squeezeState;
+  if (!squeezeState || squeezeState.length !== series.t.length) {
+    return [];
+  }
+
+  const onColor = promoteAlpha(readCssVar("--rp-squeeze-on", readCssVar("--rp-warn", "#f59e0b")));
+  const offColor = promoteAlpha(readCssVar("--rp-squeeze-off", readCssVar("--rp-bull", "#22c55e")));
+
+  const markers: SeriesMarker<UTCTimestamp>[] = [];
+  let active: "on" | "off" | null = null;
+  let start = 0;
+
+  function pushSegment(state: "on" | "off", startIdx: number, endIdx: number) {
+    if (endIdx <= startIdx) {
+      return;
+    }
+
+    const mid = Math.floor((startIdx + endIdx) / 2);
+    const time = toUtcTimestamp(series.t[mid]);
+    if (time === null) {
+      return;
+    }
+
+    markers.push({
+      time,
+      position: "belowBar",
+      color: state === "on" ? onColor : offColor,
+      shape: state === "on" ? "circle" : "square",
+      size: 1,
+      text: state === "on" ? "SQ" : undefined
+    });
+  }
+
+  for (let i = 0; i < squeezeState.length; i += 1) {
+    const stateRaw = squeezeState[i];
     const state = stateRaw === "on" ? "on" : stateRaw === "off" ? "off" : null;
 
-    if (activeState === null) {
+    if (active === null) {
       if (state) {
-        activeState = state;
-        activeStart = t;
+        active = state;
+        start = i;
       }
       continue;
     }
 
-    if (state !== activeState) {
-      const end = series.t[i - 1] ?? t;
-      // Single-tick segments are intentionally ignored because `ReferenceArea` doesn't render meaningfully when x1 == x2.
-      if (activeStart !== null && end > activeStart) {
-        squeezeShades.push({
-          x1: activeStart,
-          x2: end,
-          fill: activeState === "on" ? "var(--rp-squeeze-on)" : "var(--rp-squeeze-off)"
-        });
+    if (state !== active) {
+      pushSegment(active, start, i - 1);
+
+      if (state) {
+        active = state;
+        start = i;
+      } else {
+        active = null;
       }
-
-      activeState = state;
-      activeStart = state ? t : null;
     }
   }
 
-  if (activeState && activeStart !== null) {
-    const end = series.t[series.t.length - 1];
-    if (typeof end === "number" && end > activeStart) {
-      squeezeShades.push({
-        x1: activeStart,
-        x2: end,
-        fill: activeState === "on" ? "var(--rp-squeeze-on)" : "var(--rp-squeeze-off)"
-      });
-    }
+  if (active) {
+    pushSegment(active, start, squeezeState.length - 1);
   }
 
-  return squeezeShades;
+  return markers;
 }
 
 export function ReportChart(props: {
@@ -94,9 +190,6 @@ export function ReportChart(props: {
   annotations?: ChartAnnotations;
   showSignals?: boolean;
 }) {
-  const priceChartInitialDimension = useMemo(getRechartsInitialDimension, []);
-  const rsiChartInitialDimension = useMemo(getRechartsInitialDimension, []);
-
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -104,19 +197,15 @@ export function ReportChart(props: {
 
   const { series, annotations } = props;
 
-  const squeezeShades = useMemo(() => buildSqueezeShades(series), [series]);
+  const priceWrapperRef = useRef<HTMLDivElement | null>(null);
+  const priceChartRef = useRef<HTMLDivElement | null>(null);
+  const priceTooltipRef = useRef<HTMLDivElement | null>(null);
 
-  const data = series.t.map((t, i) => ({
-    t,
-    close: series.close[i],
-    sma20: series.sma20[i] ?? undefined,
-    ema20: series.ema20[i] ?? undefined,
-    rsi14: series.rsi14[i] ?? undefined,
-    bbUpper: series.bollinger20?.upper[i] ?? undefined,
-    bbLower: series.bollinger20?.lower[i] ?? undefined,
-    kcUpper: series.keltner20?.upper[i] ?? undefined,
-    kcLower: series.keltner20?.lower[i] ?? undefined
-  }));
+  const rsiWrapperRef = useRef<HTMLDivElement | null>(null);
+  const rsiChartRef = useRef<HTMLDivElement | null>(null);
+  const rsiTooltipRef = useRef<HTMLDivElement | null>(null);
+
+  const squeezeMarkers = useMemo(() => buildSqueezeMarkers(series), [series]);
 
   const active = series.signals.filter((s) => s.active).map((s) => s.label);
   const trade = annotations?.trade;
@@ -128,9 +217,338 @@ export function ReportChart(props: {
   if (series.keltner20) {
     legendItems.push("Keltner Channels (20)");
   }
-  if (squeezeShades.length > 0) {
-    legendItems.push("TTM Squeeze shading");
+  if (squeezeMarkers.length > 0) {
+    legendItems.push("TTM Squeeze markers");
   }
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    const priceWrapper = priceWrapperRef.current;
+    const priceChartEl = priceChartRef.current;
+    const priceTooltip = priceTooltipRef.current;
+
+    const rsiWrapper = rsiWrapperRef.current;
+    const rsiChartEl = rsiChartRef.current;
+    const rsiTooltip = rsiTooltipRef.current;
+
+    if (!priceWrapper || !priceChartEl || !rsiWrapper || !rsiChartEl) {
+      return;
+    }
+
+    const priceChartElement = priceChartEl;
+    const rsiChartElement = rsiChartEl;
+
+    let disposed = false;
+    let cleanup = () => {};
+
+    async function run() {
+      const { createChart, createSeriesMarkers, ColorType, CrosshairMode, LineSeries, LineStyle } = await import(
+        "lightweight-charts"
+      );
+      if (disposed) {
+        return;
+      }
+
+      const surface = readCssVar("--rp-surface", "rgba(255, 255, 255, 0.06)");
+      const border = readCssVar("--rp-border", "rgba(255, 255, 255, 0.12)");
+      const grid = readCssVar("--rp-grid", "rgba(255, 255, 255, 0.08)");
+      const text = readCssVar("--rp-text", "#e5e7eb");
+      const muted = readCssVar("--rp-muted", "#a1a1aa");
+
+      const priceColor = readCssVar("--rp-price", "#e5e7eb");
+      const smaColor = readCssVar("--rp-sma", "#38bdf8");
+      const emaColor = readCssVar("--rp-ema", "#a78bfa");
+      const rsiColor = readCssVar("--rp-rsi", "#34d399");
+      const bollingerColor = readCssVar("--rp-bollinger", "#60a5fa");
+      const keltnerColor = readCssVar("--rp-keltner", "#f472b6");
+      const bull = readCssVar("--rp-bull", "#22c55e");
+      const bear = readCssVar("--rp-bear", "#fb7185");
+      const warn = readCssVar("--rp-warn", "#f59e0b");
+      const target = readCssVar("--rp-target", "#38bdf8");
+
+      const sharedOptions = {
+        autoSize: true,
+        layout: {
+          background: { type: ColorType.Solid, color: surface },
+          textColor: text,
+          fontFamily:
+            "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'"
+        },
+        grid: {
+          vertLines: { color: grid },
+          horzLines: { color: grid }
+        },
+        rightPriceScale: {
+          borderColor: border,
+          textColor: muted
+        },
+        timeScale: {
+          borderColor: border,
+          timeVisible: true,
+          secondsVisible: false
+        },
+        crosshair: {
+          mode: CrosshairMode.Magnet
+        }
+      };
+
+      const priceChart = createChart(priceChartElement, sharedOptions);
+      const rsiChart = createChart(rsiChartElement, sharedOptions);
+
+      const closeSeries = priceChart.addSeries(LineSeries, {
+        color: priceColor,
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+      const smaSeries = priceChart.addSeries(LineSeries, {
+        color: smaColor,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+      const emaSeries = priceChart.addSeries(LineSeries, {
+        color: emaColor,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false
+      });
+
+      const bbUpperSeries = series.bollinger20
+        ? priceChart.addSeries(LineSeries, {
+            color: bollingerColor,
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            priceLineVisible: false,
+            lastValueVisible: false
+          })
+        : null;
+      const bbLowerSeries = series.bollinger20
+        ? priceChart.addSeries(LineSeries, {
+            color: bollingerColor,
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            priceLineVisible: false,
+            lastValueVisible: false
+          })
+        : null;
+      const kcUpperSeries = series.keltner20
+        ? priceChart.addSeries(LineSeries, {
+            color: keltnerColor,
+            lineWidth: 1,
+            lineStyle: LineStyle.SparseDotted,
+            priceLineVisible: false,
+            lastValueVisible: false
+          })
+        : null;
+      const kcLowerSeries = series.keltner20
+        ? priceChart.addSeries(LineSeries, {
+            color: keltnerColor,
+            lineWidth: 1,
+            lineStyle: LineStyle.SparseDotted,
+            priceLineVisible: false,
+            lastValueVisible: false
+          })
+        : null;
+
+      closeSeries.setData(toLineSeriesData(series.t, series.close));
+      smaSeries.setData(toLineSeriesData(series.t, series.sma20));
+      emaSeries.setData(toLineSeriesData(series.t, series.ema20));
+      bbUpperSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.upper ?? []));
+      bbLowerSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.lower ?? []));
+      kcUpperSeries?.setData(toLineSeriesData(series.t, series.keltner20?.upper ?? []));
+      kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
+
+      const squeezeMarkerPlugin =
+        squeezeMarkers.length > 0
+          ? createSeriesMarkers(closeSeries, squeezeMarkers, { autoScale: false, zOrder: "aboveSeries" })
+          : null;
+
+      if (trade) {
+        closeSeries.createPriceLine({
+          price: trade.entry,
+          color: isBuy ? bull : bear,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          title: `Entry ${trade.entry.toFixed(2)}`
+        });
+        closeSeries.createPriceLine({
+          price: trade.stop,
+          color: warn,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          title: `Stop ${trade.stop.toFixed(2)}`
+        });
+        trade.targets?.forEach((t, idx) => {
+          closeSeries.createPriceLine({
+            price: t,
+            color: target,
+            lineWidth: 1,
+            lineStyle: LineStyle.Dotted,
+            title: `T${idx + 1} ${t.toFixed(2)}`
+          });
+        });
+      }
+
+      const rsiSeries = rsiChart.addSeries(LineSeries, {
+        color: rsiColor,
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
+      });
+      rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
+      rsiSeries.createPriceLine({ price: 70, color: border, lineStyle: LineStyle.Dotted, lineWidth: 1, title: "70" });
+      rsiSeries.createPriceLine({ price: 30, color: border, lineStyle: LineStyle.Dotted, lineWidth: 1, title: "30" });
+
+      priceChart.timeScale().fitContent();
+      rsiChart.timeScale().fitContent();
+
+      const syncing = { value: false };
+      const syncPriceToRsi = (range: IRange<Time> | null) => {
+        if (!range) {
+          return;
+        }
+        if (syncing.value) {
+          return;
+        }
+        syncing.value = true;
+        try {
+          rsiChart.timeScale().setVisibleRange(range);
+        } finally {
+          syncing.value = false;
+        }
+      };
+      const syncRsiToPrice = (range: IRange<Time> | null) => {
+        if (!range) {
+          return;
+        }
+        if (syncing.value) {
+          return;
+        }
+        syncing.value = true;
+        try {
+          priceChart.timeScale().setVisibleRange(range);
+        } finally {
+          syncing.value = false;
+        }
+      };
+
+      priceChart.timeScale().subscribeVisibleTimeRangeChange(syncPriceToRsi);
+      rsiChart.timeScale().subscribeVisibleTimeRangeChange(syncRsiToPrice);
+
+      if (priceTooltip) {
+        priceTooltip.style.whiteSpace = "pre";
+        priceTooltip.style.color = text;
+        priceTooltip.style.pointerEvents = "none";
+        priceTooltip.style.background = surface;
+        priceTooltip.style.border = `1px solid ${border}`;
+        priceTooltip.style.borderRadius = "10px";
+        priceTooltip.style.padding = "8px 10px";
+        priceTooltip.style.fontSize = "12px";
+        priceTooltip.style.opacity = "0";
+      }
+
+      if (rsiTooltip) {
+        rsiTooltip.style.whiteSpace = "pre";
+        rsiTooltip.style.color = text;
+        rsiTooltip.style.pointerEvents = "none";
+        rsiTooltip.style.background = surface;
+        rsiTooltip.style.border = `1px solid ${border}`;
+        rsiTooltip.style.borderRadius = "10px";
+        rsiTooltip.style.padding = "8px 10px";
+        rsiTooltip.style.fontSize = "12px";
+        rsiTooltip.style.opacity = "0";
+      }
+
+      priceChart.subscribeCrosshairMove((param) => {
+        if (!priceTooltip) {
+          return;
+        }
+
+        const timeLabel = formatChartTime(param.time);
+        if (!param.point || !timeLabel) {
+          priceTooltip.style.opacity = "0";
+          return;
+        }
+
+        const close = param.seriesData.get(closeSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
+        const sma = param.seriesData.get(smaSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
+        const ema = param.seriesData.get(emaSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
+        const bbU = bbUpperSeries
+          ? (param.seriesData.get(bbUpperSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          : undefined;
+        const bbL = bbLowerSeries
+          ? (param.seriesData.get(bbLowerSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          : undefined;
+        const kcU = kcUpperSeries
+          ? (param.seriesData.get(kcUpperSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          : undefined;
+        const kcL = kcLowerSeries
+          ? (param.seriesData.get(kcLowerSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined)
+          : undefined;
+
+        const lines = [
+          timeLabel,
+          `Close: ${formatMaybeNumber(extractSeriesValue(close))}`,
+          `SMA 20: ${formatMaybeNumber(extractSeriesValue(sma))}`,
+          `EMA 20: ${formatMaybeNumber(extractSeriesValue(ema))}`
+        ];
+        if (bbUpperSeries && bbLowerSeries) {
+          lines.push(
+            `BB U/L: ${formatMaybeNumber(extractSeriesValue(bbU))} / ${formatMaybeNumber(extractSeriesValue(bbL))}`
+          );
+        }
+        if (kcUpperSeries && kcLowerSeries) {
+          lines.push(
+            `KC U/L: ${formatMaybeNumber(extractSeriesValue(kcU))} / ${formatMaybeNumber(extractSeriesValue(kcL))}`
+          );
+        }
+
+        priceTooltip.textContent = lines.join("\n");
+        priceTooltip.style.opacity = "1";
+      });
+
+      rsiChart.subscribeCrosshairMove((param) => {
+        if (!rsiTooltip) {
+          return;
+        }
+
+        const timeLabel = formatChartTime(param.time);
+        if (!param.point || !timeLabel) {
+          rsiTooltip.style.opacity = "0";
+          return;
+        }
+
+        const rsiValue = param.seriesData.get(rsiSeries) as (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>) | undefined;
+        const lines = [
+          timeLabel,
+          `RSI 14: ${formatMaybeNumber(extractSeriesValue(rsiValue))}`
+        ];
+
+        rsiTooltip.textContent = lines.join("\n");
+        rsiTooltip.style.opacity = "1";
+      });
+
+      cleanup = () => {
+        squeezeMarkerPlugin?.detach();
+        priceChart.timeScale().unsubscribeVisibleTimeRangeChange(syncPriceToRsi);
+        rsiChart.timeScale().unsubscribeVisibleTimeRangeChange(syncRsiToPrice);
+        priceChart.remove();
+        rsiChart.remove();
+      };
+    }
+
+    void run();
+
+    return () => {
+      disposed = true;
+      cleanup();
+    };
+  }, [mounted, series, trade, isBuy]);
 
   if (!mounted) {
     return (
@@ -148,7 +566,8 @@ export function ReportChart(props: {
             height: 260,
             borderRadius: 12,
             border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)"
+            background: "var(--rp-surface)",
+            overflow: "hidden"
           }}
         />
         <div
@@ -158,7 +577,8 @@ export function ReportChart(props: {
             marginTop: 12,
             borderRadius: 12,
             border: "1px solid var(--rp-border)",
-            background: "var(--rp-surface)"
+            background: "var(--rp-surface)",
+            overflow: "hidden"
           }}
         />
       </section>
@@ -175,130 +595,41 @@ export function ReportChart(props: {
         </p>
       ) : null}
 
-      <div style={{ width: "100%", height: 260 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={priceChartInitialDimension}>
-          <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
-            {squeezeShades.map((s, idx) => (
-              <ReferenceArea
-                key={`sq-${idx}`}
-                x1={s.x1}
-                x2={s.x2}
-                strokeOpacity={0}
-                fill={s.fill}
-                ifOverflow="hidden"
-              />
-            ))}
-            <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
-            <XAxis
-              hide
-              dataKey="t"
-              tickFormatter={formatEpochSeconds}
-              tick={{ fill: "var(--rp-muted)" }}
-            />
-            <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--rp-muted)" }} />
-            <Tooltip
-              labelFormatter={formatEpochSeconds}
-              contentStyle={{
-                background: "var(--rp-surface)",
-                border: "1px solid var(--rp-border)",
-                color: "var(--rp-text)"
-              }}
-            />
-
-            <Line type="monotone" dataKey="close" stroke="var(--rp-price)" dot={false} />
-            <Line type="monotone" dataKey="sma20" stroke="var(--rp-sma)" dot={false} />
-            <Line type="monotone" dataKey="ema20" stroke="var(--rp-ema)" dot={false} />
-
-            {series.bollinger20 ? (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="bbUpper"
-                  stroke="var(--rp-bollinger)"
-                  strokeDasharray="4 2"
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="bbLower"
-                  stroke="var(--rp-bollinger)"
-                  strokeDasharray="4 2"
-                  dot={false}
-                />
-              </>
-            ) : null}
-
-            {series.keltner20 ? (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="kcUpper"
-                  stroke="var(--rp-keltner)"
-                  strokeDasharray="2 2"
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="kcLower"
-                  stroke="var(--rp-keltner)"
-                  strokeDasharray="2 2"
-                  dot={false}
-                />
-              </>
-            ) : null}
-
-            {trade ? (
-              <ReferenceLine
-                y={trade.entry}
-                stroke={isBuy ? "var(--rp-bull)" : "var(--rp-bear)"}
-                strokeDasharray="4 2"
-                label={{ value: `Entry ${trade.entry.toFixed(2)}`, fill: "var(--rp-text)" }}
-              />
-            ) : null}
-            {trade ? (
-              <ReferenceLine
-                y={trade.stop}
-                stroke={"var(--rp-warn)"}
-                strokeDasharray="4 2"
-                label={{ value: `Stop ${trade.stop.toFixed(2)}`, fill: "var(--rp-text)" }}
-              />
-            ) : null}
-            {trade?.targets?.map((t, idx) => (
-              <ReferenceLine
-                key={`t-${idx}`}
-                y={t}
-                stroke={"var(--rp-target)"}
-                strokeDasharray="2 2"
-                label={{ value: `T${idx + 1} ${t.toFixed(2)}`, fill: "var(--rp-text)" }}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+      <div
+        ref={priceWrapperRef}
+        style={{
+          position: "relative",
+          width: "100%",
+          height: 260,
+          borderRadius: 12,
+          border: "1px solid var(--rp-border)",
+          background: "var(--rp-surface)",
+          overflow: "hidden"
+        }}
+      >
+        <div ref={priceChartRef} style={{ position: "absolute", inset: 0 }} />
+        <div ref={priceTooltipRef} style={{ position: "absolute", top: 10, left: 10 }} />
       </div>
 
       <p className="report-muted" style={{ margin: "8px 0 0" }}>
         <strong>Legend:</strong> {legendItems.join(" / ")}
       </p>
 
-      <div style={{ width: "100%", height: 200 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={rsiChartInitialDimension}>
-          <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
-            <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
-            <XAxis hide dataKey="t" tickFormatter={formatEpochSeconds} tick={{ fill: "var(--rp-muted)" }} />
-            <YAxis domain={[0, 100]} tick={{ fill: "var(--rp-muted)" }} />
-            <Tooltip
-              labelFormatter={formatEpochSeconds}
-              contentStyle={{
-                background: "var(--rp-surface)",
-                border: "1px solid var(--rp-border)",
-                color: "var(--rp-text)"
-              }}
-            />
-            <Line type="monotone" dataKey="rsi14" stroke="var(--rp-rsi)" dot={false} />
-            <ReferenceLine y={70} stroke="var(--rp-border)" strokeDasharray="2 4" />
-            <ReferenceLine y={30} stroke="var(--rp-border)" strokeDasharray="2 4" />
-          </LineChart>
-        </ResponsiveContainer>
+      <div
+        ref={rsiWrapperRef}
+        style={{
+          position: "relative",
+          width: "100%",
+          height: 200,
+          marginTop: 12,
+          borderRadius: 12,
+          border: "1px solid var(--rp-border)",
+          background: "var(--rp-surface)",
+          overflow: "hidden"
+        }}
+      >
+        <div ref={rsiChartRef} style={{ position: "absolute", inset: 0 }} />
+        <div ref={rsiTooltipRef} style={{ position: "absolute", top: 10, left: 10 }} />
       </div>
     </section>
   );
