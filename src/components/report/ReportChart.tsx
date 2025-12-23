@@ -550,10 +550,19 @@ export function ReportChart(props: {
           }
 
           const span = maxValue - minValue;
-          const pad =
-            span > 0
-              ? span * SPAN_PAD_RATIO
-              : Math.min(ZERO_SPAN_MAX_PAD, Math.max(ZERO_SPAN_MIN_PAD, Math.abs(maxValue) * ZERO_SPAN_PAD_RATIO));
+          let pad: number;
+          if (span > 0) {
+            pad = span * SPAN_PAD_RATIO;
+          } else {
+            const maxMagnitude = Math.max(Math.abs(minValue), Math.abs(maxValue));
+            pad =
+              maxMagnitude === 0
+                ? ZERO_SPAN_MIN_PAD
+                : Math.min(
+                    ZERO_SPAN_MAX_PAD,
+                    Math.max(ZERO_SPAN_MIN_PAD, maxMagnitude * ZERO_SPAN_PAD_RATIO)
+                  );
+          }
 
           return {
             ...base,
