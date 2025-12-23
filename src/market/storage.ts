@@ -241,7 +241,21 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * implied by the file path and omitted from the returned in-memory objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const stored = await readJson<StoredCnbcVideoArticle[]>(getNewsPath(date, "cnbc"));
+  const filePath = getNewsPath(date, "cnbc");
+  const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
+
+  for (const article of stored) {
+    if (article.symbol !== "cnbc" || article.provider !== "cnbc" || article.asOfDate !== date) {
+      throw new Error(
+        `[market:storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+          symbol: article.symbol,
+          provider: article.provider,
+          asOfDate: article.asOfDate
+        })}`
+      );
+    }
+  }
+
   return stored.map(({ symbol: _symbol, provider: _provider, ...article }) => article);
 }
 
