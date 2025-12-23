@@ -206,6 +206,7 @@ export class CnbcVideoProvider {
         continue;
       }
 
+      // CNBC videos are enriched via the snapshot playbook; keep these fields conservative here.
       const relatedTickers: string[] = [];
 
       const hype = scoreNewsHype(title);
