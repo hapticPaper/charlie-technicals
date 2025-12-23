@@ -11,9 +11,9 @@ import {
   YAxis
 } from "recharts";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { RECHARTS_INITIAL_DIMENSION } from "./rechartsConfig";
+import { getRechartsInitialDimension } from "./rechartsConfig";
 
 export type CnbcTopicHypeDatum = {
   topic: string;
@@ -24,6 +24,8 @@ export type CnbcTopicHypeDatum = {
 export function CnbcVideoWidgetClient(props: {
   data: CnbcTopicHypeDatum[];
 }) {
+  const initialDimension = useMemo(() => getRechartsInitialDimension(), []);
+
   // Recharts hydration workaround: render a placeholder until client mount.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -49,7 +51,7 @@ export function CnbcVideoWidgetClient(props: {
 
   return (
     <div style={{ width: "100%", height: 260 }}>
-      <ResponsiveContainer minWidth={0} initialDimension={RECHARTS_INITIAL_DIMENSION}>
+      <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
         <BarChart data={props.data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
           <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
           <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />

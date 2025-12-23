@@ -11,11 +11,11 @@ import {
   YAxis
 } from "recharts";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
-import { RECHARTS_INITIAL_DIMENSION } from "./rechartsConfig";
+import { getRechartsInitialDimension } from "./rechartsConfig";
 
 type ChartAnnotations = {
   trade?: TradePlan;
@@ -36,6 +36,9 @@ export function ReportChart(props: {
   annotations?: ChartAnnotations;
   showSignals?: boolean;
 }) {
+  const priceChartInitialDimension = useMemo(() => getRechartsInitialDimension(), []);
+  const rsiChartInitialDimension = useMemo(() => getRechartsInitialDimension(), []);
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -99,7 +102,7 @@ export function ReportChart(props: {
       ) : null}
 
       <div style={{ width: "100%", height: 260 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={RECHARTS_INITIAL_DIMENSION}>
+        <ResponsiveContainer minWidth={0} initialDimension={priceChartInitialDimension}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis
@@ -152,7 +155,7 @@ export function ReportChart(props: {
       </div>
 
       <div style={{ width: "100%", height: 200 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={RECHARTS_INITIAL_DIMENSION}>
+        <ResponsiveContainer minWidth={0} initialDimension={rsiChartInitialDimension}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis hide dataKey="t" tickFormatter={formatEpochSeconds} tick={{ fill: "var(--rp-muted)" }} />
