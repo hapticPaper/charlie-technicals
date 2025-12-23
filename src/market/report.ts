@@ -1210,6 +1210,7 @@ function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<Ma
 } {
   let breadthUp = 0;
   let breadthDown = 0;
+  let breadthFlat = 0;
   let breadthTotal = 0;
   let breakoutsUp = 0;
   let breakoutsDown = 0;
@@ -1230,6 +1231,8 @@ function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<Ma
         breadthUp += 1;
       } else if (ret < 0) {
         breadthDown += 1;
+      } else {
+        breadthFlat += 1;
       }
     }
 
@@ -1267,9 +1270,23 @@ function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<Ma
       : null;
 
   const regimeParts: string[] = [];
-  if (breadthPct !== null) {
+  if (breadthTotal > 0) {
+    const breadthPercentsExact = [breadthUp, breadthDown, breadthFlat].map((count) => (count * 100) / breadthTotal);
+    const breadthPercentsRounded = breadthPercentsExact.map((pct) => Math.floor(pct));
+    const breadthPercentsRemaining = 100 - breadthPercentsRounded.reduce((sum, pct) => sum + pct, 0);
+
+    const breadthPercentsByRemainder = breadthPercentsExact
+      .map((pct, idx) => ({ idx, remainder: pct - Math.floor(pct) }))
+      .sort((a, b) => b.remainder - a.remainder || a.idx - b.idx);
+
+    for (let i = 0; i < breadthPercentsRemaining && i < breadthPercentsByRemainder.length; i += 1) {
+      const idx = breadthPercentsByRemainder[i].idx;
+      breadthPercentsRounded[idx] += 1;
+    }
+
+    const [breadthUpPct, breadthDownPct, breadthFlatPct] = breadthPercentsRounded;
     regimeParts.push(
-      `breadth ${(breadthPct * 100).toFixed(0)}% up / ${((breadthDown / breadthTotal) * 100).toFixed(0)}% down (${breadthUp}/${breadthDown}/${breadthTotal})`
+      `breadth ${breadthUpPct}% up / ${breadthDownPct}% down / ${breadthFlatPct}% flat (${breadthUp}/${breadthDown}/${breadthFlat}/${breadthTotal})`
     );
   }
   if (vixClose !== null) {
