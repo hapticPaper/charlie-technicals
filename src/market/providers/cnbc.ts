@@ -103,14 +103,16 @@ function extractTickersFromTitle(title: string): string[] {
     if (trimmed === "") {
       return;
     }
-    if (drop.has(trimmed)) {
+
+    const upper = trimmed.toUpperCase();
+    if (drop.has(upper)) {
       return;
     }
-    if (seen.has(trimmed)) {
+    if (seen.has(upper)) {
       return;
     }
-    seen.add(trimmed);
-    out.push(trimmed);
+    seen.add(upper);
+    out.push(upper);
   };
 
   // Strong signals: explicit ticker markup.
