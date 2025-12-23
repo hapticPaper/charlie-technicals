@@ -57,22 +57,32 @@ export type MarketNewsSnapshot = {
 *
 * Stored as a flat JSON array of `StoredCnbcVideoArticle` (no wrapper object).
 *
+* Historically, snapshots stored `symbol: "cnbc"` on every record; the read path
+* normalizes that to `null`.
+*
+* `symbol` is the primary ticker symbol for the video when exactly one can be inferred;
+* otherwise it's `null`.
+*
 * Changes here are backwards-incompatible with existing snapshot files.
 */
 export type StoredCnbcVideoArticle = MarketNewsArticle & {
-  symbol: string;
   provider: string;
   fetchedAt: string;
   asOfDate: string;
+  symbol: string | null;
 };
 
 /**
-* In-memory shape for CNBC video articles. `symbol` and `provider` are implied by the
-* file path and are omitted here.
+* In-memory shape for CNBC video articles.
+*
+* `provider` is implied by the file path and omitted here.
+* `symbol` is the primary ticker symbol for the video when exactly one can be inferred;
+* otherwise it's `null`.
 */
 export type CnbcVideoArticle = MarketNewsArticle & {
   fetchedAt: string;
   asOfDate: string;
+  symbol: string | null;
 };
 
 export type SignalHit = {
@@ -87,12 +97,44 @@ export type MacdSeries = {
   histogram: Array<number | null>;
 };
 
+export type BollingerBandsSeries = {
+  middle: Array<number | null>;
+  upper: Array<number | null>;
+  lower: Array<number | null>;
+};
+
+export type KeltnerChannelsSeries = {
+  middle: Array<number | null>;
+  upper: Array<number | null>;
+  lower: Array<number | null>;
+};
+
+export const SQUEEZE_STATES = ["on", "off", "neutral"] as const;
+
+export type SqueezeState = (typeof SQUEEZE_STATES)[number];
+
+export type TtmSqueezeSeries = {
+  bollinger: BollingerBandsSeries;
+  keltner: KeltnerChannelsSeries;
+  squeezeOn: Array<boolean | null>;
+  squeezeOff: Array<boolean | null>;
+  squeezeState: Array<SqueezeState | null>;
+  momentum: Array<number | null>;
+};
+
+export type IndicatorSeries =
+  | Array<number | null>
+  | MacdSeries
+  | BollingerBandsSeries
+  | KeltnerChannelsSeries
+  | TtmSqueezeSeries;
+
 export type AnalyzedSeries = {
   symbol: string;
   interval: MarketInterval;
   analyzedAt: string;
   bars: MarketBar[];
-  indicators: Record<string, Array<number | null> | MacdSeries>;
+  indicators: Record<string, IndicatorSeries>;
   signals: SignalHit[];
 };
 
@@ -106,6 +148,10 @@ export type ReportIntervalSeries = {
   sma20: Array<number | null>;
   ema20: Array<number | null>;
   rsi14: Array<number | null>;
+  atr14?: Array<number | null>;
+  bollinger20?: BollingerBandsSeries;
+  keltner20?: KeltnerChannelsSeries;
+  ttmSqueeze20?: TtmSqueezeSeries;
   signals: SignalHit[];
 };
 

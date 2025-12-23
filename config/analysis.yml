@@ -1,8 +1,12 @@
 ## Human-editable analysis rules.
 ##
 ## Supported indicator types:
-## - sma, ema, rsi: { id, type, period, source: close }
+## - sma, ema, rsi, stdev: { id, type, period, source: close }
 ## - macd: { id, type, fastPeriod, slowPeriod, signalPeriod, source: close }
+## - atr: { id, type, period, source: bars }
+## - bollingerBands: { id, type, period, stdevMult, source: close }
+## - keltnerChannels: { id, type, period, atrMult, source: bars }
+## - ttmSqueeze: { id, type, period, bbMult, kcMult, source: bars }
 ##
 ## Supported signal ops:
 ## - lt / gt: { indicator, op, value }
@@ -37,6 +41,30 @@ indicators:
     slowPeriod: 26
     signalPeriod: 9
     source: close
+
+  - id: atr14
+    type: atr
+    period: 14
+    source: bars
+
+  - id: bollinger20
+    type: bollingerBands
+    period: 20
+    stdevMult: 2
+    source: close
+
+  - id: keltner20
+    type: keltnerChannels
+    period: 20
+    atrMult: 1.5
+    source: bars
+
+  - id: ttmSqueeze20
+    type: ttmSqueeze
+    period: 20
+    bbMult: 2
+    kcMult: 1.5
+    source: bars
 
 signals:
   - id: rsi-oversold
