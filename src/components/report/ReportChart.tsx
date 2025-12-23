@@ -540,14 +540,18 @@ export function ReportChart(props: {
 
           let minValue = baseMin;
           let maxValue = baseMax;
+          let touchesRangeEdge = false;
 
           for (const value of tradePrices) {
+            if (value <= baseMin || value >= baseMax) {
+              touchesRangeEdge = true;
+            }
             minValue = Math.min(minValue, value);
             maxValue = Math.max(maxValue, value);
           }
 
-          if (minValue === baseMin && maxValue === baseMax) {
-            // Only adjust the y-range when trade levels extend beyond the candle range.
+          if (minValue === baseMin && maxValue === baseMax && !touchesRangeEdge) {
+            // Only adjust the y-range when trade levels extend beyond (or touch) the candle range.
             return base;
           }
 
