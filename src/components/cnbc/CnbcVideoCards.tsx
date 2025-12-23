@@ -6,15 +6,16 @@ import type { CnbcVideoCard } from "./types";
 
 const CNBC_TIME_ZONE = "America/New_York";
 
-function safeTimestamp(value: string): number {
+function safeTimestamp(value: string): number | null {
   const ts = Date.parse(value);
-  return Number.isFinite(ts) ? ts : 0;
+  return Number.isFinite(ts) ? ts : null;
 }
 
 type PublishedAtLabelMode = "time" | "day" | "dayWithYear";
 
 function ymdKeyInTz(ts: number): string | null {
-  if (!Number.isFinite(ts) || ts <= 0) {
+  // Assumes `month` and `day` are emitted as 2-digit values by Intl for this locale.
+  if (!Number.isFinite(ts)) {
     return null;
   }
 
@@ -37,6 +38,9 @@ function ymdKeyInTz(ts: number): string | null {
 }
 
 function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
+  // If all timestamps are the same calendar day in the CNBC time zone, show times.
+  // If multiple days but all within the same year, show MM/DD.
+  // If dates span multiple years, show MM/DD/YYYY.
   const dayKeys = timestamps.map((ts) => ymdKeyInTz(ts)).filter((key): key is string => Boolean(key));
   if (dayKeys.length === 0) {
     return "day";
@@ -57,13 +61,15 @@ function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
 
 function formatPublishedAt(value: string, mode: PublishedAtLabelMode): string {
   const ts = safeTimestamp(value);
-  if (!ts) {
+  if (ts === null) {
     return "";
   }
 
+  const base: Intl.DateTimeFormatOptions = { timeZone: CNBC_TIME_ZONE };
+
   if (mode === "time") {
     return new Intl.DateTimeFormat("en-US", {
-      timeZone: CNBC_TIME_ZONE,
+      ...base,
       hour: "2-digit",
       minute: "2-digit"
     }).format(ts);
@@ -71,14 +77,14 @@ function formatPublishedAt(value: string, mode: PublishedAtLabelMode): string {
 
   if (mode === "day") {
     return new Intl.DateTimeFormat("en-US", {
-      timeZone: CNBC_TIME_ZONE,
+      ...base,
       month: "2-digit",
       day: "2-digit"
     }).format(ts);
   }
 
   return new Intl.DateTimeFormat("en-US", {
-    timeZone: CNBC_TIME_ZONE,
+    ...base,
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
@@ -115,7 +121,9 @@ export function CnbcVideoCards(props: {
 }) {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
-  const publishedAtMode = getPublishedAtLabelMode(items.map((video) => safeTimestamp(video.publishedAt)).filter((ts) => ts > 0));
+  const publishedAtMode = getPublishedAtLabelMode(
+    items.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
+  );
 
   if (items.length === 0) {
     return <p className="report-muted">No videos.</p>;
