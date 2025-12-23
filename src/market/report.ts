@@ -1124,6 +1124,7 @@ function buildSummaries(
   }
 
   const breadthPct = breadthTotal > 0 ? breadthUp / breadthTotal : null;
+  const breadthFlat = breadthTotal - breadthUp - breadthDown;
 
   dollarVolumes.sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || a.symbol.localeCompare(b.symbol));
   const totalDollarVolume = dollarVolumes.reduce((sum, v) => sum + v.dollarVolume1d, 0);
@@ -1140,9 +1141,12 @@ function buildSummaries(
       : null;
 
   const regimeParts: string[] = [];
-  if (breadthPct !== null) {
+  if (breadthTotal > 0) {
+    const breadthUpPct = breadthUp / breadthTotal;
+    const breadthDownPct = breadthDown / breadthTotal;
+    const breadthFlatPct = breadthFlat / breadthTotal;
     regimeParts.push(
-      `breadth ${(breadthPct * 100).toFixed(0)}% up / ${((breadthDown / breadthTotal) * 100).toFixed(0)}% down (${breadthUp}/${breadthDown}/${breadthTotal})`
+      `breadth ${(breadthUpPct * 100).toFixed(0)}% up / ${(breadthDownPct * 100).toFixed(0)}% down / ${(breadthFlatPct * 100).toFixed(0)}% flat (${breadthUp}/${breadthDown}/${breadthFlat}/${breadthTotal})`
     );
   }
   if (vixClose !== null) {
