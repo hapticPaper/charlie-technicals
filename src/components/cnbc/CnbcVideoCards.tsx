@@ -34,7 +34,7 @@ function ymdKeyInTz(ts: number): string | null {
     return null;
   }
 
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  return `${year}-${month}-${day}`;
 }
 
 function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
@@ -135,10 +135,12 @@ export function CnbcVideoCards(props: {
 }) {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
+
+  // Pick the label granularity based on the range of videos the user is seeing.
   const publishedAtMode = getPublishedAtLabelMode(
     items
       .map((video) => safeTimestamp(video.publishedAt))
-      .filter((ts): ts is number => ts !== null && Number.isFinite(ts))
+      .filter((ts): ts is number => ts !== null)
   );
 
   if (items.length === 0) {
