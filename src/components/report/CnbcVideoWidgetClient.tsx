@@ -17,8 +17,8 @@ import { CnbcVideoCards } from "../cnbc/CnbcVideoCards";
 import type { CnbcVideoCard } from "../cnbc/types";
 import { getRechartsInitialDimension } from "./rechartsConfig";
 
-type BarHoverEvent = {
-  activePayload?: Array<{ payload?: { topic?: unknown } }>;
+type BarHoverPayload = {
+  payload?: { topic?: unknown };
 };
 
 function getActiveBarTopic(evt: unknown): string | null {
@@ -31,7 +31,7 @@ function getActiveBarTopic(evt: unknown): string | null {
     return null;
   }
 
-  const topic = (activePayload[0] as BarHoverEvent["activePayload"][number] | undefined)?.payload?.topic;
+  const topic = (activePayload[0] as BarHoverPayload | undefined)?.payload?.topic;
   return typeof topic === "string" ? topic : null;
 }
 
