@@ -16,7 +16,7 @@ import type { TooltipContentProps } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
 import { CnbcVideoCards } from "./CnbcVideoCards";
-import type { CnbcVideoCard } from "./types";
+import type { CnbcVideosByDate } from "./types";
 
 export type CnbcTopicTrendDatum = {
   date: string;
@@ -198,7 +198,7 @@ function TopicTooltip(props: {
 export function CnbcTopicTrendWidgetClient(props: {
   data: CnbcTopicTrendDatum[];
   topics: string[];
-  videosByDate: Record<string, CnbcVideoCard[]>;
+  videosByDate: CnbcVideosByDate;
 }) {
   // Recharts hydration workaround: render a placeholder until client mount.
   const [mounted, setMounted] = useState(false);
@@ -232,14 +232,43 @@ export function CnbcTopicTrendWidgetClient(props: {
   const selectedDate = pinned.date ?? preview.date;
   const selectedTopic = pinned.topic ?? preview.topic;
 
+  // Keep the overlay totals aligned with the chart aggregation for the selected date/topic.
+  const selectedTotal = useMemo(() => {
+    if (!selectedDate || !selectedTopic) {
+      return null;
+    }
+
+    const row = props.data.find((entry) => entry.date === selectedDate);
+    const total = row?.values[selectedTopic];
+    return typeof total === "number" && Number.isFinite(total) ? total : null;
+  }, [props.data, selectedDate, selectedTopic]);
+
   const activeVideos = useMemo(() => {
     if (!selectedDate || !selectedTopic) {
       return [];
     }
 
-    const videos = props.videosByDate[selectedDate] ?? [];
-    return videos.filter((video) => video.topic === selectedTopic);
+    const byDate = props.videosByDate[selectedDate];
+    if (!byDate) {
+      return [];
+    }
+
+    // Missing (date, topic) pairs are treated as "no videos" for that selection.
+    return byDate[selectedTopic] ?? [];
   }, [props.videosByDate, selectedDate, selectedTopic]);
+
+  const videoCountLabel = useMemo(() => {
+    const shown = activeVideos.length;
+    if (selectedTotal === null || selectedTotal <= 0) {
+      return String(shown);
+    }
+
+    if (shown < selectedTotal) {
+      return `${shown} of ${selectedTotal} (showing most recent)`;
+    }
+
+    return `${shown} of ${selectedTotal}`;
+  }, [activeVideos.length, selectedTotal]);
 
   if (!mounted) {
     return (
@@ -394,7 +423,7 @@ export function CnbcTopicTrendWidgetClient(props: {
 
         {selectedDate && selectedTopic ? (
           <p className="report-muted">
-            <strong>Videos:</strong> {activeVideos.length} ({selectedDate} · {selectedTopic})
+            <strong>Videos:</strong> {videoCountLabel} ({selectedDate} · {selectedTopic})
             {pinned.date || pinned.topic ? " (pinned)" : null}
           </p>
         ) : null}

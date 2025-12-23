@@ -1,7 +1,7 @@
 import { listCnbcVideoDates, readCnbcVideoArticles } from "../../market/storage";
 import type { CnbcVideoArticle } from "../../market/types";
 
-import type { CnbcVideoCard } from "./types";
+import type { CnbcVideosByDate, CnbcVideosByTopic } from "./types";
 import { normalizeCnbcTopic, toCnbcVideoCard } from "./transform";
 import { CnbcTopicTrendWidgetClient, type CnbcTopicTrendDatum } from "./CnbcTopicTrendWidgetClient";
 
@@ -11,7 +11,9 @@ const MAX_NON_EMPTY_DAYS = 30;
 // Cap how far back we scan, to keep the chart "recent" and avoid unbounded reads.
 const MAX_SCAN_DAYS = MAX_NON_EMPTY_DAYS * 3;
 const MAX_TOPICS = 8;
-const MAX_VIDEOS_PER_DAY = 10;
+// Cap the number of most-recent videos we keep per (day, topic) for the overlay.
+// Older videos beyond this cap are intentionally omitted to keep the page payload small.
+const MAX_VIDEOS_PER_TOPIC_PER_DAY = 8;
 const READ_BATCH_SIZE = 10;
 
 function safePublishedTs(value: string): number {
@@ -103,15 +105,20 @@ export async function CnbcTopicTrendWidget() {
   const includedTopics = new Set(topTopics);
 
   const data: CnbcTopicTrendDatum[] = [];
-  const videosByDate: Record<string, CnbcVideoCard[]> = {};
+  const videosByDate: CnbcVideosByDate = {};
 
   for (const { date, articles } of dayArticles) {
+    const normalizedArticles = articles.map((article) => ({
+      article,
+      topic: normalizeCnbcTopic(article),
+      publishedTs: safePublishedTs(article.publishedAt)
+    }));
+
     const values: Record<string, number> = {};
 
-    for (const article of articles) {
-      const topic = normalizeCnbcTopic(article);
-      if (includedTopics.has(topic)) {
-        values[topic] = (values[topic] ?? 0) + 1;
+    for (const entry of normalizedArticles) {
+      if (includedTopics.has(entry.topic)) {
+        values[entry.topic] = (values[entry.topic] ?? 0) + 1;
       }
     }
 
@@ -121,12 +128,45 @@ export async function CnbcTopicTrendWidget() {
 
     data.push({ date, values });
 
-    videosByDate[date] = articles
-      .slice()
-      .map((article) => ({ article, ts: safePublishedTs(article.publishedAt) }))
-      .sort((a, b) => b.ts - a.ts)
-      .map((entry) => toCnbcVideoCard(entry.article))
-      .slice(0, MAX_VIDEOS_PER_DAY);
+    // The overlay shows the most recent videos per (day, topic), so topic selection always
+    // lines up with the same `normalizeCnbcTopic()` keys used for chart aggregation.
+    const targets = new Map<string, number>();
+    let remaining = 0;
+    for (const topic of topTopics) {
+      const count = values[topic] ?? 0;
+      const target = Math.min(count, MAX_VIDEOS_PER_TOPIC_PER_DAY);
+      if (target > 0) {
+        targets.set(topic, target);
+        remaining += target;
+      }
+    }
+
+    const grouped: CnbcVideosByTopic = {};
+
+    const sorted = normalizedArticles.slice().sort((a, b) => b.publishedTs - a.publishedTs);
+
+    // `remaining` tracks how many videos we still need globally across all topics.
+    // We decrement it only when we successfully add a video to a topic bucket.
+    for (const { article, topic } of sorted) {
+      if (remaining === 0) {
+        break;
+      }
+
+      const target = targets.get(topic);
+      if (!target) {
+        continue;
+      }
+
+      const bucket = (grouped[topic] ??= []);
+      if (bucket.length >= target) {
+        continue;
+      }
+
+      bucket.push(toCnbcVideoCard(article));
+      remaining -= 1;
+    }
+
+    videosByDate[date] = grouped;
   }
 
   if (topTopics.length === 0) {
