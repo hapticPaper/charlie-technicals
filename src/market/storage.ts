@@ -326,6 +326,8 @@ export async function listReportDates(): Promise<string[]> {
 const MIN_CNBC_VIDEO_YEAR = 2000;
 const MAX_FUTURE_YEAR_OFFSET = 1;
 
+let warnedInvalidCnbcVideoDates = false;
+
 function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
@@ -425,7 +427,8 @@ export async function listCnbcVideoDates(): Promise<string[]> {
     const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${dir} (expected YYYYMMDD.json)`;
     if (process.env.NODE_ENV !== "production") {
       console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
-    } else {
+    } else if (!warnedInvalidCnbcVideoDates) {
+      warnedInvalidCnbcVideoDates = true;
       const sample = invalidDatesSample[0];
       console.warn(sample ? `${message}: e.g. ${sample}` : message);
     }
