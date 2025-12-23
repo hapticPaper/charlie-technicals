@@ -114,9 +114,10 @@ export function CnbcTopicTrendWidgetClient(props: {
               const label = evt?.activeLabel;
               if (typeof label === "string") {
                 setActiveDate((prev) => (prev === label ? prev : label));
+                return;
               }
             }}
-            onMouseLeave={() => setActiveDate(null)}
+            onMouseLeave={() => setActiveDate((prev) => (prev === null ? prev : null))}
           >
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fill: "var(--rp-muted)" }} />

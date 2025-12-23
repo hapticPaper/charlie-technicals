@@ -101,7 +101,7 @@ export function CnbcVideoWidgetClient(props: {
               }
               setActiveTopic((prev) => (prev === nextTopic ? prev : nextTopic));
             }}
-            onMouseLeave={() => setActiveTopic(null)}
+            onMouseLeave={() => setActiveTopic((prev) => (prev === null ? prev : null))}
           >
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />
