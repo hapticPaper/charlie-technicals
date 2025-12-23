@@ -283,6 +283,10 @@ function trueRange(bars: MarketBar[]): Array<number | null> {
       continue;
     }
 
+    if (highValue === null && lowValue === null) {
+      continue;
+    }
+
     // If the feed only provides one bound (high or low), treat the missing
     // bound as `prevClose` and fall back to `abs(bound - prevClose)`.
     // This requires `prevClose` to be present.
