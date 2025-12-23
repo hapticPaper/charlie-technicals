@@ -554,7 +554,8 @@ export function ReportChart(props: {
           const span = maxValue - minValue;
           let pad: number;
           if (span > 0) {
-            pad = span * TRADE_AUTOSCALE_PAD.spanPadRatio;
+            const rawPad = span * TRADE_AUTOSCALE_PAD.spanPadRatio;
+            pad = Math.max(rawPad, TRADE_AUTOSCALE_PAD.zeroSpanMinPad);
           } else {
             const maxMagnitude = Math.max(Math.abs(minValue), Math.abs(maxValue));
             pad =
