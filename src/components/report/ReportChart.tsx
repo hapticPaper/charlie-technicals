@@ -199,8 +199,8 @@ function toHeikinAshiCandles(args: {
       continue;
     }
 
-    const curHaClose = (o + h + l + c) / 4;
-    const curHaOpen =
+    const curHaClose: number = (o + h + l + c) / 4;
+    const curHaOpen: number =
       prevHaOpen !== null && prevHaClose !== null ? (prevHaOpen + prevHaClose) / 2 : (o + c) / 2;
     const curHaHigh = Math.max(h, curHaOpen, curHaClose);
     const curHaLow = Math.min(l, curHaOpen, curHaClose);
