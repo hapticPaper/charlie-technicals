@@ -68,6 +68,14 @@ export function CnbcTopicTrendWidgetClient(props: {
     return props.topics.map((topic) => ({ topic, chartKey: toChartTopicKey(topic) }));
   }, [props.topics]);
 
+  const topicByChartKey = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    for (const { topic, chartKey } of chartTopics) {
+      mapping[chartKey] = topic;
+    }
+    return mapping;
+  }, [chartTopics]);
+
   const chartData = useMemo<CnbcTopicTrendChartRow[]>(() => {
     return props.data.map((row) => {
       const chartRow: CnbcTopicTrendChartRow = { date: row.date };
@@ -129,6 +137,10 @@ export function CnbcTopicTrendWidgetClient(props: {
                 color: "var(--rp-text)"
               }}
               labelFormatter={formatDateTick}
+              formatter={(value, name) => {
+                const key = typeof name === "string" ? name : String(name);
+                return [value, topicByChartKey[key] ?? key];
+              }}
             />
             <Legend />
             {chartTopics.map(({ topic, chartKey }, idx) => (
