@@ -1153,10 +1153,7 @@ function buildSummaries(
       .sort((a, b) => b.remainder - a.remainder || a.idx - b.idx);
 
     for (let i = 0; i < breadthPercentsRemaining && i < breadthPercentsByRemainder.length; i += 1) {
-      const idx = breadthPercentsByRemainder[i]?.idx;
-      if (idx === undefined) {
-        continue;
-      }
+      const idx = breadthPercentsByRemainder[i].idx;
       breadthPercentsRounded[idx] += 1;
     }
 
