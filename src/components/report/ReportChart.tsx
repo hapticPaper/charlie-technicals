@@ -28,11 +28,12 @@ const VOLUME_SCALE_ID = "volume" as const;
 const RSI_SCALE_ID = "rsi" as const;
 
 // Trade-level autoscaling padding when trade levels extend the candle range.
-// `zeroSpan*` is used for degenerate ranges (span 0) to avoid a flat-looking chart.
+// `minPad` is a general floor so extremely small ranges don't look flat.
+// `zeroSpan*` is used for degenerate ranges (span 0).
 const TRADE_AUTOSCALE_PAD = {
   spanPadRatio: 0.02,
   zeroSpanPadRatio: 0.002,
-  zeroSpanMinPad: 0.001
+  minPad: 0.001
 } as const;
 
 function formatChartTime(time: Time | undefined): string {
@@ -555,13 +556,13 @@ export function ReportChart(props: {
           let pad: number;
           if (span > 0) {
             const rawPad = span * TRADE_AUTOSCALE_PAD.spanPadRatio;
-            pad = Math.max(rawPad, TRADE_AUTOSCALE_PAD.zeroSpanMinPad);
+            pad = Math.max(rawPad, TRADE_AUTOSCALE_PAD.minPad);
           } else {
             const maxMagnitude = Math.max(Math.abs(minValue), Math.abs(maxValue));
             pad =
               maxMagnitude === 0
-                ? TRADE_AUTOSCALE_PAD.zeroSpanMinPad
-                : Math.max(TRADE_AUTOSCALE_PAD.zeroSpanMinPad, maxMagnitude * TRADE_AUTOSCALE_PAD.zeroSpanPadRatio);
+                ? TRADE_AUTOSCALE_PAD.minPad
+                : Math.max(TRADE_AUTOSCALE_PAD.minPad, maxMagnitude * TRADE_AUTOSCALE_PAD.zeroSpanPadRatio);
           }
 
           return {
