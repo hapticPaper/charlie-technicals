@@ -16,12 +16,31 @@ import { useEffect, useMemo, useState } from "react";
 import { CnbcVideoCards } from "../cnbc/CnbcVideoCards";
 import type { CnbcVideoCard } from "../cnbc/types";
 
-type BarHoverEvent = {
-  activePayload?: Array<{ payload?: { topic?: unknown } }>;
-} | null | undefined;
+function getActiveTopic(evt: unknown): string | null {
+  if (typeof evt !== "object" || evt === null) {
+    return null;
+  }
 
-function getActiveTopic(evt: BarHoverEvent): string | null {
-  const topic = evt?.activePayload?.[0]?.payload?.topic;
+  if (!("activePayload" in evt)) {
+    return null;
+  }
+
+  const { activePayload } = evt as { activePayload?: unknown };
+  if (!Array.isArray(activePayload)) {
+    return null;
+  }
+
+  const first = activePayload[0];
+  if (typeof first !== "object" || first === null || !("payload" in first)) {
+    return null;
+  }
+
+  const { payload } = first as { payload?: unknown };
+  if (typeof payload !== "object" || payload === null || !("topic" in payload)) {
+    return null;
+  }
+
+  const { topic } = payload as { topic?: unknown };
   return typeof topic === "string" ? topic : null;
 }
 
@@ -76,7 +95,10 @@ export function CnbcVideoWidgetClient(props: {
             data={props.data}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
-              const nextTopic = getActiveTopic(evt as BarHoverEvent);
+              const nextTopic = getActiveTopic(evt);
+              if (!nextTopic) {
+                return;
+              }
               setActiveTopic((prev) => (prev === nextTopic ? prev : nextTopic));
             }}
             onMouseLeave={() => setActiveTopic(null)}
