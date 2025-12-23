@@ -97,7 +97,10 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    const articleAsOfDate = normalizeCnbcAsOfDate(article.asOfDate);
+    let articleAsOfDate = article.asOfDate;
+    if (articleAsOfDate !== asOfDate) {
+      articleAsOfDate = normalizeCnbcAsOfDate(articleAsOfDate);
+    }
 
     if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
       throw new Error(
