@@ -138,26 +138,12 @@ function buildTradePlan(series15m: AnalyzedSeries, side: TradeSide): TradePlan {
   return { side, entry, stop, targets };
 }
 
-function toNullableNumber(value: unknown, context: string): number | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  throw new Error(`Invalid ${context} value: expected number|null, got ${typeof value}`);
+function toNullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function toNullableBoolean(value: unknown, context: string): boolean | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  throw new Error(`Invalid ${context} value: expected boolean|null, got ${typeof value}`);
+function toNullableBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -171,42 +157,81 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
   const sliceLength = slicedBars.length;
 
   function sliceNullableNumberSeries(value: unknown, context: string): Array<number | null> {
+    const fallback = new Array(sliceLength).fill(null);
+
     if (!Array.isArray(value)) {
-      throw new Error(`Invalid ${context} series: expected array`);
+      console.warn(`Invalid ${context} series: expected array`);
+      return fallback;
     }
     if (value.length !== bars.length) {
-      throw new Error(
-        `Invalid ${context} series length: expected ${bars.length}, got ${value.length}`
-      );
+      console.warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return fallback;
     }
 
-    return slicedBars.map((_, idx) => {
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
       const i = startIndex + idx;
-      return toNullableNumber(value[i], `${context}[${i}]`);
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v !== "number") {
+        invalidCount += 1;
+        return null;
+      }
+
+      return toNullableNumber(v);
     });
+
+    if (invalidCount > 0) {
+      console.warn(`Invalid ${context} series values: coerced ${invalidCount} non-number items to null`);
+    }
+
+    return out;
   }
 
   function sliceNullableBoolSeries(value: unknown, context: string): Array<boolean | null> {
+    const fallback = new Array(sliceLength).fill(null) as Array<boolean | null>;
+
     if (!Array.isArray(value)) {
-      throw new Error(`Invalid ${context} series: expected array`);
+      console.warn(`Invalid ${context} series: expected array`);
+      return fallback;
     }
     if (value.length !== bars.length) {
-      throw new Error(
-        `Invalid ${context} series length: expected ${bars.length}, got ${value.length}`
-      );
+      console.warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return fallback;
     }
 
-    return slicedBars.map((_, idx) => {
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
       const i = startIndex + idx;
-      return toNullableBoolean(value[i], `${context}[${i}]`);
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+
+      if (typeof v !== "boolean") {
+        invalidCount += 1;
+        return null;
+      }
+
+      return toNullableBoolean(v);
     });
+
+    if (invalidCount > 0) {
+      console.warn(`Invalid ${context} series values: coerced ${invalidCount} non-boolean items to null`);
+    }
+
+    return out;
   }
 
   type ChannelSeries = { middle: Array<number | null>; upper: Array<number | null>; lower: Array<number | null> };
 
-  function sliceChannelSeries(value: unknown, context: string): ChannelSeries {
+  function sliceChannelSeries(value: unknown, context: string): ChannelSeries | undefined {
     if (!isRecord(value)) {
-      throw new Error(`Invalid ${context} series: expected object`);
+      console.warn(`Invalid ${context} series: expected object`);
+      return undefined;
     }
 
     return {
@@ -216,14 +241,21 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     };
   }
 
-  function sliceTtmSqueezeSeries(value: unknown, context: string): TtmSqueezeSeries {
+  function sliceTtmSqueezeSeries(value: unknown, context: string): TtmSqueezeSeries | undefined {
     if (!isRecord(value)) {
-      throw new Error(`Invalid ${context} series: expected object`);
+      console.warn(`Invalid ${context} series: expected object`);
+      return undefined;
+    }
+
+    const bollinger = sliceChannelSeries(value.bollinger, `${context}.bollinger`);
+    const keltner = sliceChannelSeries(value.keltner, `${context}.keltner`);
+    if (!bollinger || !keltner) {
+      return undefined;
     }
 
     return {
-      bollinger: sliceChannelSeries(value.bollinger, `${context}.bollinger`),
-      keltner: sliceChannelSeries(value.keltner, `${context}.keltner`),
+      bollinger,
+      keltner,
       squeezeOn: sliceNullableBoolSeries(value.squeezeOn, `${context}.squeezeOn`),
       squeezeOff: sliceNullableBoolSeries(value.squeezeOff, `${context}.squeezeOff`),
       momentum: sliceNullableNumberSeries(value.momentum, `${context}.momentum`)
@@ -250,11 +282,15 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
   const bollingerOut =
     analyzed.indicators.bollinger20 === undefined
       ? undefined
-      : (sliceChannelSeries(analyzed.indicators.bollinger20, "bollinger20") as BollingerBandsSeries);
+      : (sliceChannelSeries(analyzed.indicators.bollinger20, "bollinger20") as
+          | BollingerBandsSeries
+          | undefined);
   const keltnerOut =
     analyzed.indicators.keltner20 === undefined
       ? undefined
-      : (sliceChannelSeries(analyzed.indicators.keltner20, "keltner20") as KeltnerChannelsSeries);
+      : (sliceChannelSeries(analyzed.indicators.keltner20, "keltner20") as
+          | KeltnerChannelsSeries
+          | undefined);
   const ttmOut =
     analyzed.indicators.ttmSqueeze20 === undefined
       ? undefined
