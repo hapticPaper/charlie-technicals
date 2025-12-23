@@ -87,11 +87,13 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
               const nextTopic = getActiveBarTopic(evt);
-              if (!nextTopic) {
-                return;
-              }
+              setActiveTopic((prev) => {
+                if (!nextTopic) {
+                  return prev === null ? prev : null;
+                }
 
-              setActiveTopic((prev) => (prev === nextTopic ? prev : nextTopic));
+                return prev === nextTopic ? prev : nextTopic;
+              });
             }}
             onMouseLeave={() => setActiveTopic((prev) => (prev === null ? prev : null))}
           >
