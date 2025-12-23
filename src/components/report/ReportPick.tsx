@@ -16,6 +16,11 @@ function formatPrice(value: number, reference: number): string {
   return value.toFixed(5);
 }
 
+function formatSignedPrice(value: number, reference: number): string {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${formatPrice(value, reference)}`;
+}
+
 function formatTrade(trade: TradePlan): {
   sideLabel: string;
   entry: string;
@@ -83,6 +88,24 @@ export function ReportPick(props: { symbol: string }) {
           <div className={styles.kLabel}>Targets</div>
           <div className={styles.kValue}>{formatted.targets.join(" / ")}</div>
         </div>
+
+        {typeof pick.atr14_1d === "number" && Number.isFinite(pick.atr14_1d) ? (
+          <div className={styles.kv}>
+            <div className={styles.kLabel}>ATR14 (1d)</div>
+            <div className={styles.kValue}>{formatPrice(pick.atr14_1d, pick.trade.entry)}</div>
+          </div>
+        ) : null}
+        {typeof pick.move1d === "number" && Number.isFinite(pick.move1d) ? (
+          <div className={styles.kv}>
+            <div className={styles.kLabel}>1d move</div>
+            <div className={styles.kValue}>
+              {formatSignedPrice(pick.move1d, pick.trade.entry)}
+              {typeof pick.move1dAtr14 === "number" && Number.isFinite(pick.move1dAtr14)
+                ? ` (${Math.abs(pick.move1dAtr14).toFixed(1)} ATR)`
+                : ""}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {pick.rationale.length > 0 ? (
