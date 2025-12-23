@@ -97,12 +97,9 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
-    const articleAsOfDate =
-      article.asOfDate === asOfDate ? article.asOfDate : normalizeCnbcAsOfDate(article.asOfDate);
-
-    if (article.provider !== "cnbc" || articleAsOfDate !== asOfDate) {
+    if (article.provider !== "cnbc" || article.asOfDate !== asOfDate) {
       throw new Error(
-        `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: provider=${article.provider}, asOfDate=${article.asOfDate}, normalizedAsOfDate=${articleAsOfDate}, expectedAsOfDate=${asOfDate}`
+        `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: provider=${article.provider}, asOfDate=${article.asOfDate}, expectedAsOfDate=${asOfDate}`
       );
     }
 
