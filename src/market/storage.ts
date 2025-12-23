@@ -323,6 +323,124 @@ export async function listReportDates(): Promise<string[]> {
     .sort();
 }
 
+const MIN_CNBC_VIDEO_YEAR = 2000;
+const MAX_FUTURE_YEAR_OFFSET = 1;
+
+// Avoid noisy per-request warnings in production when the CNBC data directory contains junk files.
+// We still log a sample once per directory per process to keep it debuggable (subsequent calls won't warn again until restart).
+// Note: `listCnbcVideoDates` uses a fixed CNBC directory, so this Set should remain tiny.
+const warnedInvalidCnbcVideoDateDirs = new Set<string>();
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function isValidIsoDateYmd(value: string, now = new Date()): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return false;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return false;
+  }
+
+  const currentYear = now.getUTCFullYear();
+  if (year < MIN_CNBC_VIDEO_YEAR || year > currentYear + MAX_FUTURE_YEAR_OFFSET) {
+    return false;
+  }
+
+  if (month < 1 || month > 12) {
+    return false;
+  }
+
+  if (day < 1 || day > 31) {
+    return false;
+  }
+
+  const daysInMonth = [
+    31,
+    isLeapYear(year) ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31
+  ][month - 1];
+
+  if (typeof daysInMonth !== "number" || day > daysInMonth) {
+    return false;
+  }
+
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  return utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day;
+}
+
+export async function listCnbcVideoDates(): Promise<string[]> {
+  const dir = getNewsDir("cnbc");
+  const dirKey = path.resolve(dir);
+  let entries: string[] = [];
+  try {
+    entries = await readdir(dir);
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+
+  const candidates = entries
+    .filter((e) => e.endsWith(".json"))
+    .map((e) => e.replace(/\.json$/, ""))
+    .filter((name) => /^\d{8}$/.test(name))
+    .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`);
+
+  const dates: string[] = [];
+  const invalidDatesSample: string[] = [];
+  let invalidCount = 0;
+
+  for (const date of candidates) {
+    if (isValidIsoDateYmd(date)) {
+      dates.push(date);
+      continue;
+    }
+
+    invalidCount += 1;
+
+    if (invalidDatesSample.length < 5) {
+      invalidDatesSample.push(date);
+    }
+  }
+
+  if (invalidCount > 0) {
+    const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${dir} (expected YYYYMMDD.json)`;
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
+    } else if (!warnedInvalidCnbcVideoDateDirs.has(dirKey)) {
+      warnedInvalidCnbcVideoDateDirs.add(dirKey);
+      const sample = invalidDatesSample[0];
+      console.warn(sample ? `${message}: e.g. ${sample}` : message);
+    }
+  }
+
+  return dates.sort();
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);

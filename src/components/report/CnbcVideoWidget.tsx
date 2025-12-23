@@ -1,9 +1,12 @@
 import { readCnbcVideoArticles } from "../../market/reportStorage";
 import type { CnbcVideoArticle } from "../../market/types";
 
+import type { CnbcVideoCard } from "../cnbc/types";
+import { normalizeCnbcTopic, toCnbcVideoCard } from "../cnbc/transform";
 import { CnbcVideoWidgetClient, type CnbcTopicHypeDatum } from "./CnbcVideoWidgetClient";
 
 const MAX_CNBC_WIDGET_ARTICLES = 500;
+const MAX_VIDEOS_PER_TOPIC = 10;
 
 type CnbcVideoArticles = CnbcVideoArticle[];
 
@@ -18,18 +21,18 @@ function buildTopicData(articles: CnbcVideoArticles): CnbcTopicHypeDatum[] {
     .map((article) => ({ article, ts: safePublishedTs(article.publishedAt) }))
     .sort((a, b) => b.ts - a.ts)
     .map((entry) => entry.article);
-  const counts = new Map<string, { count: number; hypeSum: number }>();
+  const counts = new Map<string, { count: number; hypeSum: number; videos: CnbcVideoCard[] }>();
 
   for (const article of sorted.slice(0, MAX_CNBC_WIDGET_ARTICLES)) {
-    const topic = (article.topic ?? "other").trim().toLowerCase();
-    if (topic === "") {
-      continue;
-    }
+    const topic = normalizeCnbcTopic(article);
     const hype = typeof article.hype === "number" && Number.isFinite(article.hype) ? article.hype : 0;
 
-    const existing = counts.get(topic) ?? { count: 0, hypeSum: 0 };
+    const existing = counts.get(topic) ?? { count: 0, hypeSum: 0, videos: [] };
     existing.count += 1;
     existing.hypeSum += hype;
+    if (existing.videos.length < MAX_VIDEOS_PER_TOPIC) {
+      existing.videos.push(toCnbcVideoCard(article));
+    }
     counts.set(topic, existing);
   }
 
@@ -37,7 +40,8 @@ function buildTopicData(articles: CnbcVideoArticles): CnbcTopicHypeDatum[] {
     .map(([topic, v]) => ({
       topic,
       count: v.count,
-      avgHype: v.count > 0 ? Math.round((v.hypeSum / v.count) * 10) / 10 : 0
+      avgHype: v.count > 0 ? Math.round((v.hypeSum / v.count) * 10) / 10 : 0,
+      videos: v.videos
     }))
     .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic))
     .slice(0, 10);
