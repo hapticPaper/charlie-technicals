@@ -270,6 +270,7 @@ function trueRange(bars: MarketBar[]): Array<number | null> {
     const prevCloseValue = isFiniteNumber(prevClose) ? prevClose : null;
 
     if (highValue !== null && lowValue !== null) {
+      // Normalize in case the data source reports inverted bars (high < low).
       const normHigh = Math.max(highValue, lowValue);
       const normLow = Math.min(highValue, lowValue);
       const hl = normHigh - normLow;
@@ -282,8 +283,9 @@ function trueRange(bars: MarketBar[]): Array<number | null> {
       continue;
     }
 
-    // If the feed only provides one bound (high or low), fall back to
-    // comparing it to the previous close instead of dropping the bar.
+    // If the feed only provides one bound (high or low), treat the missing
+    // bound as `prevClose` and fall back to `abs(bound - prevClose)`.
+    // This requires `prevClose` to be present.
     if (prevCloseValue === null) {
       continue;
     }
