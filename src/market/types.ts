@@ -54,6 +54,8 @@ export type MarketNewsSnapshot = {
 
 /**
 * On-disk schema for CNBC video snapshots under content/data/cnbc/news/<YYYYMMDD>.json.
+*
+* Stored as a flat JSON array of `StoredCnbcVideoArticle` (no wrapper object).
 */
 export type StoredCnbcVideoArticle = MarketNewsArticle & {
   symbol: string;

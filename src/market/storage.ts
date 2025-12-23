@@ -237,6 +237,18 @@ export async function readCnbcVideoArticles(date: string): Promise<StoredCnbcVid
   return readJson<StoredCnbcVideoArticle[]>(getNewsPath(date, "cnbc"));
 }
 
+export type StoredNewsData =
+  | { kind: "snapshot"; snapshot: MarketNewsSnapshot }
+  | { kind: "cnbc_articles"; articles: StoredCnbcVideoArticle[] };
+
+export async function readNewsData(date: string, symbol: string): Promise<StoredNewsData> {
+  if (symbol === "cnbc") {
+    return { kind: "cnbc_articles", articles: await readCnbcVideoArticles(date) };
+  }
+
+  return { kind: "snapshot", snapshot: await readJson<MarketNewsSnapshot>(getNewsPath(date, symbol)) };
+}
+
 export async function listReportDates(): Promise<string[]> {
   const dir = getReportsDir();
   let entries: string[] = [];
@@ -327,7 +339,16 @@ export type WriteNewsSnapshotResult =
 
 function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
   return snapshot.articles.map((article) => ({
-    ...article,
+    id: article.id,
+    title: article.title,
+    url: article.url,
+    publisher: article.publisher,
+    publishedAt: article.publishedAt,
+    relatedTickers: article.relatedTickers,
+    topic: article.topic,
+    hype: article.hype,
+    mainIdea: article.mainIdea,
+    summary: article.summary,
     symbol: snapshot.symbol,
     provider: snapshot.provider,
     fetchedAt: snapshot.fetchedAt,
