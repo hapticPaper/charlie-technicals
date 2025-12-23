@@ -37,18 +37,15 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
   Array<{ date: string; articles: CnbcVideoArticle[] }>
 > {
   const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
-  const scanDates = [...allDates].sort().slice(-MAX_SCAN_DAYS);
+  const scanDates = [...allDates].sort().slice(-MAX_SCAN_DAYS).reverse();
 
   // Scan newest-to-oldest until we have N non-empty days. Fetch in small concurrent batches.
   const BATCH_SIZE = 10;
-  let end = scanDates.length;
-  while (end > 0 && dayArticles.length < MAX_NON_EMPTY_DAYS) {
-    const start = Math.max(0, end - BATCH_SIZE);
-    const dates = scanDates.slice(start, end);
-    end = start;
-
+  for (let offset = 0; offset < scanDates.length && dayArticles.length < MAX_NON_EMPTY_DAYS; offset += BATCH_SIZE) {
+    const dates = scanDates.slice(offset, offset + BATCH_SIZE);
     const results = await Promise.allSettled(dates.map((date) => readCnbcVideoArticles(date)));
-    for (let idx = dates.length - 1; idx >= 0 && dayArticles.length < MAX_NON_EMPTY_DAYS; idx -= 1) {
+
+    for (let idx = 0; idx < dates.length && dayArticles.length < MAX_NON_EMPTY_DAYS; idx += 1) {
       const date = dates[idx];
       const result = results[idx];
 
