@@ -122,8 +122,15 @@ export default async function HomePage() {
 
   const toCardTs = (d: string): number => {
     const isYYYYMMDD = /^\d{4}-\d{2}-\d{2}$/.test(d);
-    const ts = Date.parse(isYYYYMMDD ? `${d}T00:00:00Z` : d);
-    return Number.isFinite(ts) ? ts : 0;
+    const isISODateTime = /^\d{4}-\d{2}-\d{2}T/.test(d);
+    const ts = Date.parse(isYYYYMMDD ? `${d}T00:00:00Z` : isISODateTime ? d : "");
+
+    if (!Number.isFinite(ts)) {
+      console.warn(`[home] Unexpected report card date format: ${d}`);
+      return 0;
+    }
+
+    return ts;
   };
 
   const sortedCards = cards.slice().sort((a, b) => toCardTs(b.date) - toCardTs(a.date));
