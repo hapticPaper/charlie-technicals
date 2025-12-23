@@ -88,6 +88,7 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
     timeoutIdRef.current = window.setTimeout(() => {
       if (!loadedRef.current) {
         setTimedOut(true);
+        setFailed(true);
       }
 
       timeoutIdRef.current = null;
@@ -101,11 +102,15 @@ function ChartsExampleEmbed(props: { label: string; url: string; sandbox?: strin
   return (
     <details style={{ marginTop: 12 }}>
       <summary>{label}</summary>
-      <p id={statusId} className="report-muted" style={{ margin: "6px 0 10px" }}>
+      <p id={statusId} role="status" className="report-muted" style={{ margin: "6px 0 10px" }}>
         <a href={url} target="_blank" rel="noreferrer">
           Open in a new tab
         </a>
-        {failed ? " · Embedding failed" : timedOut ? " · Still loading (may be blocked)" : ""}
+        {failed
+          ? timedOut
+            ? " · Load timed out (may be blocked)"
+            : " · Embedding failed"
+          : ""}
       </p>
 
       <iframe
