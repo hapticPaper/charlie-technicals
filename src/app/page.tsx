@@ -2,6 +2,7 @@ import Link from "next/link";
 import { rm } from "node:fs/promises";
 
 import styles from "./home.module.css";
+import { CnbcTopicTrendWidget } from "../components/cnbc/CnbcTopicTrendWidget";
 import {
   getReportHighlightsJsonPath,
   getReportJsonPath,
@@ -120,6 +121,8 @@ export default async function HomePage() {
     <>
       <h1>Charlie technicals</h1>
       <p className="report-muted">Daily highlights. Click a day for the full rundown.</p>
+
+      <CnbcTopicTrendWidget />
 
       {failedCards > 0 ? (
         <p className="report-muted">{failedCards} report cards failed to load.</p>

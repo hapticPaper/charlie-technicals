@@ -323,6 +323,32 @@ export async function listReportDates(): Promise<string[]> {
     .sort();
 }
 
+export async function listCnbcVideoDates(): Promise<string[]> {
+  const dir = getNewsDir("cnbc");
+  let entries: string[] = [];
+  try {
+    entries = await readdir(dir);
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code === "ENOENT") {
+      return [];
+    }
+
+    throw error;
+  }
+
+  return entries
+    .filter((e) => e.endsWith(".json"))
+    .map((e) => e.replace(/\.json$/, ""))
+    .filter((name) => /^\d{8}$/.test(name))
+    .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`)
+    .sort();
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
