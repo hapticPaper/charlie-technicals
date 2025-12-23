@@ -11,6 +11,8 @@ import {
   YAxis
 } from "recharts";
 
+import type { TooltipContentProps } from "recharts";
+
 import { useEffect, useMemo, useState } from "react";
 
 import { CnbcVideoCards } from "./CnbcVideoCards";
@@ -276,18 +278,11 @@ export function CnbcTopicTrendWidgetClient(props: {
             <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fill: "var(--rp-muted)" }} />
             <YAxis tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
             <Tooltip
-              content={(tooltipProps: unknown) => (
+              content={(tooltipProps: TooltipContentProps<number, string>) => (
                 <TopicTooltip
-                  active={typeof tooltipProps === "object" && tooltipProps !== null && "active" in tooltipProps ? (tooltipProps as { active?: boolean }).active : undefined}
-                  label={typeof tooltipProps === "object" && tooltipProps !== null && "label" in tooltipProps ? (tooltipProps as { label?: unknown }).label : undefined}
-                  payload={
-                    typeof tooltipProps === "object" &&
-                    tooltipProps !== null &&
-                    "payload" in tooltipProps &&
-                    Array.isArray((tooltipProps as { payload?: unknown }).payload)
-                      ? ((tooltipProps as { payload?: unknown }).payload as readonly TooltipEntry[])
-                      : undefined
-                  }
+                  active={tooltipProps.active}
+                  label={tooltipProps.label}
+                  payload={tooltipProps.payload as unknown as readonly TooltipEntry[] | undefined}
                   selectedTopic={selectedTopic}
                   pinnedTopic={pinned.topic}
                   onSelect={({ date, topic }) => {
