@@ -18,6 +18,14 @@ type ChartAnnotations = {
   trade?: TradePlan;
 };
 
+// Shared price scale for candles and price-based overlays (SMA/EMA/BB/KC).
+// All price overlays must use this scale so the price axis fits them.
+const PRICE_SCALE_ID = "right" as const;
+
+// Dedicated scales for non-price indicators.
+const VOLUME_SCALE_ID = "volume" as const;
+const RSI_SCALE_ID = "rsi" as const;
+
 function formatChartTime(time: Time | undefined): string {
   if (!time) {
     return "";
@@ -114,13 +122,23 @@ function toUtcTimestamp(t: number): UTCTimestamp | null {
   return Math.floor(seconds) as UTCTimestamp;
 }
 
-function formatUtcDateKey(seconds: number): string {
-  const millis = seconds * 1000;
+// Returns a UTC date key (YYYY-MM-DD) or null when the timestamp is invalid.
+function formatUtcDateKey(t: number): string | null {
+  if (!Number.isFinite(t)) {
+    return null;
+  }
+
+  // Mirrors `toUtcTimestamp` normalization: accept ms or s, always operate on seconds.
+  const tsSeconds = t > 10_000_000_000 ? t / 1000 : t;
+  const millis = tsSeconds * 1000;
   if (!Number.isFinite(millis)) {
-    return "";
+    return null;
   }
 
   const dt = new Date(millis);
+  if (!Number.isFinite(dt.getTime())) {
+    return null;
+  }
   const year = dt.getUTCFullYear();
   const month = String(dt.getUTCMonth() + 1).padStart(2, "0");
   const day = String(dt.getUTCDate()).padStart(2, "0");
@@ -132,19 +150,33 @@ function startIndexForLastUtcDays(t: number[], distinctDays: number): number {
     return 0;
   }
 
+  // Only stores valid YYYY-MM-DD keys; invalid timestamps are skipped.
   const seen = new Set<string>();
+  let invalidTail = 0;
+  const invalidTailWindow = 12;
+
   for (let i = t.length - 1; i >= 0; i -= 1) {
     const key = formatUtcDateKey(t[i]);
-    if (!key) {
+    if (key === null) {
+      if (t.length - 1 - i < invalidTailWindow) {
+        invalidTail += 1;
+      }
       continue;
     }
 
     if (!seen.has(key)) {
       seen.add(key);
       if (seen.size > distinctDays) {
+        if (invalidTail > 0 && process.env.NODE_ENV !== "production") {
+          console.warn(`[ReportChart] skipped ${invalidTail} invalid timestamps near the series end`);
+        }
         return i + 1;
       }
     }
+  }
+
+  if (invalidTail > 0 && process.env.NODE_ENV !== "production") {
+    console.warn(`[ReportChart] skipped ${invalidTail} invalid timestamps near the series end`);
   }
 
   return 0;
@@ -223,15 +255,26 @@ function defaultVisibleRange(series: ReportIntervalSeries): { from: number; to: 
   }
 
   if (series.interval === "1d") {
-    const points = Math.min(5, len);
+    // 34 prior candles + the most recent candle.
+    // Assumes `series.t` is sorted oldest-first (newest-last) and that 1 candle maps to 1 trading day.
+    // For symbols with shorter history, this shows all available candles.
+    const priorCandles = 34;
+    const currentCandle = 1;
+    const targetVisibleCandles = priorCandles + currentCandle;
+    const points = Math.min(targetVisibleCandles, len);
     const rightBuffer = 1;
     const from = Math.max(0, len - points);
+    // `to` intentionally exceeds the last series index to create a right-side buffer.
     return { from, to: len - 1 + rightBuffer };
   }
 
   if (series.interval === "15m") {
-    const from = startIndexForLastUtcDays(series.t, 3);
+    // Show the most recent 2 distinct UTC calendar days that have data:
+    // typically "prior trading day" + "current trading day" for active markets.
+    // Note: weekends/holidays (no candles) are naturally skipped.
+    const from = startIndexForLastUtcDays(series.t, 2);
     const rightBuffer = 8;
+    // `to` intentionally exceeds the last series index to create a right-side buffer.
     return { from, to: len - 1 + rightBuffer };
   }
 
@@ -469,18 +512,21 @@ export function ReportChart(props: {
         wickUpColor: bull,
         wickDownColor: bear,
         borderVisible: false,
+        priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
       });
       const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,
         lineWidth: 1,
+        priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
       });
       const emaSeries = chart.addSeries(LineSeries, {
         color: emaColor,
         lineWidth: 1,
+        priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
       });
@@ -490,6 +536,7 @@ export function ReportChart(props: {
             color: bollingerColor,
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
+            priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
           })
@@ -499,6 +546,7 @@ export function ReportChart(props: {
             color: bollingerColor,
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
+            priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
           })
@@ -508,6 +556,7 @@ export function ReportChart(props: {
             color: keltnerColor,
             lineWidth: 1,
             lineStyle: LineStyle.SparseDotted,
+            priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
           })
@@ -517,6 +566,7 @@ export function ReportChart(props: {
             color: keltnerColor,
             lineWidth: 1,
             lineStyle: LineStyle.SparseDotted,
+            priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
           })
@@ -524,7 +574,7 @@ export function ReportChart(props: {
 
       const volumeSeries = hasVolume
         ? chart.addSeries(HistogramSeries, {
-            priceScaleId: "volume",
+            priceScaleId: VOLUME_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
           })
@@ -535,17 +585,17 @@ export function ReportChart(props: {
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: false,
-        priceScaleId: "rsi",
+        priceScaleId: RSI_SCALE_ID,
         autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
       });
 
-      chart.priceScale("rsi").applyOptions({
+      chart.priceScale(RSI_SCALE_ID).applyOptions({
         scaleMargins: rsiScaleMargins,
         visible: false
       });
 
       if (volumeSeries && volumeScaleMargins) {
-        chart.priceScale("volume").applyOptions({
+        chart.priceScale(VOLUME_SCALE_ID).applyOptions({
           scaleMargins: volumeScaleMargins,
           visible: false
         });
