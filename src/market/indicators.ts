@@ -3,6 +3,7 @@ import type {
   KeltnerChannelsSeries,
   MacdSeries,
   MarketBar,
+  SqueezeState,
   TtmSqueezeSeries
 } from "./types";
 
@@ -461,6 +462,7 @@ export function ttmSqueeze(
 
   const squeezeOn: Array<boolean | null> = new Array(bars.length).fill(null);
   const squeezeOff: Array<boolean | null> = new Array(bars.length).fill(null);
+  const squeezeState: Array<SqueezeState | null> = new Array(bars.length).fill(null);
 
   for (let i = 0; i < bars.length; i += 1) {
     const bbU = bollinger.upper[i];
@@ -471,8 +473,11 @@ export function ttmSqueeze(
       continue;
     }
 
-    squeezeOn[i] = bbU < kcU && bbL > kcL;
-    squeezeOff[i] = bbU > kcU && bbL < kcL;
+    const on = bbU < kcU && bbL > kcL;
+    const off = !on && bbU > kcU && bbL < kcL;
+    squeezeOn[i] = on;
+    squeezeOff[i] = off;
+    squeezeState[i] = on ? "on" : off ? "off" : "neutral";
   }
 
   const highestHigh = highest(high, period);
@@ -501,6 +506,7 @@ export function ttmSqueeze(
     keltner,
     squeezeOn,
     squeezeOff,
+    squeezeState,
     momentum
   };
 }

@@ -6,6 +6,7 @@ import type {
   MarketReport,
   ReportPick,
   ReportIntervalSeries,
+  SqueezeState,
   TtmSqueezeSeries
 } from "./types";
 
@@ -269,6 +270,41 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     return out;
   }
 
+  function sliceStrictNullableSqueezeStateSeries(
+    value: unknown,
+    context: string
+  ): Array<SqueezeState | null> | undefined {
+    if (!Array.isArray(value)) {
+      warn(`Invalid ${context} series: expected array`);
+      return undefined;
+    }
+    if (value.length !== bars.length) {
+      warn(`Invalid ${context} series length: expected ${bars.length}, got ${value.length}`);
+      return undefined;
+    }
+
+    let invalidCount = 0;
+    const out = slicedBars.map((_, idx) => {
+      const i = startIndex + idx;
+      const v = value[i];
+      if (v === null || v === undefined) {
+        return null;
+      }
+      if (v === "on" || v === "off" || v === "neutral") {
+        return v;
+      }
+
+      invalidCount += 1;
+      return null;
+    });
+
+    if (invalidCount > 0) {
+      warn(`Invalid ${context} series values: coerced ${invalidCount} non-state items to null`);
+    }
+
+    return out;
+  }
+
   type ChannelSeries = { middle: Array<number | null>; upper: Array<number | null>; lower: Array<number | null> };
 
   function sliceChannelSeries(value: unknown, context: string): ChannelSeries | undefined {
@@ -310,6 +346,19 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
       return undefined;
     }
 
+    const derivedSqueezeState = squeezeOn.map((on, idx) => {
+      const off = squeezeOff[idx];
+      if (on === null || off === null) {
+        return null;
+      }
+      return on ? "on" : off ? "off" : "neutral";
+    });
+
+    const squeezeState =
+      value.squeezeState === undefined
+        ? derivedSqueezeState
+        : sliceStrictNullableSqueezeStateSeries(value.squeezeState, `${context}.squeezeState`) ?? derivedSqueezeState;
+
     const hasMomentum = momentum.some((v) => v !== null);
     const hasSqueezeFlag = squeezeOn.some((v) => v !== null) || squeezeOff.some((v) => v !== null);
     if (!hasMomentum && !hasSqueezeFlag) {
@@ -321,6 +370,7 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
       keltner,
       squeezeOn,
       squeezeOff,
+      squeezeState,
       momentum
     };
   }

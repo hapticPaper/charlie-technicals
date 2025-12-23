@@ -76,11 +76,14 @@ export type KeltnerChannelsSeries = {
   lower: Array<number | null>;
 };
 
+export type SqueezeState = "on" | "off" | "neutral";
+
 export type TtmSqueezeSeries = {
   bollinger: BollingerBandsSeries;
   keltner: KeltnerChannelsSeries;
   squeezeOn: Array<boolean | null>;
   squeezeOff: Array<boolean | null>;
+  squeezeState: Array<SqueezeState | null>;
   momentum: Array<number | null>;
 };
 
