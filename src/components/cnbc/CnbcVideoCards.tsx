@@ -37,11 +37,12 @@ function ymdKeyInTz(ts: number): string | null {
   return `${year}-${month}-${day}`;
 }
 
-function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
+function getPublishedAtLabelMode(timestamps: Array<number | null>): PublishedAtLabelMode {
   // If all timestamps are the same calendar day in the CNBC time zone, show times.
   // If multiple days but all within the same year, show MM/DD.
   // If dates span multiple years, show MM/DD/YYYY.
-  const dayKeys = timestamps.map((ts) => ymdKeyInTz(ts)).filter((key): key is string => Boolean(key));
+  const valid = timestamps.filter((ts): ts is number => typeof ts === "number" && Number.isFinite(ts));
+  const dayKeys = valid.map((ts) => ymdKeyInTz(ts)).filter((key): key is string => Boolean(key));
   if (dayKeys.length === 0) {
     return "day";
   }
@@ -136,16 +137,14 @@ export function CnbcVideoCards(props: {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
 
-  // Pick the label granularity based on the range of videos the user is seeing.
-  const publishedAtMode = getPublishedAtLabelMode(
-    items
-      .map((video) => safeTimestamp(video.publishedAt))
-      .filter((ts): ts is number => ts !== null)
-  );
-
   if (items.length === 0) {
     return <p className="report-muted">No videos.</p>;
   }
+
+  // Pick the label granularity based on the range of videos the user is seeing.
+  const publishedAtMode = getPublishedAtLabelMode(
+    items.map((video) => safeTimestamp(video.publishedAt))
+  );
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
