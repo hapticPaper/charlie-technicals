@@ -1,4 +1,4 @@
-# Daily market report (data → analysis → MDX)
+# Daily market report (acquire → analyze → report)
 
 ## Overview
 Generate a daily MDX report (plus supporting JSON artifacts) for the configured universe and time windows.
@@ -18,9 +18,11 @@ Generate a daily MDX report (plus supporting JSON artifacts) for the configured 
 
 - Max artifacts per run: 1 PR
 - Allowed paths:
-  - `content/reports/**`
+  - `content/data/**` (only new snapshots for the run date)
+  - `content/reports/**` (only the run date)
 - Guardrails:
-  - Do not modify existing report files for previous dates.
+  - Previous (non-today) dates are treated as immutable. Don't modify existing `content/data/**/<YYYYMMDD>.json` snapshots or `content/reports/<DATE>.*` for past dates.
+  - For today's date (America/New_York), reruns are allowed to pick up late news/videos and fill missing OHLCV timestamps.
   - Do not change `config/**` or any source code in this playbook.
   - Trade ideas / setups should be based on tradeable symbols. Market internals (breadth/volume) and regime indicators (e.g., `^VIX`) can be referenced for context, but shouldn't be the sole basis for a trade.
 
@@ -36,14 +38,20 @@ Generate a daily MDX report (plus supporting JSON artifacts) for the configured 
    ```bash
    bun --version
    bun install
-   # Runs data → analysis → report for the given date
+   # Runs acquire → analyze → report for the given date
    bun run market:run --date=<DATE>
    ```
 
 3. Confirm these files exist:
    - `content/reports/<DATE>.mdx`
    - `content/reports/<DATE>.json`
-4. Create a PR containing only `content/reports/<DATE>.mdx` and `content/reports/<DATE>.json`.
+   - (Optional cache) `content/reports/<DATE>.highlights.json`
+4. Create a PR containing:
+
+   - `content/data/**/<YYYYMMDD>.json` snapshots for the run date (OHLCV + news + CNBC)
+   - `content/reports/<DATE>.mdx`
+   - `content/reports/<DATE>.json`
+   - (Optional) `content/reports/<DATE>.highlights.json`
 
 ## Verify
 
