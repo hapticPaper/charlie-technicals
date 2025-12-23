@@ -23,7 +23,12 @@ function normalizeCnbcAsOfDate(date: string): string {
   try {
     parseIsoDateYmd(asOfDate);
   } catch (error) {
-    throw new Error(`[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date})`, {
+    const message =
+      error instanceof Error
+        ? `[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date}): ${error.message}`
+        : `[market:reportStorage] Invalid CNBC asOfDate: ${asOfDate} (input=${date})`;
+
+    throw new Error(message, {
       cause: error
     });
   }
@@ -82,6 +87,8 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * Reads CNBC video articles for a day.
 *
 * The on-disk schema includes `provider`, `fetchedAt`, and `asOfDate` on each object.
+*
+* `date` can be either `YYYY-MM-DD` or `YYYYMMDD`, and is normalized to `YYYY-MM-DD`.
 *
 * `provider` is implied by the file path and is omitted from the returned in-memory
 * objects.
