@@ -93,7 +93,7 @@ export function CnbcTopicTrendWidgetClient(props: {
             onMouseMove={(evt) => {
               const label = evt?.activeLabel;
               if (typeof label === "string") {
-                setActiveDate(label);
+                setActiveDate((prev) => (prev === label ? prev : label));
               }
             }}
             onMouseLeave={() => setActiveDate(null)}

@@ -76,7 +76,8 @@ export function CnbcVideoWidgetClient(props: {
             data={props.data}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
             onMouseMove={(evt) => {
-              setActiveTopic(getActiveTopic(evt as BarHoverEvent));
+              const nextTopic = getActiveTopic(evt as BarHoverEvent);
+              setActiveTopic((prev) => (prev === nextTopic ? prev : nextTopic));
             }}
             onMouseLeave={() => setActiveTopic(null)}
           >
