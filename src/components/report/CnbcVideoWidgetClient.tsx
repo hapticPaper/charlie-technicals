@@ -13,6 +13,9 @@ import {
 
 import { useEffect, useState } from "react";
 
+// Recharts defaults `initialDimension` to `-1`, which triggers a warning before ResizeObserver runs.
+const RECHARTS_INITIAL_DIMENSION = { width: 1, height: 1 };
+
 export type CnbcTopicHypeDatum = {
   topic: string;
   count: number;
@@ -22,8 +25,6 @@ export type CnbcTopicHypeDatum = {
 export function CnbcVideoWidgetClient(props: {
   data: CnbcTopicHypeDatum[];
 }) {
-  const initialDimension = { width: 1, height: 1 };
-
   // Recharts hydration workaround: render a placeholder until client mount.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -49,7 +50,7 @@ export function CnbcVideoWidgetClient(props: {
 
   return (
     <div style={{ width: "100%", height: 260 }}>
-      <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
+      <ResponsiveContainer minWidth={0} initialDimension={RECHARTS_INITIAL_DIMENSION}>
         <BarChart data={props.data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
           <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
           <XAxis dataKey="topic" tick={{ fill: "var(--rp-muted)" }} />

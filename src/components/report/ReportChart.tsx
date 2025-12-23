@@ -15,6 +15,9 @@ import { useEffect, useState } from "react";
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
+// Recharts defaults `initialDimension` to `-1`, which triggers a warning before ResizeObserver runs.
+const RECHARTS_INITIAL_DIMENSION = { width: 1, height: 1 };
+
 type ChartAnnotations = {
   trade?: TradePlan;
 };
@@ -34,8 +37,6 @@ export function ReportChart(props: {
   annotations?: ChartAnnotations;
   showSignals?: boolean;
 }) {
-  const initialDimension = { width: 1, height: 1 };
-
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -99,7 +100,7 @@ export function ReportChart(props: {
       ) : null}
 
       <div style={{ width: "100%", height: 260 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
+        <ResponsiveContainer minWidth={0} initialDimension={RECHARTS_INITIAL_DIMENSION}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis
@@ -152,7 +153,7 @@ export function ReportChart(props: {
       </div>
 
       <div style={{ width: "100%", height: 200 }}>
-        <ResponsiveContainer minWidth={0} initialDimension={initialDimension}>
+        <ResponsiveContainer minWidth={0} initialDimension={RECHARTS_INITIAL_DIMENSION}>
           <LineChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
             <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
             <XAxis hide dataKey="t" tickFormatter={formatEpochSeconds} tick={{ fill: "var(--rp-muted)" }} />
