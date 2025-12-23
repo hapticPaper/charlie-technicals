@@ -13,33 +13,42 @@ function safeTimestamp(value: string): number {
 
 type PublishedAtLabelMode = "time" | "day" | "dayWithYear";
 
-function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
-  if (timestamps.length === 0) {
-    return "day";
+function ymdKeyInTz(ts: number): string | null {
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return null;
   }
 
-  const minTs = Math.min(...timestamps);
-  const maxTs = Math.max(...timestamps);
-  if (!Number.isFinite(minTs) || !Number.isFinite(maxTs)) {
-    return "day";
-  }
-
-  const fmt = new Intl.DateTimeFormat("en-US", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: CNBC_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
-  });
+  }).formatToParts(ts);
 
-  const minKey = fmt.format(minTs);
-  const maxKey = fmt.format(maxTs);
-  if (minKey === maxKey) {
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return `${year}-${month}-${day}`;
+}
+
+function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
+  const dayKeys = timestamps.map((ts) => ymdKeyInTz(ts)).filter((key): key is string => Boolean(key));
+  if (dayKeys.length === 0) {
+    return "day";
+  }
+
+  const uniqueDays = new Set(dayKeys);
+  if (uniqueDays.size === 1) {
     return "time";
   }
 
-  const minYear = minKey.split("/")[2];
-  const maxYear = maxKey.split("/")[2];
-  if (minYear && maxYear && minYear === maxYear) {
+  const uniqueYears = new Set(Array.from(uniqueDays, (k) => k.slice(0, 4)));
+  if (uniqueYears.size === 1) {
     return "day";
   }
 
@@ -106,7 +115,7 @@ export function CnbcVideoCards(props: {
 }) {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
-  const publishedAtMode = getPublishedAtLabelMode(items.map((video) => safeTimestamp(video.publishedAt)).filter(Boolean));
+  const publishedAtMode = getPublishedAtLabelMode(items.map((video) => safeTimestamp(video.publishedAt)).filter((ts) => ts > 0));
 
   if (items.length === 0) {
     return <p className="report-muted">No videos.</p>;
