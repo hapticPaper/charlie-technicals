@@ -329,6 +329,7 @@ export function atr(bars: MarketBar[], period: number): Array<number | null> {
 
     const currTr = tr[i];
     if (!isFiniteNumber(currTr)) {
+      // Preserve continuity by carrying forward the last ATR value when TR is missing.
       out[i] = prev;
       continue;
     }
