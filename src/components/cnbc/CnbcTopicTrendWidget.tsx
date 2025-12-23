@@ -23,7 +23,7 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
   { days: Array<{ date: string; articles: CnbcVideoArticle[] }>; failedReads: number }
 > {
   const days: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
-  const failed: Array<{ date: string; message: string }> = [];
+  const failed: Array<{ date: string; message: string; name?: string; code?: unknown }> = [];
   const scanDates = [...allDates].sort().slice(-MAX_SCAN_DAYS).reverse();
 
   for (
@@ -45,15 +45,27 @@ async function loadRecentNonEmptyDays(allDates: string[]): Promise<
         continue;
       }
 
-      const message = result?.reason instanceof Error ? result.reason.message : String(result?.reason);
-      failed.push({ date, message: message.length > 140 ? `${message.slice(0, 140)}…` : message });
+      const reason = result?.reason;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      failed.push({
+        date,
+        message: message.length > 140 ? `${message.slice(0, 140)}…` : message,
+        name: reason instanceof Error ? reason.name : undefined,
+        code:
+          typeof reason === "object" && reason !== null && "code" in reason
+            ? (reason as { code?: unknown }).code
+            : undefined
+      });
     }
   }
 
   if (failed.length > 0) {
     const preview = failed
       .slice(0, 5)
-      .map(({ date, message }) => `${date} (${message})`)
+      .map(({ date, name, code, message }) => {
+        const meta = [name, code].filter(Boolean).join(":");
+        return meta ? `${date} [${meta}] (${message})` : `${date} (${message})`;
+      })
       .join(", ");
     const suffix = failed.length > 5 ? ", …" : "";
     console.error(`[home:cnbc] Failed reading CNBC videos for ${failed.length} day(s): ${preview}${suffix}`);
