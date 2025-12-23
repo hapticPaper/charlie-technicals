@@ -4,8 +4,7 @@ import type { CnbcVideoArticle } from "../../market/types";
 import type { CnbcVideoCard } from "./types";
 import { CnbcTopicTrendWidgetClient, type CnbcTopicTrendDatum } from "./CnbcTopicTrendWidgetClient";
 
-// Max number of non-empty days with data to show.
-const MAX_DAYS = 30;
+const MAX_NON_EMPTY_DAYS = 30;
 const MAX_TOPICS = 8;
 const MAX_VIDEOS_PER_DAY = 10;
 
@@ -38,18 +37,20 @@ export async function CnbcTopicTrendWidget() {
 
   const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
 
-  const BATCH_SIZE = MAX_DAYS;
-  for (let end = allDates.length; end > 0 && dayArticles.length < MAX_DAYS; ) {
+  // Scan newest-to-oldest until we have N non-empty days. Fetch in small concurrent batches.
+  const BATCH_SIZE = 10;
+  let end = allDates.length;
+  while (end > 0 && dayArticles.length < MAX_NON_EMPTY_DAYS) {
     const start = Math.max(0, end - BATCH_SIZE);
     const dates = allDates.slice(start, end);
     end = start;
 
     const results = await Promise.allSettled(dates.map((date) => readCnbcVideoArticles(date)));
-
-    for (let idx = dates.length - 1; idx >= 0 && dayArticles.length < MAX_DAYS; idx -= 1) {
+    for (let idx = dates.length - 1; idx >= 0 && dayArticles.length < MAX_NON_EMPTY_DAYS; idx -= 1) {
       const date = dates[idx];
       const result = results[idx];
-      if (!date || !result) {
+
+      if (!result) {
         continue;
       }
 
