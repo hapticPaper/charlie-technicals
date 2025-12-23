@@ -528,30 +528,25 @@ export function ReportChart(props: {
             return base;
           }
 
-          // Trade-level autoscaling padding so trade lines at extrema don't appear visually clipped.
-          // When the expanded range is degenerate (span 0), fall back to a smaller pad derived from price magnitude.
-          const SPAN_PAD_RATIO = 0.02;
-          const ZERO_SPAN_PAD_RATIO = 0.002;
-          const ZERO_SPAN_MIN_PAD = 0.001;
-          const ZERO_SPAN_MAX_PAD = 10;
+          // Trade-level autoscaling padding when trade levels extend the candle range.
+          // The zero-span fallback is tuned for typical equity price ranges.
+          const SPAN_PAD_RATIO = 0.02; // 2% of the expanded range
+          const ZERO_SPAN_PAD_RATIO = 0.002; // 0.2% of the max magnitude value
+          const ZERO_SPAN_MIN_PAD = 0.001; // minimum pad in price units
+          const ZERO_SPAN_MAX_PAD = 10; // cap pad in price units
 
           const baseMin = base.priceRange.minValue;
           const baseMax = base.priceRange.maxValue;
 
           let minValue = baseMin;
           let maxValue = baseMax;
-          let touchesRangeEdge = false;
 
           for (const value of tradePrices) {
-            if (value <= baseMin || value >= baseMax) {
-              touchesRangeEdge = true;
-            }
             minValue = Math.min(minValue, value);
             maxValue = Math.max(maxValue, value);
           }
 
-          if (minValue === baseMin && maxValue === baseMax && !touchesRangeEdge) {
-            // Only adjust the y-range when trade levels extend beyond (or touch) the candle range.
+          if (minValue === baseMin && maxValue === baseMax) {
             return base;
           }
 
