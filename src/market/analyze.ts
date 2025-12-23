@@ -36,6 +36,19 @@ function getValueAt(values: Array<number | null>, index: number): number | null 
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+function getStrictValueAt(values: Array<number | null>, index: number, context: string): number | null {
+  const raw = (values as unknown[])[index];
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+
+  throw new Error(`Invalid ${context} value at index ${index}`);
+}
+
 function computeIndicators(bars: MarketBar[], indicators: IndicatorDefinition[]): AnalyzedSeries["indicators"] {
   const close = getCloseSeries(bars);
   const out: AnalyzedSeries["indicators"] = {};
@@ -112,10 +125,16 @@ function evalSignal(def: SignalDefinition, indicators: AnalyzedSeries["indicator
     const leftSeries = getMacdField(series, when.left);
     const rightSeries = getMacdField(series, when.right);
 
-    const prevLeft = getValueAt(leftSeries, index - 1);
-    const prevRight = getValueAt(rightSeries, index - 1);
-    const currLeft = getValueAt(leftSeries, index);
-    const currRight = getValueAt(rightSeries, index);
+    if (index < 1 || index >= leftSeries.length || index >= rightSeries.length) {
+      throw new Error(
+        `Signal ${def.id} expected MACD series length >= ${index + 1} in indicators.${when.indicator}`
+      );
+    }
+
+    const prevLeft = getStrictValueAt(leftSeries, index - 1, `indicators.${when.indicator}.${when.left}`);
+    const prevRight = getStrictValueAt(rightSeries, index - 1, `indicators.${when.indicator}.${when.right}`);
+    const currLeft = getStrictValueAt(leftSeries, index, `indicators.${when.indicator}.${when.left}`);
+    const currRight = getStrictValueAt(rightSeries, index, `indicators.${when.indicator}.${when.right}`);
 
     if (prevLeft === null || prevRight === null || currLeft === null || currRight === null) {
       return false;
