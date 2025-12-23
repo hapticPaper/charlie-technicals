@@ -8,11 +8,6 @@ import type { CnbcVideoCard } from "./types";
 const CNBC_TIME_ZONE = "America/New_York";
 
 function safeTimestamp(value: string): number | null {
-  // CNBC `publishedAt` is expected to be an ISO-like timestamp.
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) {
-    return null;
-  }
-
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : null;
 }
@@ -39,14 +34,15 @@ function ymdKeyInTz(ts: number): string | null {
     return null;
   }
 
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  return `${year}-${month}-${day}`;
 }
 
-function getPublishedAtLabelMode(timestamps: number[]): PublishedAtLabelMode {
+function getPublishedAtLabelMode(timestamps: Array<number | null>): PublishedAtLabelMode {
   // If all timestamps are the same calendar day in the CNBC time zone, show times.
   // If multiple days but all within the same year, show MM/DD.
   // If dates span multiple years, show MM/DD/YYYY.
-  const dayKeys = timestamps.map((ts) => ymdKeyInTz(ts)).filter((key): key is string => Boolean(key));
+  const valid = timestamps.filter((ts): ts is number => typeof ts === "number" && Number.isFinite(ts));
+  const dayKeys = valid.map((ts) => ymdKeyInTz(ts)).filter((key): key is string => Boolean(key));
   if (dayKeys.length === 0) {
     return "day";
   }
@@ -98,7 +94,20 @@ function formatPublishedAt(value: string, mode: PublishedAtLabelMode): string {
 
 function topicBadgeLabel(topic: string): string {
   // `CnbcVideoCard.topic` is expected to already be user-presentable via `normalizeCnbcTopic`.
-  return topic.trim() || DEFAULT_CNBC_TOPIC_LABEL;
+  const cleaned = topic.trim();
+  const normalized = cleaned.toLowerCase();
+
+  const isPlaceholder =
+    !cleaned ||
+    normalized === "other" ||
+    normalized === "unknown" ||
+    normalized === "n/a" ||
+    normalized === "na" ||
+    normalized === "none" ||
+    normalized === "null" ||
+    normalized === "undefined";
+
+  return isPlaceholder ? DEFAULT_CNBC_TOPIC_LABEL : cleaned;
 }
 
 function formatThumbnailSrc(url: string, width: number, height: number): string {
@@ -154,13 +163,15 @@ export function CnbcVideoCards(props: {
 }) {
   const limit = typeof props.max === "number" && Number.isFinite(props.max) ? Math.max(0, props.max) : 8;
   const items = props.videos.slice(0, limit);
-  const publishedAtMode = getPublishedAtLabelMode(
-    items.map((video) => safeTimestamp(video.publishedAt)).filter((ts): ts is number => ts !== null)
-  );
 
   if (items.length === 0) {
     return <p className="report-muted">No videos.</p>;
   }
+
+  // Pick the label granularity based on the range of videos the user is seeing.
+  const publishedAtMode = getPublishedAtLabelMode(
+    items.map((video) => safeTimestamp(video.publishedAt))
+  );
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
