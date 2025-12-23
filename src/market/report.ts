@@ -163,6 +163,8 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
     console.warn(`${warnPrefix} ${message}`);
   }
 
+  const SQUEEZE_STATES: readonly SqueezeState[] = ["on", "off", "neutral"];
+
   function sliceNullableNumberSeries(value: unknown, context: string): Array<number | null> {
     const fallback = new Array(sliceLength).fill(null);
 
@@ -290,8 +292,9 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
       if (v === null || v === undefined) {
         return null;
       }
-      if (v === "on" || v === "off" || v === "neutral") {
-        return v;
+
+      if (typeof v === "string" && SQUEEZE_STATES.includes(v as SqueezeState)) {
+        return v as SqueezeState;
       }
 
       invalidCount += 1;
