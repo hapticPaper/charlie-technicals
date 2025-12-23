@@ -29,12 +29,9 @@ function toVideoCard(article: CnbcVideoArticle): CnbcVideoCard {
   };
 }
 
-export async function CnbcTopicTrendWidget() {
-  const allDates = await listCnbcVideoDates();
-  if (allDates.length === 0) {
-    return null;
-  }
-
+async function loadRecentNonEmptyDays(allDates: string[]): Promise<
+  Array<{ date: string; articles: CnbcVideoArticle[] }>
+> {
   const dayArticles: Array<{ date: string; articles: CnbcVideoArticle[] }> = [];
 
   // Scan newest-to-oldest until we have N non-empty days. Fetch in small concurrent batches.
@@ -65,6 +62,17 @@ export async function CnbcTopicTrendWidget() {
       console.error(`[home:cnbc] Failed reading CNBC videos for ${date}: ${message}`);
     }
   }
+
+  return dayArticles;
+}
+
+export async function CnbcTopicTrendWidget() {
+  const allDates = await listCnbcVideoDates();
+  if (allDates.length === 0) {
+    return null;
+  }
+
+  const dayArticles = await loadRecentNonEmptyDays(allDates);
 
   if (dayArticles.length === 0) {
     return null;
