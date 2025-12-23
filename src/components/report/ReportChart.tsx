@@ -528,6 +528,8 @@ export function ReportChart(props: {
             return base;
           }
 
+          // Trade-level autoscaling padding so trade lines at extrema don't appear visually clipped.
+          // When the expanded range is degenerate (span 0), fall back to a smaller pad derived from price magnitude.
           const SPAN_PAD_RATIO = 0.02;
           const ZERO_SPAN_PAD_RATIO = 0.002;
           const ZERO_SPAN_MIN_PAD = 0.001;
