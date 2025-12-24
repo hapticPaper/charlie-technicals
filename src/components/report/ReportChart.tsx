@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  AreaData,
   AutoscaleInfo,
   CandlestickData,
   HistogramData,
@@ -26,6 +27,8 @@ const PRICE_SCALE_ID = "right" as const;
 // Dedicated scales for non-price indicators.
 const VOLUME_SCALE_ID = "volume" as const;
 const RSI_SCALE_ID = "rsi" as const;
+const MOMENTUM_SCALE_ID = "momentum" as const;
+const SHADE_SCALE_ID = "shade" as const;
 
 // Trade-level autoscaling padding when trade levels extend the candle range (tuned for equities).
 // - `spanPadRatio`: symmetric pad as a % of the expanded range (2%).
@@ -317,6 +320,30 @@ function toLineSeriesData(
   return out;
 }
 
+function toAreaShadeSeriesData(
+  t: number[],
+  shouldShade: Array<boolean | null>
+): Array<AreaData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> {
+  const out: Array<AreaData<UTCTimestamp> | WhitespaceData<UTCTimestamp>> = [];
+  const len = Math.min(t.length, shouldShade.length);
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(t[i]);
+    if (time === null) {
+      continue;
+    }
+
+    if (shouldShade[i] !== true) {
+      out.push({ time });
+      continue;
+    }
+
+    out.push({ time, value: 1 });
+  }
+
+  return out;
+}
+
 function toHistogramSeriesData(
   t: number[],
   values: Array<number | null>,
@@ -452,12 +479,14 @@ export function ReportChart(props: {
     async function run() {
       const {
         ColorType,
+        AreaSeries,
         CandlestickSeries,
         CrosshairMode,
         HistogramSeries,
         LineSeries,
         LineStyle,
         createChart,
+        createImageWatermark,
         createSeriesMarkers
       } = await import("lightweight-charts");
       if (disposed) {
@@ -480,12 +509,23 @@ export function ReportChart(props: {
       const warn = readCssVar("--rp-warn", "#f59e0b");
       const target = readCssVar("--rp-target", "#38bdf8");
 
+      const squeezeOnShade = promoteAlpha(warn, 0.08);
+      const squeezeOffShade = promoteAlpha(bull, 0.08);
+
       const hasVolume =
         Array.isArray(series.volume) &&
         series.volume.length === series.t.length &&
         series.volume.some((v) => typeof v === "number" && Number.isFinite(v));
 
-      const priceScaleMargins = hasVolume ? { top: 0.05, bottom: 0.38 } : { top: 0.05, bottom: 0.3 };
+      const hasSqueeze =
+        Array.isArray(series.ttmSqueeze20?.squeezeState) &&
+        series.ttmSqueeze20.squeezeState.length === series.t.length;
+      const hasMomentum =
+        Array.isArray(series.ttmSqueeze20?.momentum) &&
+        series.ttmSqueeze20.momentum.length === series.t.length &&
+        series.ttmSqueeze20.momentum.some((v) => typeof v === "number" && Number.isFinite(v));
+
+      const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
       const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
 
@@ -522,6 +562,69 @@ export function ReportChart(props: {
           mode: CrosshairMode.Magnet
         }
       });
+
+      function escapeSvgText(value: string): string {
+        return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      }
+
+      const MAIN_PANE_INDEX = 0;
+      const pane = chart.panes()[MAIN_PANE_INDEX];
+      const watermarkSvg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="170">` +
+        `<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}</style>` +
+        `<text x="100%" y="68" text-anchor="end" font-size="72" font-weight="700" fill="#ffffff">${escapeSvgText(
+          series.symbol
+        )}</text>` +
+        `<text x="100%" y="140" text-anchor="end" font-size="46" font-weight="700" fill="#ffffff">${escapeSvgText(
+          series.interval
+        )}</text>` +
+        `</svg>`;
+      const watermarkPlugin = pane
+        ? createImageWatermark(
+            pane,
+            `data:image/svg+xml,${encodeURIComponent(watermarkSvg)}`,
+            {
+              alpha: 0.12,
+              padding: 12,
+              maxWidth: 420
+            }
+          )
+        : null;
+
+      // Squeeze shading is meant to act like a background wash. lightweight-charts draws later-added
+      // series on top, so keep these shade AreaSeries created before the candlesticks.
+      const squeezeOnShadeSeries = hasSqueeze
+        ? chart.addSeries(
+            AreaSeries,
+            {
+              topColor: squeezeOnShade,
+              bottomColor: squeezeOnShade,
+              lineColor: "transparent",
+              lineWidth: 1,
+              priceLineVisible: false,
+              lastValueVisible: false,
+              priceScaleId: SHADE_SCALE_ID,
+              autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+            },
+            MAIN_PANE_INDEX
+          )
+        : null;
+      const squeezeOffShadeSeries = hasSqueeze
+        ? chart.addSeries(
+            AreaSeries,
+            {
+              topColor: squeezeOffShade,
+              bottomColor: squeezeOffShade,
+              lineColor: "transparent",
+              lineWidth: 1,
+              priceLineVisible: false,
+              lastValueVisible: false,
+              priceScaleId: SHADE_SCALE_ID,
+              autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+            },
+            MAIN_PANE_INDEX
+          )
+        : null;
 
       const priceSeries = chart.addSeries(CandlestickSeries, {
         upColor: bull,
@@ -575,21 +678,21 @@ export function ReportChart(props: {
             }
           };
         }
-      });
+      }, MAIN_PANE_INDEX);
       const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,
         lineWidth: 1,
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
-      });
+      }, MAIN_PANE_INDEX);
       const emaSeries = chart.addSeries(LineSeries, {
         color: emaColor,
         lineWidth: 1,
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
-      });
+      }, MAIN_PANE_INDEX);
 
       const bbUpperSeries = series.bollinger20
         ? chart.addSeries(LineSeries, {
@@ -599,7 +702,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
       const bbLowerSeries = series.bollinger20
         ? chart.addSeries(LineSeries, {
@@ -609,7 +712,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
       const kcUpperSeries = series.keltner20
         ? chart.addSeries(LineSeries, {
@@ -619,7 +722,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
       const kcLowerSeries = series.keltner20
         ? chart.addSeries(LineSeries, {
@@ -629,7 +732,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
 
       const volumeSeries = hasVolume
@@ -637,7 +740,7 @@ export function ReportChart(props: {
             priceScaleId: VOLUME_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
 
       const rsiSeries = chart.addSeries(LineSeries, {
@@ -647,12 +750,44 @@ export function ReportChart(props: {
         lastValueVisible: false,
         priceScaleId: RSI_SCALE_ID,
         autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
-      });
+      }, MAIN_PANE_INDEX);
+
+      const momentumSeries = hasMomentum
+        ? chart.addSeries(HistogramSeries, {
+            priceScaleId: MOMENTUM_SCALE_ID,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            base: 0
+          }, MAIN_PANE_INDEX)
+        : null;
+
+      const trendSeries = chart.addSeries(LineSeries, {
+        color: muted,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        priceScaleId: PRICE_SCALE_ID,
+        priceLineVisible: false,
+        lastValueVisible: false
+      }, MAIN_PANE_INDEX);
+
+      if (hasSqueeze) {
+        chart.priceScale(SHADE_SCALE_ID).applyOptions({
+          scaleMargins: priceScaleMargins,
+          visible: false
+        });
+      }
 
       chart.priceScale(RSI_SCALE_ID).applyOptions({
         scaleMargins: rsiScaleMargins,
         visible: false
       });
+
+      if (momentumSeries) {
+        chart.priceScale(MOMENTUM_SCALE_ID).applyOptions({
+          scaleMargins: rsiScaleMargins,
+          visible: false
+        });
+      }
 
       if (volumeSeries && volumeScaleMargins) {
         chart.priceScale(VOLUME_SCALE_ID).applyOptions({
@@ -675,6 +810,66 @@ export function ReportChart(props: {
       kcUpperSeries?.setData(toLineSeriesData(series.t, series.keltner20?.upper ?? []));
       kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
       rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
+
+      if (hasSqueeze && series.ttmSqueeze20?.squeezeState) {
+        squeezeOnShadeSeries?.setData(
+          toAreaShadeSeriesData(
+            series.t,
+            series.ttmSqueeze20.squeezeState.map((s) => s === "on")
+          )
+        );
+        squeezeOffShadeSeries?.setData(
+          toAreaShadeSeriesData(
+            series.t,
+            series.ttmSqueeze20.squeezeState.map((s) => s === "off")
+          )
+        );
+      }
+
+      if (momentumSeries && hasMomentum && series.ttmSqueeze20?.momentum) {
+        const values = series.ttmSqueeze20.momentum;
+        let absMax = 0;
+        for (const v of values) {
+          if (typeof v === "number" && Number.isFinite(v)) {
+            absMax = Math.max(absMax, Math.abs(v));
+          }
+        }
+        if (!Number.isFinite(absMax) || absMax <= 0) {
+          absMax = 1;
+        }
+
+        momentumSeries.applyOptions({
+          autoscaleInfoProvider: () => ({ priceRange: { minValue: -absMax, maxValue: absMax } })
+        });
+
+        momentumSeries.setData(
+          toHistogramSeriesData(series.t, values, (idx) => {
+            const v = values[idx];
+            if (typeof v !== "number" || !Number.isFinite(v)) {
+              return promoteAlpha(muted, 0.4);
+            }
+            return promoteAlpha(v >= 0 ? bull : bear, 0.45);
+          })
+        );
+      }
+
+      const trendCandles = series.interval === "15m" ? 96 : 55;
+      const trendLen = Math.min(series.t.length, series.close.length);
+      if (trendLen >= 2) {
+        const end = trendLen - 1;
+        const start = Math.max(0, end - trendCandles);
+        const startTime = toUtcTimestamp(series.t[start]);
+        const endTime = toUtcTimestamp(series.t[end]);
+        const startValue = series.close[start];
+        const endValue = series.close[end];
+
+        if (startTime !== null && endTime !== null && [startValue, endValue].every((v) => Number.isFinite(v))) {
+          trendSeries.setData([
+            { time: startTime, value: startValue },
+            { time: endTime, value: endValue }
+          ]);
+        }
+      }
 
       if (volumeSeries && hasVolume && series.volume) {
         volumeSeries.setData(
@@ -840,6 +1035,7 @@ export function ReportChart(props: {
       });
 
       cleanup = () => {
+        watermarkPlugin?.detach();
         squeezeMarkerPlugin?.detach();
         chart.remove();
       };
