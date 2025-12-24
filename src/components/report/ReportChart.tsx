@@ -165,6 +165,7 @@ function resolveChartLocale(): string | undefined {
 *
 * Supported formats: `rgb(...)`, `rgba(...)`, `#rgb`, `#rrggbb`, `#rgba`, `#rrggbbaa`.
 * Any embedded alpha is ignored and replaced with the provided `alpha`.
+* RGB channels are clamped to `[0,255]`. Only comma-separated `rgb/rgba` syntax is supported.
 *
 * If `alpha` is not finite, returns `color` unchanged.
 */
@@ -197,12 +198,18 @@ function withAlpha(color: string, alpha: number): string {
     /^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/i
   );
   if (rgbaMatch) {
-    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${safeAlpha})`;
+    const r = Math.max(0, Math.min(255, Number.parseInt(rgbaMatch[1], 10)));
+    const g = Math.max(0, Math.min(255, Number.parseInt(rgbaMatch[2], 10)));
+    const b = Math.max(0, Math.min(255, Number.parseInt(rgbaMatch[3], 10)));
+    return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
   }
 
   const rgbMatch = trimmed.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
   if (rgbMatch) {
-    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${safeAlpha})`;
+    const r = Math.max(0, Math.min(255, Number.parseInt(rgbMatch[1], 10)));
+    const g = Math.max(0, Math.min(255, Number.parseInt(rgbMatch[2], 10)));
+    const b = Math.max(0, Math.min(255, Number.parseInt(rgbMatch[3], 10)));
+    return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
   }
 
   if (normalizedHex === null) {
