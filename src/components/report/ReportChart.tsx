@@ -786,15 +786,22 @@ export function ReportChart(props: {
 
       // Hidden host series for primitives (band clouds). Added after squeeze shading so clouds render above the wash.
       // Uses close values (the basis for BB/KC calculations) to stay aligned with the price scale.
-      const cloudAnchorSeries = chart.addSeries(LineSeries, {
-        color: "transparent",
-        lineWidth: 1,
-        lineVisible: false,
-        crosshairMarkerVisible: false,
-        priceScaleId: PRICE_SCALE_ID,
-        priceLineVisible: false,
-        lastValueVisible: false
-      }, MAIN_PANE_INDEX);
+      const wantsClouds = Boolean(series.bollinger20) || Boolean(series.keltner20);
+      const cloudAnchorSeries = wantsClouds
+        ? chart.addSeries(
+            LineSeries,
+            {
+              color: "transparent",
+              lineWidth: 1,
+              lineVisible: false,
+              crosshairMarkerVisible: false,
+              priceScaleId: PRICE_SCALE_ID,
+              priceLineVisible: false,
+              lastValueVisible: false
+            },
+            MAIN_PANE_INDEX
+          )
+        : null;
 
       const priceSeries = chart.addSeries(CandlestickSeries, {
         upColor: bull,
@@ -918,10 +925,10 @@ export function ReportChart(props: {
           })
         : null;
 
-      if (bbCloud) {
+      if (bbCloud && cloudAnchorSeries) {
         cloudAnchorSeries.attachPrimitive(bbCloud);
       }
-      if (kcCloud) {
+      if (kcCloud && cloudAnchorSeries) {
         cloudAnchorSeries.attachPrimitive(kcCloud);
       }
 
@@ -993,7 +1000,7 @@ export function ReportChart(props: {
       const ha = toHeikinAshiCandles({ t: series.t, open, high: series.high, low: series.low, close: series.close });
 
       priceSeries.setData(ha.candles);
-      cloudAnchorSeries.setData(toLineSeriesData(series.t, series.close));
+      cloudAnchorSeries?.setData(toLineSeriesData(series.t, series.close));
       smaSeries.setData(toLineSeriesData(series.t, series.sma20));
       emaSeries.setData(toLineSeriesData(series.t, series.ema20));
       bbUpperSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.upper ?? []));
