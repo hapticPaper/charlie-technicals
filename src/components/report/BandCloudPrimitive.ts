@@ -166,7 +166,9 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
         continue;
       }
 
-      current.push({ x, yUpper, yLower });
+      const yTop = Math.min(yUpper, yLower);
+      const yBottom = Math.max(yUpper, yLower);
+      current.push({ x, yUpper: yTop, yLower: yBottom });
     }
 
     flush();
