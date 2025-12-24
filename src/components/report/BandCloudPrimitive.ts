@@ -242,7 +242,7 @@ function logicalRangesEqual(left: LogicalRange | null, right: LogicalRange | nul
     return left === right;
   }
 
-  return left.from === right.from && left.to === right.to;
+  return nearlyEqual(left.from, right.from) && nearlyEqual(left.to, right.to);
 }
 
 function numericRangesEqual(left: IRange<number> | null, right: IRange<number> | null): boolean {
@@ -250,5 +250,20 @@ function numericRangesEqual(left: IRange<number> | null, right: IRange<number> |
     return left === right;
   }
 
-  return left.from === right.from && left.to === right.to;
+  return nearlyEqual(left.from, right.from) && nearlyEqual(left.to, right.to);
+}
+
+function nearlyEqual(left: number, right: number, relEps = 1e-6): boolean {
+  // Treat NaN as never equal to anything, and infinities only equal to themselves.
+  if (!Number.isFinite(left) || !Number.isFinite(right)) {
+    return left === right;
+  }
+
+  if (left === right) {
+    return true;
+  }
+
+  const diff = Math.abs(left - right);
+  const norm = Math.max(1, Math.abs(left), Math.abs(right));
+  return diff <= relEps * norm;
 }
