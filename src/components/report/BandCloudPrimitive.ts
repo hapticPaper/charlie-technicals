@@ -24,6 +24,8 @@ export type BandCloudPrimitiveOptions = {
   zOrder?: PrimitivePaneViewZOrder;
 };
 
+export type BandCloudPrimitiveMutableOptions = Partial<Pick<BandCloudPrimitiveOptions, "fillColor">>;
+
 type BandCloudCoord = {
   x: number;
   yUpper: number;
@@ -110,7 +112,7 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     fillColor: string;
     dataRef: readonly BandCloudPoint[];
   } | null = null;
-  zOrder: PrimitivePaneViewZOrder;
+  readonly zOrder: PrimitivePaneViewZOrder;
 
   constructor(options: BandCloudPrimitiveOptions) {
     this.#view = new BandCloudView(this);
@@ -125,16 +127,11 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     this.#attached?.requestUpdate();
   }
 
-  setOptions(next: Partial<BandCloudPrimitiveOptions>): void {
+  setOptions(next: BandCloudPrimitiveMutableOptions): void {
     let changed = false;
 
     if (next.fillColor !== undefined && next.fillColor !== this.#fillColor) {
       this.#fillColor = next.fillColor;
-      changed = true;
-    }
-
-    if (next.zOrder !== undefined && next.zOrder !== this.zOrder) {
-      this.zOrder = next.zOrder;
       changed = true;
     }
 
