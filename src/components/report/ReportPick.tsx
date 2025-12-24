@@ -50,7 +50,7 @@ export function ReportPick(props: { symbol: string }) {
   const watch = report.watchlist?.find((p) => p.symbol === props.symbol);
   const setup = pick ?? watch;
   if (!setup) {
-    return <p>Missing pick data.</p>;
+    return <p>Missing setup data for {props.symbol}.</p>;
   }
 
   const formatted = formatTrade(setup.trade);

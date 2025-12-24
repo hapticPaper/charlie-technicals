@@ -1229,7 +1229,9 @@ function buildPicks(args: {
       const dvA = a.dollarVolume1d ?? 0;
       const dvB = b.dollarVolume1d ?? 0;
       return dvB - dvA || b.score - a.score || a.symbol.localeCompare(b.symbol);
-    });
+    })
+    // Keep this bucket anchored to the liquid leaders to avoid surfacing random low-liquidity names.
+    .slice(0, REPORT_MAX_WATCHLIST * 4);
 
   for (const c of byDollarVolume) {
     if (watchlist.length >= REPORT_MAX_WATCHLIST) {
@@ -1396,6 +1398,19 @@ function buildSummaries(
     return `${words.slice(0, maxWords).join(" ")} …`;
   }
 
+  function describeVolatility(medAbsMoveAtr: number): string {
+    if (medAbsMoveAtr >= 1.5) {
+      return "elevated";
+    }
+    if (medAbsMoveAtr >= 1.0) {
+      return "active";
+    }
+    if (medAbsMoveAtr >= 0.6) {
+      return "moderate";
+    }
+    return "muted";
+  }
+
   const { regimeParts, regimeLabel } = computeRegimeReadout(analyzedBySymbol);
 
   const absMoveAtrValues: number[] = [];
@@ -1421,8 +1436,9 @@ function buildSummaries(
     mainIdeaParts.push(`${label ? `Risk tone was ${label}` : "Risk tone"}: ${regimeParts.join(", ")}.`);
   }
   if (medAbsMoveAtr !== null) {
+    const label = describeVolatility(medAbsMoveAtr);
     mainIdeaParts.push(
-      `Volatility stayed muted (median 1d move ${medAbsMoveAtr.toFixed(1)} ATR; ≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
+      `Volatility was ${label} (median 1d move ${medAbsMoveAtr.toFixed(1)} ATR; ≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
     );
   }
   if (picks.length === 0) {
@@ -1460,8 +1476,9 @@ function buildSummaries(
     summaryParts.push(`Market take: ${label} tone — ${regimeParts.join(", ")}.`);
   }
   if (medAbsMoveAtr !== null) {
+    const label = describeVolatility(medAbsMoveAtr);
     summaryParts.push(
-      `Volatility: median 1d move ${medAbsMoveAtr.toFixed(1)} ATR (≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
+      `Volatility: ${label} (median 1d move ${medAbsMoveAtr.toFixed(1)} ATR; ≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
     );
   }
 
@@ -1573,11 +1590,13 @@ export function buildReportMdx(report: MarketReport): string {
 
   lines.push("## Watchlist");
   lines.push("");
-  if (!report.watchlist?.length) {
+
+  const watchlistEntries = (report.watchlist ?? []).slice(0, REPORT_MAX_WATCHLIST);
+  if (watchlistEntries.length === 0) {
     lines.push("No watchlist names stood out today; staying selective until volatility expands.");
     lines.push("");
   } else {
-    for (const p of report.watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
+    for (const p of watchlistEntries) {
       const basis = p.basis === "trend" ? "trend" : p.basis === "signal" ? "sub-ATR signal" : "watchlist";
       const atrLabel =
         typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
@@ -1587,7 +1606,7 @@ export function buildReportMdx(report: MarketReport): string {
     }
     lines.push("");
 
-    for (const pick of report.watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
+    for (const pick of watchlistEntries) {
       lines.push(`### ${pick.symbol}`);
       lines.push("");
       lines.push(`<ReportPick symbol="${pick.symbol}" />`);
