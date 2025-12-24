@@ -176,6 +176,11 @@ function withAlpha(color: string, alpha: number): string {
 
   const safeAlpha = Math.max(0, Math.min(1, alpha));
 
+  const clampRgbChannel = (value: string): number => {
+    const parsed = Number.parseInt(value, 10);
+    return Math.max(0, Math.min(255, parsed));
+  };
+
   const trimmed = color.trim();
   const isRgba = /^rgba\s*\(/i.test(trimmed);
 
@@ -198,17 +203,17 @@ function withAlpha(color: string, alpha: number): string {
     /^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/i
   );
   if (rgbaMatch) {
-    const r = Math.max(0, Math.min(255, Number.parseInt(rgbaMatch[1], 10)));
-    const g = Math.max(0, Math.min(255, Number.parseInt(rgbaMatch[2], 10)));
-    const b = Math.max(0, Math.min(255, Number.parseInt(rgbaMatch[3], 10)));
+    const r = clampRgbChannel(rgbaMatch[1]);
+    const g = clampRgbChannel(rgbaMatch[2]);
+    const b = clampRgbChannel(rgbaMatch[3]);
     return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
   }
 
   const rgbMatch = trimmed.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
   if (rgbMatch) {
-    const r = Math.max(0, Math.min(255, Number.parseInt(rgbMatch[1], 10)));
-    const g = Math.max(0, Math.min(255, Number.parseInt(rgbMatch[2], 10)));
-    const b = Math.max(0, Math.min(255, Number.parseInt(rgbMatch[3], 10)));
+    const r = clampRgbChannel(rgbMatch[1]);
+    const g = clampRgbChannel(rgbMatch[2]);
+    const b = clampRgbChannel(rgbMatch[3]);
     return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
   }
 
