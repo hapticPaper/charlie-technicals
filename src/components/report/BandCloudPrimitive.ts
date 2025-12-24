@@ -128,18 +128,14 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     this.#attached?.requestUpdate();
   }
 
+  // Currently only `fillColor` is supported. Extend this when new mutable options are added.
   setOptions(next: BandCloudPrimitiveMutableOptions): void {
-    let changed = false;
-
-    if (next.fillColor !== undefined && next.fillColor !== this.#fillColor) {
-      this.#fillColor = next.fillColor;
-      changed = true;
-    }
-
-    if (!changed) {
+    const nextFill = next.fillColor;
+    if (nextFill === undefined || nextFill === this.#fillColor) {
       return;
     }
 
+    this.#fillColor = nextFill;
     this.updateAllViews();
     this.#attached?.requestUpdate();
   }
