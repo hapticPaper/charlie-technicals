@@ -173,6 +173,8 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     const visibleLogicalRange = timeScale.getVisibleLogicalRange();
     const priceVisibleRange = priceScale.getVisibleRange();
 
+    // Intentionally exclude `scrollPosition` from the cache key: panning can introduce small float deltas
+    // even when the rendered viewport is effectively unchanged.
     const cacheKeyUnchanged =
       this.#lastViewport !== null &&
       this.#lastViewport.timeScaleWidth === timeScaleWidth &&
