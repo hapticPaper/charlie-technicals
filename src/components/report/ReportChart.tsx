@@ -567,8 +567,8 @@ export function ReportChart(props: {
         return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
       }
 
-      const paneIndex = 0;
-      const pane = chart.panes()[paneIndex];
+      const MAIN_PANE_INDEX = 0;
+      const pane = chart.panes()[MAIN_PANE_INDEX];
       const watermarkSvg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="170">` +
         `<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}</style>` +
@@ -606,7 +606,7 @@ export function ReportChart(props: {
               priceScaleId: SHADE_SCALE_ID,
               autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
             },
-            paneIndex
+            MAIN_PANE_INDEX
           )
         : null;
       const squeezeOffShadeSeries = hasSqueeze
@@ -622,7 +622,7 @@ export function ReportChart(props: {
               priceScaleId: SHADE_SCALE_ID,
               autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
             },
-            paneIndex
+            MAIN_PANE_INDEX
           )
         : null;
 
@@ -678,21 +678,21 @@ export function ReportChart(props: {
             }
           };
         }
-      }, paneIndex);
+      }, MAIN_PANE_INDEX);
       const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,
         lineWidth: 1,
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
-      });
+      }, MAIN_PANE_INDEX);
       const emaSeries = chart.addSeries(LineSeries, {
         color: emaColor,
         lineWidth: 1,
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
-      });
+      }, MAIN_PANE_INDEX);
 
       const bbUpperSeries = series.bollinger20
         ? chart.addSeries(LineSeries, {
@@ -702,7 +702,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
       const bbLowerSeries = series.bollinger20
         ? chart.addSeries(LineSeries, {
@@ -712,7 +712,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
       const kcUpperSeries = series.keltner20
         ? chart.addSeries(LineSeries, {
@@ -722,7 +722,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
       const kcLowerSeries = series.keltner20
         ? chart.addSeries(LineSeries, {
@@ -732,7 +732,7 @@ export function ReportChart(props: {
             priceScaleId: PRICE_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
 
       const volumeSeries = hasVolume
@@ -740,7 +740,7 @@ export function ReportChart(props: {
             priceScaleId: VOLUME_SCALE_ID,
             priceLineVisible: false,
             lastValueVisible: false
-          })
+          }, MAIN_PANE_INDEX)
         : null;
 
       const rsiSeries = chart.addSeries(LineSeries, {
@@ -750,7 +750,7 @@ export function ReportChart(props: {
         lastValueVisible: false,
         priceScaleId: RSI_SCALE_ID,
         autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
-      });
+      }, MAIN_PANE_INDEX);
 
       const momentumSeries = hasMomentum
         ? chart.addSeries(HistogramSeries, {
@@ -758,7 +758,7 @@ export function ReportChart(props: {
             priceLineVisible: false,
             lastValueVisible: false,
             base: 0
-          })
+          }, MAIN_PANE_INDEX)
         : null;
 
       const trendSeries = chart.addSeries(LineSeries, {
@@ -768,7 +768,7 @@ export function ReportChart(props: {
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
         lastValueVisible: false
-      });
+      }, MAIN_PANE_INDEX);
 
       if (hasSqueeze) {
         chart.priceScale(SHADE_SCALE_ID).applyOptions({
