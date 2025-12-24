@@ -26,7 +26,7 @@ export type BandCloudPrimitiveOptions = {
 
 // `fillColor` may change at runtime (e.g. theme changes). z-order is fixed by chart layering.
 export interface BandCloudPrimitiveMutableOptions {
-  fillColor?: string;
+  fillColor?: BandCloudPrimitiveOptions["fillColor"];
 }
 
 type BandCloudCoord = {
