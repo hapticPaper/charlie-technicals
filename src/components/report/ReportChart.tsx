@@ -167,7 +167,11 @@ function resolveChartLocale(): string | undefined {
 * Any embedded alpha is ignored and replaced with the provided `alpha`.
 */
 function withAlpha(color: string, alpha: number): string {
-  const safeAlpha = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+  if (!Number.isFinite(alpha)) {
+    return color;
+  }
+
+  const safeAlpha = Math.max(0, Math.min(1, alpha));
 
   const trimmed = color.trim();
   const isRgba = /^rgba\s*\(/i.test(trimmed);
@@ -181,6 +185,8 @@ function withAlpha(color: string, alpha: number): string {
           .join("")
       : rawHex;
   const hasHexAlpha = normalizedHex !== null && normalizedHex.length === 8;
+
+  // Normalize alpha-bearing inputs even when `safeAlpha === 1` so embedded alpha does not leak.
   if (safeAlpha >= 1 && !isRgba && !hasHexAlpha) {
     return color;
   }
