@@ -165,6 +165,8 @@ function resolveChartLocale(): string | undefined {
 *
 * Supported formats: `rgb(...)`, `rgba(...)`, `#rgb`, `#rrggbb`, `#rgba`, `#rrggbbaa`.
 * Any embedded alpha is ignored and replaced with the provided `alpha`.
+*
+* If `alpha` is not finite, returns `color` unchanged.
 */
 function withAlpha(color: string, alpha: number): string {
   if (!Number.isFinite(alpha)) {
