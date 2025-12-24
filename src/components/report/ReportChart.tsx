@@ -566,7 +566,8 @@ export function ReportChart(props: {
         return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
       }
 
-      const pane = chart.panes()[0];
+      const paneIndex = 0;
+      const pane = chart.panes()[paneIndex];
       const watermarkSvg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="170">` +
         `<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}</style>` +
@@ -589,29 +590,39 @@ export function ReportChart(props: {
           )
         : null;
 
+      // Squeeze shading is meant to act like a background wash. lightweight-charts draws later-added
+      // series on top, so keep these shade AreaSeries created before the candlesticks.
       const squeezeOnShadeSeries = hasSqueeze
-        ? chart.addSeries(AreaSeries, {
-            topColor: squeezeOnShade,
-            bottomColor: squeezeOnShade,
-            lineColor: "transparent",
-            lineWidth: 1,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            priceScaleId: SHADE_SCALE_ID,
-            autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
-          })
+        ? chart.addSeries(
+            AreaSeries,
+            {
+              topColor: squeezeOnShade,
+              bottomColor: squeezeOnShade,
+              lineColor: "transparent",
+              lineWidth: 1,
+              priceLineVisible: false,
+              lastValueVisible: false,
+              priceScaleId: SHADE_SCALE_ID,
+              autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+            },
+            paneIndex
+          )
         : null;
       const squeezeOffShadeSeries = hasSqueeze
-        ? chart.addSeries(AreaSeries, {
-            topColor: squeezeOffShade,
-            bottomColor: squeezeOffShade,
-            lineColor: "transparent",
-            lineWidth: 1,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            priceScaleId: SHADE_SCALE_ID,
-            autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
-          })
+        ? chart.addSeries(
+            AreaSeries,
+            {
+              topColor: squeezeOffShade,
+              bottomColor: squeezeOffShade,
+              lineColor: "transparent",
+              lineWidth: 1,
+              priceLineVisible: false,
+              lastValueVisible: false,
+              priceScaleId: SHADE_SCALE_ID,
+              autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+            },
+            paneIndex
+          )
         : null;
 
       const priceSeries = chart.addSeries(CandlestickSeries, {
@@ -666,7 +677,7 @@ export function ReportChart(props: {
             }
           };
         }
-      });
+      }, paneIndex);
       const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,
         lineWidth: 1,
