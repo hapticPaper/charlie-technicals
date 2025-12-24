@@ -1,8 +1,12 @@
 import type {
   IPrimitivePaneRenderer,
   IPrimitivePaneView,
+  IPriceScaleApi,
   ISeriesPrimitive,
+  ITimeScaleApi,
+  LogicalRange,
   PrimitivePaneViewZOrder,
+  IRange,
   SeriesAttachedParameter,
   Time
 } from "lightweight-charts";
@@ -97,6 +101,15 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
   #attached: SeriesAttachedParameter<Time> | null = null;
   #data: readonly BandCloudPoint[] = [];
   #fillColor: string;
+  #renderer: BandCloudRenderer | null = null;
+  #lastViewport: {
+    timeScaleWidth: number;
+    scrollPosition: number;
+    visibleLogicalRange: LogicalRange | null;
+    priceVisibleRange: IRange<number> | null;
+    fillColor: string;
+    dataRef: readonly BandCloudPoint[];
+  } | null = null;
   zOrder: PrimitivePaneViewZOrder;
 
   constructor(options: BandCloudPrimitiveOptions) {
@@ -115,12 +128,12 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
   setOptions(next: Partial<BandCloudPrimitiveOptions>): void {
     let changed = false;
 
-    if (typeof next.fillColor === "string" && next.fillColor !== this.#fillColor) {
+    if (next.fillColor !== undefined && next.fillColor !== this.#fillColor) {
       this.#fillColor = next.fillColor;
       changed = true;
     }
 
-    if (typeof next.zOrder === "string" && next.zOrder !== this.zOrder) {
+    if (next.zOrder !== undefined && next.zOrder !== this.zOrder) {
       this.zOrder = next.zOrder;
       changed = true;
     }
@@ -148,6 +161,8 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
 
   detached(): void {
     this.#attached = null;
+    this.#renderer = null;
+    this.#lastViewport = null;
   }
 
   buildRenderer(): BandCloudRenderer | null {
@@ -156,7 +171,26 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     }
 
     const { chart, series } = this.#attached;
-    const timeScale = chart.timeScale();
+    const timeScale: ITimeScaleApi<Time> = chart.timeScale();
+    const priceScale: IPriceScaleApi = series.priceScale();
+
+    const timeScaleWidth = timeScale.width();
+    const scrollPosition = timeScale.scrollPosition();
+    const visibleLogicalRange = timeScale.getVisibleLogicalRange();
+    const priceVisibleRange = priceScale.getVisibleRange();
+
+    const cacheKeyUnchanged =
+      this.#lastViewport !== null &&
+      this.#lastViewport.timeScaleWidth === timeScaleWidth &&
+      this.#lastViewport.scrollPosition === scrollPosition &&
+      logicalRangesEqual(this.#lastViewport.visibleLogicalRange, visibleLogicalRange) &&
+      numericRangesEqual(this.#lastViewport.priceVisibleRange, priceVisibleRange) &&
+      this.#lastViewport.fillColor === this.#fillColor &&
+      this.#lastViewport.dataRef === this.#data;
+
+    if (cacheKeyUnchanged) {
+      return this.#renderer;
+    }
 
     const segments: BandCloudCoord[][] = [];
     let current: BandCloudCoord[] = [];
@@ -195,10 +229,32 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
 
     flush();
 
-    if (segments.length === 0) {
-      return null;
-    }
+    this.#lastViewport = {
+      timeScaleWidth,
+      scrollPosition,
+      visibleLogicalRange,
+      priceVisibleRange,
+      fillColor: this.#fillColor,
+      dataRef: this.#data
+    };
 
-    return new BandCloudRenderer(segments, this.#fillColor);
+    this.#renderer = segments.length > 0 ? new BandCloudRenderer(segments, this.#fillColor) : null;
+    return this.#renderer;
   }
+}
+
+function logicalRangesEqual(left: LogicalRange | null, right: LogicalRange | null): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+
+  return left.from === right.from && left.to === right.to;
+}
+
+function numericRangesEqual(left: IRange<number> | null, right: IRange<number> | null): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+
+  return left.from === right.from && left.to === right.to;
 }
