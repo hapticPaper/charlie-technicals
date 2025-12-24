@@ -16,6 +16,8 @@ import type {
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
+import { BandCloudPrimitive, type BandCloudPoint } from "./BandCloudPrimitive";
+
 type ChartAnnotations = {
   trade?: TradePlan;
 };
@@ -456,6 +458,33 @@ function toAreaShadeSeriesData(
   return out;
 }
 
+function toBandCloudPoints(
+  t: number[],
+  upper: Array<number | null>,
+  lower: Array<number | null>
+): BandCloudPoint[] {
+  const out: BandCloudPoint[] = [];
+  const len = Math.min(t.length, upper.length, lower.length);
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(t[i]);
+    if (time === null) {
+      continue;
+    }
+
+    const u = upper[i];
+    const l = lower[i];
+    if (typeof u !== "number" || !Number.isFinite(u) || typeof l !== "number" || !Number.isFinite(l)) {
+      out.push({ time, upper: Number.NaN, lower: Number.NaN });
+      continue;
+    }
+
+    out.push({ time, upper: u, lower: l });
+  }
+
+  return out;
+}
+
 function toHistogramSeriesData(
   t: number[],
   values: Array<number | null>,
@@ -756,6 +785,16 @@ export function ReportChart(props: {
           )
         : null;
 
+      const cloudAnchorSeries = chart.addSeries(LineSeries, {
+        color: "transparent",
+        lineWidth: 1,
+        lineVisible: false,
+        crosshairMarkerVisible: false,
+        priceScaleId: PRICE_SCALE_ID,
+        priceLineVisible: false,
+        lastValueVisible: false
+      }, MAIN_PANE_INDEX);
+
       const priceSeries = chart.addSeries(CandlestickSeries, {
         upColor: bull,
         downColor: bear,
@@ -865,6 +904,26 @@ export function ReportChart(props: {
           }, MAIN_PANE_INDEX)
         : null;
 
+      const bbCloud = bbUpperSeries && bbLowerSeries
+        ? new BandCloudPrimitive({
+            fillColor: withAlpha(muted, 0.18),
+            zOrder: "normal"
+          })
+        : null;
+      const kcCloud = kcUpperSeries && kcLowerSeries
+        ? new BandCloudPrimitive({
+            fillColor: withAlpha(warn, 0.16),
+            zOrder: "normal"
+          })
+        : null;
+
+      if (bbCloud) {
+        cloudAnchorSeries.attachPrimitive(bbCloud);
+      }
+      if (kcCloud) {
+        cloudAnchorSeries.attachPrimitive(kcCloud);
+      }
+
       const volumeSeries = hasVolume
         ? chart.addSeries(HistogramSeries, {
             priceScaleId: VOLUME_SCALE_ID,
@@ -933,6 +992,7 @@ export function ReportChart(props: {
       const ha = toHeikinAshiCandles({ t: series.t, open, high: series.high, low: series.low, close: series.close });
 
       priceSeries.setData(ha.candles);
+      cloudAnchorSeries.setData(toLineSeriesData(series.t, ha.haClose));
       smaSeries.setData(toLineSeriesData(series.t, series.sma20));
       emaSeries.setData(toLineSeriesData(series.t, series.ema20));
       bbUpperSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.upper ?? []));
@@ -940,6 +1000,13 @@ export function ReportChart(props: {
       kcUpperSeries?.setData(toLineSeriesData(series.t, series.keltner20?.upper ?? []));
       kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
       rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
+
+      bbCloud?.setData(
+        toBandCloudPoints(series.t, series.bollinger20?.upper ?? [], series.bollinger20?.lower ?? [])
+      );
+      kcCloud?.setData(
+        toBandCloudPoints(series.t, series.keltner20?.upper ?? [], series.keltner20?.lower ?? [])
+      );
 
       if (hasSqueeze && series.ttmSqueeze20?.squeezeState) {
         squeezeOnShadeSeries?.setData(
