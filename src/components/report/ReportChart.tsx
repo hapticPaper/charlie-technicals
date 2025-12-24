@@ -749,6 +749,8 @@ export function ReportChart(props: {
           )
         : null;
 
+      let didCleanup = false;
+
       // Squeeze shading is meant to act like a background wash. lightweight-charts draws later-added
       // series on top, so keep these shade AreaSeries created before the candlesticks.
       const squeezeOnShadeSeries = hasSqueeze
@@ -1241,8 +1243,22 @@ export function ReportChart(props: {
       });
 
       cleanup = () => {
+        if (didCleanup) {
+          return;
+        }
+        didCleanup = true;
+
         watermarkPlugin?.detach();
         squeezeMarkerPlugin?.detach();
+        if (cloudAnchorSeries) {
+          if (bbCloud) {
+            cloudAnchorSeries.detachPrimitive(bbCloud);
+          }
+          if (kcCloud) {
+            cloudAnchorSeries.detachPrimitive(kcCloud);
+          }
+          chart.removeSeries(cloudAnchorSeries);
+        }
         chart.remove();
       };
     }
