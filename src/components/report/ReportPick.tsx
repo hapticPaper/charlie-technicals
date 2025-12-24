@@ -65,7 +65,7 @@ export function ReportPick(props: { symbol: string }) {
     series1d = mustGetSeries(report, props.symbol, "1d");
     series15m = mustGetSeries(report, props.symbol, "15m");
   } catch {
-    return <p>Missing series data for {props.symbol}.</p>;
+    return <p>Missing price series data for {props.symbol} (cannot render report charts).</p>;
   }
 
   return (
