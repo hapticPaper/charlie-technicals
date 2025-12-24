@@ -1176,10 +1176,11 @@ function buildPicks(args: {
   candidates.sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
 
   function stripCandidate(candidate: Candidate): ReportPick {
-    const { absMove1dAtr14, breakout, hasParticipation, ...pick } = candidate;
+    const { absMove1dAtr14, breakout, hasParticipation, dollarVolume1d, ...pick } = candidate;
     void absMove1dAtr14;
     void breakout;
     void hasParticipation;
+    void dollarVolume1d;
     return pick;
   }
 
@@ -1204,9 +1205,6 @@ function buildPicks(args: {
 
   const watchlistCandidates = candidates.filter((c) => isWatchlistEntry(c, pickSymbols));
 
-  const watchlist: ReportPick[] = [];
-  const watchlistSymbols = new Set<string>();
-
   // Bucket 1: explicit (signal-driven) setups that are still sub-ATR on the day.
   // These may not always be the top dollar-volume names, but they should be technically meaningful.
   const signalCandidates = watchlistCandidates
@@ -1214,32 +1212,32 @@ function buildPicks(args: {
     .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol))
     .slice(0, Math.min(REPORT_MAX_WATCHLIST, 4));
 
-  for (const c of signalCandidates) {
-    if (watchlist.length >= REPORT_MAX_WATCHLIST) {
-      break;
-    }
-    watchlist.push(stripCandidate(c));
-    watchlistSymbols.add(c.symbol);
-  }
+  const signalSymbols = new Set(signalCandidates.map((c) => c.symbol));
+  const remainingSlots = Math.max(0, REPORT_MAX_WATCHLIST - signalCandidates.length);
 
   // Bucket 2: fill the remainder with the most-liquid names (dollar volume), biasing toward momentum/score.
-  const byDollarVolume = watchlistCandidates
-    .filter((c) => !watchlistSymbols.has(c.symbol))
+  // When dollar volume is missing, fall back to score-based ordering (but rank those names last).
+  const withDollarVolume = watchlistCandidates
+    .filter((c) => !signalSymbols.has(c.symbol) && c.dollarVolume1d !== null)
     .sort((a, b) => {
-      const dvA = a.dollarVolume1d ?? 0;
-      const dvB = b.dollarVolume1d ?? 0;
-      return dvB - dvA || b.score - a.score || a.symbol.localeCompare(b.symbol);
+      return (
+        b.dollarVolume1d! - a.dollarVolume1d! ||
+        b.score - a.score ||
+        a.symbol.localeCompare(b.symbol)
+      );
     })
-    // Keep this bucket anchored to the liquid leaders to avoid surfacing random low-liquidity names.
     .slice(0, REPORT_MAX_WATCHLIST * 4);
 
-  for (const c of byDollarVolume) {
-    if (watchlist.length >= REPORT_MAX_WATCHLIST) {
-      break;
-    }
-    watchlist.push(stripCandidate(c));
-    watchlistSymbols.add(c.symbol);
-  }
+  const withoutDollarVolume = watchlistCandidates
+    .filter((c) => !signalSymbols.has(c.symbol) && c.dollarVolume1d === null)
+    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
+
+  const byDollarVolume = withDollarVolume.concat(withoutDollarVolume).slice(0, remainingSlots);
+
+  const watchlist = signalCandidates
+    .concat(byDollarVolume)
+    .slice(0, REPORT_MAX_WATCHLIST)
+    .map(stripCandidate);
 
   return { picks, watchlist };
 }
