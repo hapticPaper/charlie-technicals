@@ -465,20 +465,33 @@ function toBandCloudPoints(
 ): BandCloudPoint[] {
   const out: BandCloudPoint[] = [];
   const len = Math.min(t.length, upper.length, lower.length);
+  // Only draw band segments when *both* upper and lower are finite; treat any partial-invalid sample
+  // as a full break in the band and emit a single null/null point to terminate the previous run.
+  let lastWasValid = false;
 
   for (let i = 0; i < len; i += 1) {
     const time = toUtcTimestamp(t[i]);
     if (time === null) {
+      lastWasValid = false;
       continue;
     }
 
     const u = upper[i];
     const l = lower[i];
-    out.push({
-      time,
-      upper: typeof u === "number" && Number.isFinite(u) ? u : null,
-      lower: typeof l === "number" && Number.isFinite(l) ? l : null
-    });
+
+    const uOk = typeof u === "number" && Number.isFinite(u);
+    const lOk = typeof l === "number" && Number.isFinite(l);
+
+    if (uOk && lOk) {
+      out.push({ time, upper: u, lower: l });
+      lastWasValid = true;
+      continue;
+    }
+
+    if (lastWasValid) {
+      out.push({ time, upper: null, lower: null });
+      lastWasValid = false;
+    }
   }
 
   return out;
