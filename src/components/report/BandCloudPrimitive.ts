@@ -11,8 +11,8 @@ import type { CanvasRenderingTarget2D } from "fancy-canvas";
 
 export type BandCloudPoint = {
   time: Time;
-  upper: number;
-  lower: number;
+  upper: number | null;
+  lower: number | null;
 };
 
 export type BandCloudPrimitiveOptions = {
@@ -147,7 +147,12 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     };
 
     for (const point of this.#data) {
-      if (!Number.isFinite(point.upper) || !Number.isFinite(point.lower)) {
+      if (
+        typeof point.upper !== "number" ||
+        !Number.isFinite(point.upper) ||
+        typeof point.lower !== "number" ||
+        !Number.isFinite(point.lower)
+      ) {
         flush();
         continue;
       }

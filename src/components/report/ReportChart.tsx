@@ -474,12 +474,11 @@ function toBandCloudPoints(
 
     const u = upper[i];
     const l = lower[i];
-    if (typeof u !== "number" || !Number.isFinite(u) || typeof l !== "number" || !Number.isFinite(l)) {
-      out.push({ time, upper: Number.NaN, lower: Number.NaN });
-      continue;
-    }
-
-    out.push({ time, upper: u, lower: l });
+    out.push({
+      time,
+      upper: typeof u === "number" && Number.isFinite(u) ? u : null,
+      lower: typeof l === "number" && Number.isFinite(l) ? l : null
+    });
   }
 
   return out;
@@ -785,6 +784,7 @@ export function ReportChart(props: {
           )
         : null;
 
+      // Hidden host series for primitives (band clouds). Added after squeeze shading so clouds render above the wash.
       const cloudAnchorSeries = chart.addSeries(LineSeries, {
         color: "transparent",
         lineWidth: 1,
