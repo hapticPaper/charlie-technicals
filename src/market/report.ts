@@ -16,10 +16,6 @@ import { REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHORT_MAX_WORDS, SQ
 
 import type { TradePlan, TradeSide } from "./types";
 
-function activeSignals(series: ReportIntervalSeries): string[] {
-  return series.signals.filter((s) => s.active).map((s) => s.label);
-}
-
 function activeSignalLabels(series: AnalyzedSeries): string[] {
   return series.signals.filter((s) => s.active).map((s) => s.label);
 }
@@ -144,6 +140,14 @@ const PICK_SCORE = {
   rsiDeviationScaleDiv: 6
 } as const;
 
+const PICK_NON_SELECTABLE_SYMBOL_PREFIXES = ["^"] as const;
+
+// Single source of truth for pick/watchlist symbol eligibility.
+function isNonSelectableSymbol(symbol: string): boolean {
+  // Market context symbols (e.g. indices like ^VIX) are still allowed elsewhere (regime readout, most active).
+  return PICK_NON_SELECTABLE_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix));
+}
+
 const REGIME_POLICY = {
   riskOn: {
     breadthPctMin: 0.55,
@@ -154,6 +158,33 @@ const REGIME_POLICY = {
     vixChangePctMin: 0.02
   }
 } as const;
+
+// Narrative-only bias: intentionally conservative to avoid overconfident stance on small watchlists.
+const WATCHLIST_NARRATIVE_BIAS_MIN_TOTAL = 4;
+const WATCHLIST_NARRATIVE_BIAS_MIN_MARGIN = 2;
+
+function getNarrativeWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" {
+  let buyCount = 0;
+  let sellCount = 0;
+  for (const p of picks) {
+    // Bias is based on directional trade setups only.
+    if (p.trade.side === "buy") {
+      buyCount += 1;
+    } else if (p.trade.side === "sell") {
+      sellCount += 1;
+    }
+  }
+
+  const total = buyCount + sellCount;
+  const margin = Math.abs(buyCount - sellCount);
+
+  // Avoid overconfident narrative on small watchlists.
+  if (total >= WATCHLIST_NARRATIVE_BIAS_MIN_TOTAL && margin >= WATCHLIST_NARRATIVE_BIAS_MIN_MARGIN) {
+    return buyCount > sellCount ? "bullish" : "bearish";
+  }
+
+  return "mixed";
+}
 
 type BreakoutHit =
   | {
@@ -912,17 +943,24 @@ function buildPicks(args: {
     absMove1dAtr14: number | null;
     breakout: BreakoutHit;
     hasParticipation: boolean;
+    dollarVolume1d: number | null;
   };
 
   const candidates: Candidate[] = [];
 
   for (const symbol of Object.keys(args.analyzedBySymbol)) {
+    if (isNonSelectableSymbol(symbol)) {
+      continue;
+    }
+
     const series15m = args.analyzedBySymbol[symbol]?.["15m"];
     const series1h = args.analyzedBySymbol[symbol]?.["1h"];
     const series1d = args.analyzedBySymbol[symbol]?.["1d"];
     if (!series15m || !series1d) {
       continue;
     }
+
+    const dollarVolume1d = safeDollarVolume(series1d.bars.at(-1));
 
     const breakout = detectDailyBreakout(series1d);
 
@@ -1165,17 +1203,19 @@ function buildPicks(args: {
         "1d": signals1d
       },
       breakout,
-      hasParticipation
+      hasParticipation,
+      dollarVolume1d
     });
   }
 
   candidates.sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
 
   function stripCandidate(candidate: Candidate): ReportPick {
-    const { absMove1dAtr14, breakout, hasParticipation, ...pick } = candidate;
+    const { absMove1dAtr14, breakout, hasParticipation, dollarVolume1d, ...pick } = candidate;
     void absMove1dAtr14;
     void breakout;
     void hasParticipation;
+    void dollarVolume1d;
     return pick;
   }
 
@@ -1194,14 +1234,44 @@ function buildPicks(args: {
     return candidate.basis === "trend" || subAtr;
   }
 
+  function hasDollarVolume1d(
+    candidate: Candidate
+  ): candidate is Candidate & { dollarVolume1d: NonNullable<Candidate["dollarVolume1d"]> } {
+    return candidate.dollarVolume1d !== null;
+  }
+
   const picks = candidates.filter(isTechnicalTrade).slice(0, REPORT_MAX_PICKS).map(stripCandidate);
 
   const pickSymbols = new Set(picks.map((p) => p.symbol));
 
-  const watchlist = candidates
-    .filter((c) => isWatchlistEntry(c, pickSymbols))
-    .slice(0, REPORT_MAX_WATCHLIST)
-    .map(stripCandidate);
+  const watchlistCandidates = candidates.filter((c) => isWatchlistEntry(c, pickSymbols));
+
+  // Bucket 1: explicit (signal-driven) setups that are still sub-ATR on the day.
+  // These may not always be the top dollar-volume names, but they should be technically meaningful.
+  const signalCandidates = watchlistCandidates
+    .filter((c) => c.basis === "signal")
+    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol))
+    .slice(0, Math.min(REPORT_MAX_WATCHLIST, 4));
+
+  const signalSymbols = new Set(signalCandidates.map((c) => c.symbol));
+  const remainingSlots = Math.max(0, REPORT_MAX_WATCHLIST - signalCandidates.length);
+
+  // Bucket 2: fill the remainder with the most-liquid names (dollar volume), biasing toward momentum/score.
+  // When dollar volume is missing, fall back to score-based ordering (but rank those names last).
+  const withDollarVolume = watchlistCandidates
+    .filter((c) => !signalSymbols.has(c.symbol))
+    .filter(hasDollarVolume1d)
+    .sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || b.score - a.score || a.symbol.localeCompare(b.symbol))
+    .slice(0, remainingSlots);
+
+  const withoutDollarVolume = watchlistCandidates
+    .filter((c) => !signalSymbols.has(c.symbol) && c.dollarVolume1d === null)
+    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol))
+    .slice(0, remainingSlots);
+
+  const byDollarVolume = [...withDollarVolume, ...withoutDollarVolume].slice(0, remainingSlots);
+
+  const watchlist = signalCandidates.concat(byDollarVolume).map(stripCandidate);
 
   return { picks, watchlist };
 }
@@ -1287,9 +1357,8 @@ function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<Ma
     }
 
     const [breadthUpPct, breadthDownPct, breadthFlatPct] = breadthPercentsRounded;
-    regimeParts.push(
-      `breadth ${breadthUpPct}% up / ${breadthDownPct}% down / ${breadthFlatPct}% flat (${breadthUp}/${breadthDown}/${breadthFlat}/${breadthTotal})`
-    );
+    const flatLabel = breadthFlatPct > 0 ? ` / ${breadthFlatPct}% flat` : "";
+    regimeParts.push(`breadth ${breadthUpPct}% up / ${breadthDownPct}% down${flatLabel}`);
   }
   if (vixClose !== null) {
     const vixPctLabel =
@@ -1297,10 +1366,10 @@ function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<Ma
     regimeParts.push(`VIX ${vixClose.toFixed(1)}${vixPctLabel}`);
   }
   if (concentrationPct !== null) {
-    regimeParts.push(`concentration top10 ${(concentrationPct * 100).toFixed(0)}% of $vol`);
+    regimeParts.push(`top10 concentration ${(concentrationPct * 100).toFixed(0)}% of $vol`);
   }
   if (breakoutsUp + breakoutsDown > 0) {
-    regimeParts.push(`breakouts ${breakoutsUp}↑/${breakoutsDown}↓ (20/55/252d)`);
+    regimeParts.push(`breakouts ${breakoutsUp} up / ${breakoutsDown} down (20/55/252d)`);
   }
 
   let regimeLabel: string | null = null;
@@ -1329,7 +1398,6 @@ function buildSummaries(
   picks: ReportPick[],
   watchlist: ReportPick[],
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>,
-  seriesBySymbol: Record<string, Partial<Record<MarketInterval, ReportIntervalSeries>>>,
   missingSymbols: string[]
 ): MarketReport["summaries"] {
   function median(values: number[]): number | null {
@@ -1362,34 +1430,18 @@ function buildSummaries(
     return `${words.slice(0, maxWords).join(" ")} …`;
   }
 
-  const lines: string[] = [];
-
-  for (const symbol of Object.keys(seriesBySymbol).sort()) {
-    const intervals = seriesBySymbol[symbol];
-    const hits: string[] = [];
-    for (const maybeSeries of Object.values(intervals)) {
-      if (maybeSeries) {
-        hits.push(...activeSignals(maybeSeries));
-      }
+  function describeVolatility(medAbsMoveAtr: number): string {
+    if (medAbsMoveAtr >= 1.5) {
+      return "elevated";
     }
-    const unique = Array.from(new Set(hits));
-    if (unique.length > 0) {
-      lines.push(`${symbol}: ${unique.slice(0, 2).join("; ")}`);
+    if (medAbsMoveAtr >= 1.0) {
+      return "active";
     }
+    if (medAbsMoveAtr >= 0.6) {
+      return "moderate";
+    }
+    return "muted";
   }
-
-  const veryShort = capWords(
-    picks.length === 0
-      ? lines.length === 0
-          ? "No major technical signals triggered in the configured rules." +
-              (missingSymbols.length > 0 ? " (Some symbols missing.)" : "")
-          : lines.slice(0, 3).join(" | ") + (lines.length > 3 ? " | …" : "")
-      : picks
-          .slice(0, 3)
-          .map((p) => `${p.symbol}: ${p.trade.side.toUpperCase()} (stop ${p.trade.stop.toFixed(2)})`)
-          .join(" | ") + (picks.length > 3 ? " | …" : ""),
-    REPORT_VERY_SHORT_MAX_WORDS
-  );
 
   const { regimeParts, regimeLabel } = computeRegimeReadout(analyzedBySymbol);
 
@@ -1412,72 +1464,77 @@ function buildSummaries(
 
   const mainIdeaParts: string[] = [];
   if (regimeParts.length > 0) {
-    const label = regimeLabel ? `${regimeLabel}: ` : "";
-    mainIdeaParts.push(`Fear/greed + concentration: ${label}${regimeParts.join("; ")}.`);
+    const label = regimeLabel ? `${regimeLabel}` : null;
+    mainIdeaParts.push(`${label ? `Risk tone was ${label}` : "Risk tone"}: ${regimeParts.join(", ")}.`);
   }
   if (medAbsMoveAtr !== null) {
+    const label = describeVolatility(medAbsMoveAtr);
     mainIdeaParts.push(
-      `Volatility context: median 1d move was ${medAbsMoveAtr.toFixed(1)} ATR (≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
+      `Volatility was ${label} (median 1d move ${medAbsMoveAtr.toFixed(1)} ATR; ≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
     );
   }
-  if (picks.length === 0 && lines.length === 0) {
-    mainIdeaParts.push(
-      "Across the configured universe, the ruleset did not flag aligned momentum, breakouts, or key level interactions on the latest bar."
-    );
-  } else if (picks.length > 0) {
-    mainIdeaParts.push(
-      `Top setups today: ${picks
-        .slice(0, REPORT_MAX_PICKS)
-        .map((p) => `${p.symbol} ${p.trade.side}`)
-        .join(", ")}.`
-    );
-  } else if (watchlist.length > 0) {
-    mainIdeaParts.push(
-      `No high-conviction technical trades met the filter today; watchlist: ${watchlist
-        .slice(0, REPORT_MAX_PICKS)
-        .map((p) => `${p.symbol} ${p.trade.side}`)
-        .join(", ")}.`
-    );
+  if (picks.length === 0) {
+    mainIdeaParts.push("No high-conviction technical trades met the filter today; focus is on watchlist follow-through.");
   } else {
     mainIdeaParts.push(
-      `The ruleset flagged actionable signals in ${lines.length} symbol${lines.length === 1 ? "" : "s"} on the latest bar.`
+      `Top setups: ${picks
+        .slice(0, REPORT_MAX_PICKS)
+        .map((p) => `${p.symbol} ${p.trade.side}`)
+        .join(", ")}.`
     );
   }
-  if (missingSymbols.length > 0) {
-    mainIdeaParts.push(`Missing symbols from provider (${missingSymbols.length}): ${formatList(missingSymbols, 8)}.`);
-  }
+
+  const watchlistTake = (() => {
+    if (watchlist.length === 0) {
+      return "Watchlist stance: none flagged; staying selective into the next few sessions.";
+    }
+
+    const bias = getNarrativeWatchlistBias(watchlist);
+    return `Watchlist stance: ${bias} bias, watching ${watchlist
+      .slice(0, REPORT_MAX_WATCHLIST)
+      .map((p) => p.symbol)
+      .join(", ")} for follow-through.`;
+  })();
+
+  const veryShort = capWords(watchlistTake, REPORT_VERY_SHORT_MAX_WORDS);
 
   const summaryParts: string[] = [];
   summaryParts.push(`Report date: ${date}.`);
+
   if (regimeParts.length > 0) {
-    const label = regimeLabel ? `${regimeLabel}: ` : "";
-    summaryParts.push(`Risk tone (fear/greed + concentration): ${label}${regimeParts.join("; ")}.`);
+    const label = regimeLabel ? `${regimeLabel}` : "mixed";
+    summaryParts.push(`Market take: ${label} tone — ${regimeParts.join(", ")}.`);
   }
+  if (medAbsMoveAtr !== null) {
+    const label = describeVolatility(medAbsMoveAtr);
+    summaryParts.push(
+      `Volatility: ${label} (median 1d move ${medAbsMoveAtr.toFixed(1)} ATR; ≥1 ATR: ${movedAtLeast1Atr}; ≥2 ATR: ${movedAtLeast2Atr}).`
+    );
+  }
+
   if (picks.length > 0) {
-    summaryParts.push("Top setups:");
+    summaryParts.push("Technical trades:");
     for (const p of picks) {
       summaryParts.push(
         `- ${p.symbol}: ${p.trade.side.toUpperCase()} entry ${p.trade.entry.toFixed(2)}, stop ${p.trade.stop.toFixed(2)}`
       );
     }
-  } else if (watchlist.length > 0) {
+  } else {
+    summaryParts.push("Technical trades: none met the filter today.");
+  }
+
+  summaryParts.push(watchlistTake);
+
+  if (watchlist.length > 0) {
     summaryParts.push("Watchlist:");
     for (const p of watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
       const basis = p.basis === "trend" ? "trend" : p.basis === "signal" ? "sub-ATR signal" : "watchlist";
       summaryParts.push(`- ${p.symbol}: ${p.trade.side.toUpperCase()} (${basis})`);
     }
-  } else if (lines.length > 0) {
-    summaryParts.push("Top hits:");
-    for (const l of lines.slice(0, 8)) {
-      summaryParts.push(`- ${l}`);
-    }
-  } else {
-    summaryParts.push("No active signals were detected on the latest bar. Use the charts below to sanity-check the context.");
   }
+
   if (missingSymbols.length > 0) {
-    summaryParts.push(
-      `Symbols skipped due to missing data (${missingSymbols.length}): ${formatList(missingSymbols, 12)}.`
-    );
+    summaryParts.push(`Missing symbols from provider (${missingSymbols.length}): ${formatList(missingSymbols, 12)}.`);
   }
 
   const rawSummary = summaryParts.join("\n");
@@ -1509,7 +1566,7 @@ export function buildMarketReport(args: {
 
   const { picks, watchlist } = buildPicks({ analyzedBySymbol });
   const mostActive = buildMostActive({ analyzedBySymbol });
-  const summaries = buildSummaries(args.date, picks, watchlist, analyzedBySymbol, seriesBySymbol, args.missingSymbols);
+  const summaries = buildSummaries(args.date, picks, watchlist, analyzedBySymbol, args.missingSymbols);
 
   return {
     date: args.date,
@@ -1561,10 +1618,15 @@ export function buildReportMdx(report: MarketReport): string {
     }
   }
 
-  if (report.watchlist?.length) {
-    lines.push("## Watchlist");
+  lines.push("## Watchlist");
+  lines.push("");
+
+  const watchlistEntries = (report.watchlist ?? []).slice(0, REPORT_MAX_WATCHLIST);
+  if (watchlistEntries.length === 0) {
+    lines.push("No watchlist names stood out today; staying selective until volatility expands.");
     lines.push("");
-    for (const p of report.watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
+  } else {
+    for (const p of watchlistEntries) {
       const basis = p.basis === "trend" ? "trend" : p.basis === "signal" ? "sub-ATR signal" : "watchlist";
       const atrLabel =
         typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
@@ -1573,6 +1635,13 @@ export function buildReportMdx(report: MarketReport): string {
       lines.push(`- ${p.symbol}: ${p.trade.side.toUpperCase()} (${basis})${atrLabel}`);
     }
     lines.push("");
+
+    for (const pick of watchlistEntries) {
+      lines.push(`### ${pick.symbol}`);
+      lines.push("");
+      lines.push(`<ReportPick symbol="${pick.symbol}" />`);
+      lines.push("");
+    }
   }
 
   lines.push("## Universe");
@@ -1581,7 +1650,7 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push("");
   lines.push("## Charts");
   lines.push("");
-  lines.push("(Charts are rendered per-pick above; full series live in the JSON report.)");
+  lines.push("(Charts are rendered per-setup above; full series live in the JSON report.)");
   lines.push("");
 
   return `${lines.join("\n")}\n`;

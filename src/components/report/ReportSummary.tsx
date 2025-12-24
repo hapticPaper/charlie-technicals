@@ -112,9 +112,11 @@ export function ReportSummary() {
       ) : null}
 
       <p>
-        <strong>Main idea:</strong> {report.summaries.mainIdea}
+        <strong>Market:</strong> {report.summaries.mainIdea}
       </p>
-      <p className="report-muted">{report.summaries.veryShort}</p>
+      <p className="report-muted">
+        <strong>Watchlist:</strong> {report.summaries.veryShort}
+      </p>
 
       <details className="report-muted">
         <summary>Full context</summary>

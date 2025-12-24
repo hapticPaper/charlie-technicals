@@ -47,12 +47,17 @@ function mustGetSeries(report: ReturnType<typeof useReport>, symbol: string, int
 export function ReportPick(props: { symbol: string }) {
   const report = useReport();
   const pick = report.picks.find((p) => p.symbol === props.symbol);
-  if (!pick) {
-    return <p>Missing pick data.</p>;
+  const watch = report.watchlist?.find((p) => p.symbol === props.symbol);
+  const hasDuplicateSetup = pick != null && watch != null;
+  const setup = pick ?? watch;
+  if (!setup) {
+    return <p>Missing setup data for {props.symbol}.</p>;
   }
 
-  const formatted = formatTrade(pick.trade);
-  const isBuy = pick.trade.side === "buy";
+  const setupTypeLabel = hasDuplicateSetup ? "Trade (also on Watchlist)" : pick ? "Trade" : "Watchlist";
+
+  const formatted = formatTrade(setup.trade);
+  const isBuy = setup.trade.side === "buy";
 
   let series1d;
   let series15m;
@@ -60,7 +65,7 @@ export function ReportPick(props: { symbol: string }) {
     series1d = mustGetSeries(report, props.symbol, "1d");
     series15m = mustGetSeries(report, props.symbol, "15m");
   } catch {
-    return <p>Missing series for pick.</p>;
+    return <p>Missing price series data for {props.symbol} (cannot render report charts).</p>;
   }
 
   return (
@@ -68,7 +73,8 @@ export function ReportPick(props: { symbol: string }) {
       <div className={styles.pickHeader}>
         <div className={styles.badges}>
           <span className={isBuy ? styles.badgeBuy : styles.badgeSell}>{formatted.sideLabel}</span>
-          <span className={styles.badgeNeutral}>Score {pick.score}</span>
+          <span className={styles.badgeNeutral}>{setupTypeLabel}</span>
+          <span className={styles.badgeNeutral}>Score {setup.score}</span>
         </div>
         <div className={styles.tradeSummary}>
           Entry {formatted.entry} | Stop {formatted.stop}
@@ -89,36 +95,36 @@ export function ReportPick(props: { symbol: string }) {
           <div className={styles.kValue}>{formatted.targets.join(" / ")}</div>
         </div>
 
-        {typeof pick.atr14_1d === "number" && Number.isFinite(pick.atr14_1d) ? (
+        {typeof setup.atr14_1d === "number" && Number.isFinite(setup.atr14_1d) ? (
           <div className={styles.kv}>
             <div className={styles.kLabel}>ATR14 (1d)</div>
-            <div className={styles.kValue}>{formatPrice(pick.atr14_1d, pick.trade.entry)}</div>
+            <div className={styles.kValue}>{formatPrice(setup.atr14_1d, setup.trade.entry)}</div>
           </div>
         ) : null}
-        {typeof pick.move1d === "number" && Number.isFinite(pick.move1d) ? (
+        {typeof setup.move1d === "number" && Number.isFinite(setup.move1d) ? (
           <div className={styles.kv}>
             <div className={styles.kLabel}>1d move</div>
             <div className={styles.kValue}>
-              {formatSignedPrice(pick.move1d, pick.trade.entry)}
-              {typeof pick.move1dAtr14 === "number" && Number.isFinite(pick.move1dAtr14)
-                ? ` (${Math.abs(pick.move1dAtr14).toFixed(1)} ATR)`
+              {formatSignedPrice(setup.move1d, setup.trade.entry)}
+              {typeof setup.move1dAtr14 === "number" && Number.isFinite(setup.move1dAtr14)
+                ? ` (${Math.abs(setup.move1dAtr14).toFixed(1)} ATR)`
                 : ""}
             </div>
           </div>
         ) : null}
       </div>
 
-      {pick.rationale.length > 0 ? (
+      {setup.rationale.length > 0 ? (
         <ul className={styles.rationale}>
-          {pick.rationale.map((r, idx) => (
+          {setup.rationale.map((r, idx) => (
             <li key={idx}>{r}</li>
           ))}
         </ul>
       ) : null}
 
       <div className={styles.charts}>
-        <ReportChart title="1d" series={series1d} annotations={{ trade: pick.trade }} />
-        <ReportChart title="15m" series={series15m} annotations={{ trade: pick.trade }} />
+        <ReportChart title="1d" series={series1d} annotations={{ trade: setup.trade }} />
+        <ReportChart title="15m" series={series15m} annotations={{ trade: setup.trade }} />
       </div>
     </section>
   );
