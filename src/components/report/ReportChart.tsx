@@ -651,6 +651,7 @@ export function ReportChart(props: {
       }, Number.NEGATIVE_INFINITY);
       const maxTradePrice = tradePrices.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
 
+      // Use ">=" so trade levels exactly at the candle high still get headroom (avoids line/label clipping).
       const priceScaleTopMargin =
         tradePrices.length > 0 && Number.isFinite(maxCandleHigh) && maxTradePrice >= maxCandleHigh
           ? TRADE_PRICE_SCALE_TOP_MARGIN
