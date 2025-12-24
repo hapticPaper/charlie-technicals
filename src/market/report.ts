@@ -140,10 +140,12 @@ const PICK_SCORE = {
   rsiDeviationScaleDiv: 6
 } as const;
 
+const PICK_NON_SELECTABLE_SYMBOL_PREFIXES = ["^"] as const;
+
 function isSelectableSymbol(symbol: string): boolean {
   // Pick/watchlist selection should be limited to tradeable names.
   // Market context symbols (e.g. indices like ^VIX) are still allowed elsewhere (regime readout, most active).
-  return /^[A-Z][A-Z0-9.]{0,15}$/.test(symbol);
+  return PICK_NON_SELECTABLE_SYMBOL_PREFIXES.every((prefix) => !symbol.startsWith(prefix));
 }
 
 const REGIME_POLICY = {
@@ -899,7 +901,6 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
 }
 
 function buildPicks(args: {
-  symbols: string[];
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
 }): { picks: ReportPick[]; watchlist: ReportPick[] } {
   // Policy:
@@ -920,7 +921,7 @@ function buildPicks(args: {
 
   const candidates: Candidate[] = [];
 
-  for (const symbol of args.symbols) {
+  for (const symbol of Object.keys(args.analyzedBySymbol)) {
     if (!isSelectableSymbol(symbol)) {
       continue;
     }
@@ -1538,7 +1539,7 @@ export function buildMarketReport(args: {
     analyzedBySymbol[s.symbol][s.interval] = s;
   }
 
-  const { picks, watchlist } = buildPicks({ symbols: args.symbols, analyzedBySymbol });
+  const { picks, watchlist } = buildPicks({ analyzedBySymbol });
   const mostActive = buildMostActive({ analyzedBySymbol });
   const summaries = buildSummaries(args.date, picks, watchlist, analyzedBySymbol, args.missingSymbols);
 
