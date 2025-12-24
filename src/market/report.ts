@@ -159,6 +159,32 @@ const REGIME_POLICY = {
   }
 } as const;
 
+const WATCHLIST_BIAS_MIN_TOTAL = 4;
+const WATCHLIST_BIAS_MIN_MARGIN = 2;
+
+function getWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" {
+  let buyCount = 0;
+  let sellCount = 0;
+  for (const p of picks) {
+    // Bias is based on directional trade setups only.
+    if (p.trade.side === "buy") {
+      buyCount += 1;
+    } else if (p.trade.side === "sell") {
+      sellCount += 1;
+    }
+  }
+
+  const total = buyCount + sellCount;
+  const margin = Math.abs(buyCount - sellCount);
+
+  // Avoid overconfident narrative on small watchlists.
+  if (total >= WATCHLIST_BIAS_MIN_TOTAL && margin >= WATCHLIST_BIAS_MIN_MARGIN) {
+    return buyCount > sellCount ? "bullish" : "bearish";
+  }
+
+  return "mixed";
+}
+
 type BreakoutHit =
   | {
       direction: "up" | "down";
@@ -1455,32 +1481,6 @@ function buildSummaries(
         .map((p) => `${p.symbol} ${p.trade.side}`)
         .join(", ")}.`
     );
-  }
-
-  function getWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" {
-    let buyCount = 0;
-    let sellCount = 0;
-    for (const p of picks) {
-      // Bias is based on directional trade setups only.
-      if (p.trade.side === "buy") {
-        buyCount += 1;
-      } else if (p.trade.side === "sell") {
-        sellCount += 1;
-      }
-    }
-
-    const total = buyCount + sellCount;
-    const margin = Math.abs(buyCount - sellCount);
-
-    // Avoid overconfident narrative on small watchlists.
-    const WATCHLIST_BIAS_MIN_TOTAL = 4;
-    const WATCHLIST_BIAS_MIN_MARGIN = 2;
-
-    if (total >= WATCHLIST_BIAS_MIN_TOTAL && margin >= WATCHLIST_BIAS_MIN_MARGIN) {
-      return buyCount > sellCount ? "bullish" : "bearish";
-    }
-
-    return "mixed";
   }
 
   const watchlistTake = (() => {
