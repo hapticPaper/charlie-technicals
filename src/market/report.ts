@@ -1457,17 +1457,14 @@ function buildSummaries(
     );
   }
 
-  const watchlistTake = (() => {
-    if (watchlist.length === 0) {
-      return "Watchlist stance: none flagged; staying selective into the next few sessions.";
-    }
-
+  function getWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" {
     let buyCount = 0;
     let sellCount = 0;
-    for (const p of watchlist) {
+    for (const p of picks) {
+      // Bias is based on directional trade setups only.
       if (p.trade.side === "buy") {
         buyCount += 1;
-      } else if (p.trade.side === "sell") {
+      } else {
         sellCount += 1;
       }
     }
@@ -1475,12 +1472,23 @@ function buildSummaries(
     const total = buyCount + sellCount;
     const margin = Math.abs(buyCount - sellCount);
 
-    const bias =
-      total >= 4 && margin >= 2
-        ? buyCount > sellCount
-          ? "bullish"
-          : "bearish"
-        : "mixed";
+    // Avoid overconfident narrative on small watchlists.
+    const minTotal = 4;
+    const minMargin = 2;
+
+    if (total >= minTotal && margin >= minMargin) {
+      return buyCount > sellCount ? "bullish" : "bearish";
+    }
+
+    return "mixed";
+  }
+
+  const watchlistTake = (() => {
+    if (watchlist.length === 0) {
+      return "Watchlist stance: none flagged; staying selective into the next few sessions.";
+    }
+
+    const bias = getWatchlistBias(watchlist);
     return `Watchlist stance: ${bias} bias, watching ${watchlist
       .slice(0, REPORT_MAX_WATCHLIST)
       .map((p) => p.symbol)
