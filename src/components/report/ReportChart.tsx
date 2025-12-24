@@ -42,7 +42,9 @@ const TRADE_AUTOSCALE_PAD = {
 
 const TRADE_PRICE_SCALE_TOP_MARGIN = 0.08 as const;
 
-function formatChartTime(time: Time | undefined, locale?: string): string {
+function formatChartTime(time: Time | undefined, locale: string | undefined): string {
+  const safeLocale = typeof locale === "string" && locale.length > 0 ? locale : undefined;
+
   if (!time) {
     return "";
   }
@@ -54,7 +56,10 @@ function formatChartTime(time: Time | undefined, locale?: string): string {
     }
 
     const dt = new Date(millis);
-    return dt.toLocaleString(locale, {
+    if (!Number.isFinite(dt.getTime())) {
+      return "";
+    }
+    return dt.toLocaleString(safeLocale, {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -69,7 +74,7 @@ function formatChartTime(time: Time | undefined, locale?: string): string {
       return "";
     }
 
-    return dt.toLocaleDateString(locale, { month: "2-digit", day: "2-digit" });
+    return dt.toLocaleDateString(safeLocale, { month: "2-digit", day: "2-digit" });
   }
 
   return "";
@@ -155,58 +160,59 @@ function resolveChartLocale(): string | undefined {
   }
 }
 
-// Converts common color formats to rgba with a fixed alpha (overwrites any existing alpha).
+/**
+* Returns `color` as an `rgba(...)` value with a fixed alpha.
+*
+* Supported formats: `rgb(...)`, `rgba(...)`, `#rgb`, `#rrggbb`, `#rgba`, `#rrggbbaa`.
+* Any embedded alpha is ignored and replaced with the provided `alpha`.
+*/
 function withAlpha(color: string, alpha: number): string {
-  if (alpha >= 1) {
+  const safeAlpha = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+
+  const trimmed = color.trim();
+  const isRgba = /^rgba\s*\(/i.test(trimmed);
+
+  const rawHex = trimmed.startsWith("#") ? trimmed.slice(1) : null;
+  const normalizedHex =
+    rawHex !== null && (rawHex.length === 3 || rawHex.length === 4)
+      ? rawHex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : rawHex;
+  const hasHexAlpha = normalizedHex !== null && normalizedHex.length === 8;
+  if (safeAlpha >= 1 && !isRgba && !hasHexAlpha) {
     return color;
   }
 
-  const rgbaMatch = color.match(
+  const rgbaMatch = trimmed.match(
     /^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/i
   );
   if (rgbaMatch) {
-    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`;
+    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${safeAlpha})`;
   }
 
-  const rgbMatch = color.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+  const rgbMatch = trimmed.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
   if (rgbMatch) {
-    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${safeAlpha})`;
   }
 
-  const hex = color.trim();
-  if (!hex.startsWith("#")) {
+  if (normalizedHex === null) {
     return color;
   }
 
-  const raw = hex.slice(1);
-
-  if (raw.length === 3 || raw.length === 4) {
-    const expanded = raw
-      .split("")
-      .map((c) => c + c)
-      .join("");
-    const r = Number.parseInt(expanded.slice(0, 2), 16);
-    const g = Number.parseInt(expanded.slice(2, 4), 16);
-    const b = Number.parseInt(expanded.slice(4, 6), 16);
-    if (![r, g, b].every((n) => Number.isFinite(n))) {
-      return color;
-    }
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  if (normalizedHex.length !== 6 && normalizedHex.length !== 8) {
+    return color;
   }
 
-  if (raw.length === 6 || raw.length === 8) {
-    const r = Number.parseInt(raw.slice(0, 2), 16);
-    const g = Number.parseInt(raw.slice(2, 4), 16);
-    const b = Number.parseInt(raw.slice(4, 6), 16);
-    if (![r, g, b].every((n) => Number.isFinite(n))) {
-      return color;
-    }
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const r = Number.parseInt(normalizedHex.slice(0, 2), 16);
+  const g = Number.parseInt(normalizedHex.slice(2, 4), 16);
+  const b = Number.parseInt(normalizedHex.slice(4, 6), 16);
+  if (![r, g, b].every((n) => Number.isFinite(n))) {
+    return color;
   }
 
-  return color;
+  return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
 }
 
 function toUtcTimestamp(t: number): UTCTimestamp | null {
@@ -620,10 +626,9 @@ export function ReportChart(props: {
         return typeof value === "number" && Number.isFinite(value) ? Math.max(max, value) : max;
       }, Number.NEGATIVE_INFINITY);
       const maxTradePrice = tradePrices.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
-      const hasFiniteHigh = Number.isFinite(maxCandleHigh);
 
       const priceScaleTopMargin =
-        tradePrices.length > 0 && hasFiniteHigh && maxTradePrice >= maxCandleHigh
+        tradePrices.length > 0 && Number.isFinite(maxCandleHigh) && maxTradePrice >= maxCandleHigh
           ? TRADE_PRICE_SCALE_TOP_MARGIN
           : 0;
       const priceScaleMargins = hasVolume
@@ -631,8 +636,6 @@ export function ReportChart(props: {
         : { top: priceScaleTopMargin, bottom: 0.3 };
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
       const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
-
-      const chartLocale = resolveChartLocale();
 
       const chart = createChart(chartElement, {
         autoSize: true,
