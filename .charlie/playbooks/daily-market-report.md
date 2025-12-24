@@ -5,15 +5,24 @@ Generate a daily MDX report (plus supporting JSON artifacts) for the configured 
 
 The rendered report is split into:
 
-- Narrative/context (volatility context + missing symbols)
+- Market commentary (1–3 sentences; what matters over the next few sessions)
 - Most-active names (dollar volume, within the configured universe)
 - Technical trades (signal-based picks that pass the current filters)
-- Watchlist (trend/low-vol names that didn’t meet the technical-trade filter)
+- Watchlist commentary + stance (always present, even when there are zero technical trades)
+- Technical analysis + visuals (charts) for both technical trades and watchlist names
 
 ### Selection rules (current)
 
 - *Technical trades* (`report.picks`): momentum/breakout/levels setups, scored using multi-timeframe momentum (15m/1h/1d), daily breakouts (close above/below prior 20d/55d/252d highs/lows), pivot support/resistance proximity, and a simple supply/demand proxy (range expansion + volume confirmation). If ATR14 is available, names with a sub-1-ATR daily move are filtered out unless they are in a 20d/55d/252d breakout/breakdown.
-- *Watchlist* (`report.watchlist`): trend-following setups, or explicit setups with a sub-1-ATR daily move.
+- *Watchlist* (`report.watchlist`): prioritize liquid (high dollar-volume) names with clear momentum/trend bias and/or an explicit setup that is still sub-ATR on the day. Avoid "random" low-liquidity names unless they're showing a strong trade-quality setup.
+
+### Narrative guidelines (required)
+
+- Always include both:
+  - *Market commentary* (what matters over the next few sessions; focus on breadth/volatility/concentration in plain English).
+  - *Watchlist commentary* (our stance/bias on the watchlist names; what to watch for next).
+- Keep it clean and concise (human-readable).
+- Do not dump per-symbol indicator hits (e.g., "AIG: RSI overbought | …") into the narrative; keep that detail on the technical analysis charts/sections.
 
 ## Creates
 
