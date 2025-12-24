@@ -1199,7 +1199,9 @@ function buildPicks(args: {
     return candidate.basis === "trend" || subAtr;
   }
 
-  function hasDollarVolume1d(candidate: Candidate): candidate is Candidate & { dollarVolume1d: number } {
+  function hasDollarVolume1d(
+    candidate: Candidate
+  ): candidate is Candidate & { dollarVolume1d: NonNullable<Candidate["dollarVolume1d"]> } {
     return candidate.dollarVolume1d !== null;
   }
 
@@ -1221,7 +1223,7 @@ function buildPicks(args: {
 
   // Bucket 2: fill the remainder with the most-liquid names (dollar volume), biasing toward momentum/score.
   // When dollar volume is missing, fall back to score-based ordering (but rank those names last).
-  const withDollarVolume: Candidate[] = watchlistCandidates
+  const withDollarVolume = watchlistCandidates
     .filter((c) => !signalSymbols.has(c.symbol))
     .filter(hasDollarVolume1d)
     .sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || b.score - a.score || a.symbol.localeCompare(b.symbol))
@@ -1232,7 +1234,7 @@ function buildPicks(args: {
     .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol))
     .slice(0, remainingSlots);
 
-  const byDollarVolume = withDollarVolume.concat(withoutDollarVolume).slice(0, remainingSlots);
+  const byDollarVolume = [...withDollarVolume, ...withoutDollarVolume].slice(0, remainingSlots);
 
   const watchlist = signalCandidates.concat(byDollarVolume).map(stripCandidate);
 
