@@ -40,7 +40,11 @@ const TRADE_AUTOSCALE_PAD = {
   minPad: 0.001
 } as const;
 
-function formatChartTime(time: Time | undefined): string {
+const TRADE_PRICE_SCALE_TOP_MARGIN = 0.08 as const;
+
+function formatChartTime(time: Time | undefined, locale: string | undefined): string {
+  const safeLocale = typeof locale === "string" && locale.length > 0 ? locale : undefined;
+
   if (!time) {
     return "";
   }
@@ -52,7 +56,10 @@ function formatChartTime(time: Time | undefined): string {
     }
 
     const dt = new Date(millis);
-    return dt.toLocaleString(undefined, {
+    if (!Number.isFinite(dt.getTime())) {
+      return "";
+    }
+    return dt.toLocaleString(safeLocale, {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -67,7 +74,7 @@ function formatChartTime(time: Time | undefined): string {
       return "";
     }
 
-    return dt.toLocaleDateString(undefined, { month: "2-digit", day: "2-digit" });
+    return dt.toLocaleDateString(safeLocale, { month: "2-digit", day: "2-digit" });
   }
 
   return "";
@@ -125,6 +132,111 @@ function promoteAlpha(color: string, minAlpha = 0.85): string {
   }
 
   return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${minAlpha})`;
+}
+
+function resolveChartLocale(): string | undefined {
+  const raw =
+    typeof navigator !== "undefined"
+      ? (navigator.languages && navigator.languages.length > 0 ? navigator.languages[0] : navigator.language)
+      : undefined;
+  if (typeof raw !== "string" || raw.length === 0) {
+    return undefined;
+  }
+
+  try {
+    const normalized = raw.replace(/_/g, "-").split("@")[0];
+    if (normalized.length === 0) {
+      return undefined;
+    }
+
+    const canonical =
+      typeof Intl !== "undefined" && typeof Intl.getCanonicalLocales === "function"
+        ? Intl.getCanonicalLocales(normalized)[0]
+        : normalized;
+
+    return typeof canonical === "string" && canonical.length > 0 ? canonical : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+* Returns `color` as an `rgba(...)` value with a fixed alpha.
+*
+* Supported formats: `rgb(...)`, `rgba(...)`, `#rgb`, `#rrggbb`, `#rgba`, `#rrggbbaa`.
+* Any embedded alpha is ignored and replaced with the provided `alpha`.
+* RGB channels are clamped to `[0,255]`. Only comma-separated `rgb/rgba` syntax is supported.
+*
+* If `alpha` is not finite, returns `color` unchanged.
+*/
+function withAlpha(color: string, alpha: number): string {
+  if (!Number.isFinite(alpha)) {
+    return color;
+  }
+
+  const safeAlpha = Math.max(0, Math.min(1, alpha));
+
+  const clampRgbChannel = (value: string): number => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(255, parsed));
+  };
+
+  const trimmed = color.trim();
+  const isRgba = /^rgba\s*\(/i.test(trimmed);
+
+  const rawHex = trimmed.startsWith("#") ? trimmed.slice(1) : null;
+  const normalizedHex =
+    rawHex !== null && (rawHex.length === 3 || rawHex.length === 4)
+      ? rawHex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : rawHex;
+  const hasHexAlpha = normalizedHex !== null && normalizedHex.length === 8;
+
+  // Normalize alpha-bearing inputs even when `safeAlpha === 1` so embedded alpha does not leak.
+  if (safeAlpha >= 1 && !isRgba && !hasHexAlpha) {
+    return color;
+  }
+
+  const rgbaMatch = trimmed.match(
+    /^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/i
+  );
+  if (rgbaMatch) {
+    const r = clampRgbChannel(rgbaMatch[1]);
+    const g = clampRgbChannel(rgbaMatch[2]);
+    const b = clampRgbChannel(rgbaMatch[3]);
+    return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+  }
+
+  const rgbMatch = trimmed.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+  if (rgbMatch) {
+    const r = clampRgbChannel(rgbMatch[1]);
+    const g = clampRgbChannel(rgbMatch[2]);
+    const b = clampRgbChannel(rgbMatch[3]);
+    return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+  }
+
+  if (normalizedHex === null) {
+    return color;
+  }
+
+  if (normalizedHex.length !== 6 && normalizedHex.length !== 8) {
+    return color;
+  }
+
+  const r = Number.parseInt(normalizedHex.slice(0, 2), 16);
+  const g = Number.parseInt(normalizedHex.slice(2, 4), 16);
+  const b = Number.parseInt(normalizedHex.slice(4, 6), 16);
+  if (![r, g, b].every((n) => Number.isFinite(n))) {
+    return color;
+  }
+
+  return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
 }
 
 function toUtcTimestamp(t: number): UTCTimestamp | null {
@@ -493,6 +605,8 @@ export function ReportChart(props: {
         return;
       }
 
+      const chartLocale = resolveChartLocale();
+
       const surface = readCssVar("--rp-surface", "rgba(255, 255, 255, 0.06)");
       const border = readCssVar("--rp-border", "rgba(255, 255, 255, 0.12)");
       const grid = readCssVar("--rp-grid", "rgba(255, 255, 255, 0.08)");
@@ -509,8 +623,8 @@ export function ReportChart(props: {
       const warn = readCssVar("--rp-warn", "#f59e0b");
       const target = readCssVar("--rp-target", "#38bdf8");
 
-      const squeezeOnShade = readCssVar("--rp-squeeze-on", "rgba(245, 158, 11, 0.08)");
-      const squeezeOffShade = readCssVar("--rp-squeeze-off", "rgba(34, 197, 94, 0.08)");
+      const squeezeOnShade = withAlpha(warn, 0.08);
+      const squeezeOffShade = withAlpha(bull, 0.08);
 
       const hasVolume =
         Array.isArray(series.volume) &&
@@ -525,15 +639,28 @@ export function ReportChart(props: {
         series.ttmSqueeze20.momentum.length === series.t.length &&
         series.ttmSqueeze20.momentum.some((v) => typeof v === "number" && Number.isFinite(v));
 
-      const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
-      const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
-      const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
-
       const tradePrices = trade
         ? [trade.entry, trade.stop, ...(trade.targets ?? [])].filter(
             (value): value is number => typeof value === "number" && Number.isFinite(value)
           )
         : [];
+
+      const candleHighs = Array.isArray(series.high) ? series.high : [];
+      const maxCandleHigh = candleHighs.reduce((max, value) => {
+        return typeof value === "number" && Number.isFinite(value) ? Math.max(max, value) : max;
+      }, Number.NEGATIVE_INFINITY);
+      const maxTradePrice = tradePrices.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
+
+      // Use ">=" so trade levels exactly at the candle high still get headroom (avoids line/label clipping).
+      const priceScaleTopMargin =
+        tradePrices.length > 0 && Number.isFinite(maxCandleHigh) && maxTradePrice >= maxCandleHigh
+          ? TRADE_PRICE_SCALE_TOP_MARGIN
+          : 0;
+      const priceScaleMargins = hasVolume
+        ? { top: priceScaleTopMargin, bottom: 0.38 }
+        : { top: priceScaleTopMargin, bottom: 0.3 };
+      const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
+      const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
 
       const chart = createChart(chartElement, {
         autoSize: true,
@@ -557,6 +684,9 @@ export function ReportChart(props: {
           timeVisible: true,
           secondsVisible: false,
           rightOffset: 0
+        },
+        localization: {
+          locale: chartLocale
         },
         crosshair: {
           mode: CrosshairMode.Magnet
@@ -950,7 +1080,7 @@ export function ReportChart(props: {
           return;
         }
 
-        const timeLabel = formatChartTime(param.time);
+        const timeLabel = formatChartTime(param.time, chartLocale);
         if (!param.point || !timeLabel) {
           tooltip.style.opacity = "0";
           return;
