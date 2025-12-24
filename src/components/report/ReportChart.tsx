@@ -16,6 +16,8 @@ import type {
 
 import type { ReportIntervalSeries, TradePlan } from "../../market/types";
 
+import { BandCloudPrimitive, type BandCloudPoint } from "./BandCloudPrimitive";
+
 type ChartAnnotations = {
   trade?: TradePlan;
 };
@@ -456,6 +458,45 @@ function toAreaShadeSeriesData(
   return out;
 }
 
+function toBandCloudPoints(
+  t: number[],
+  upper: Array<number | null>,
+  lower: Array<number | null>
+): BandCloudPoint[] {
+  const out: BandCloudPoint[] = [];
+  const len = Math.min(t.length, upper.length, lower.length);
+  // Only draw band segments when *both* upper and lower are finite; treat any partial-invalid sample
+  // as a full break in the band and emit a single null/null point to terminate the previous run.
+  let lastWasValid = false;
+
+  for (let i = 0; i < len; i += 1) {
+    const time = toUtcTimestamp(t[i]);
+    if (time === null) {
+      lastWasValid = false;
+      continue;
+    }
+
+    const u = upper[i];
+    const l = lower[i];
+
+    const uOk = typeof u === "number" && Number.isFinite(u);
+    const lOk = typeof l === "number" && Number.isFinite(l);
+
+    if (uOk && lOk) {
+      out.push({ time, upper: u, lower: l });
+      lastWasValid = true;
+      continue;
+    }
+
+    if (lastWasValid) {
+      out.push({ time, upper: null, lower: null });
+      lastWasValid = false;
+    }
+  }
+
+  return out;
+}
+
 function toHistogramSeriesData(
   t: number[],
   values: Array<number | null>,
@@ -721,6 +762,8 @@ export function ReportChart(props: {
           )
         : null;
 
+      let didCleanup = false;
+
       // Squeeze shading is meant to act like a background wash. lightweight-charts draws later-added
       // series on top, so keep these shade AreaSeries created before the candlesticks.
       const squeezeOnShadeSeries = hasSqueeze
@@ -751,6 +794,26 @@ export function ReportChart(props: {
               lastValueVisible: false,
               priceScaleId: SHADE_SCALE_ID,
               autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } })
+            },
+            MAIN_PANE_INDEX
+          )
+        : null;
+
+      // Hidden host series for primitives (band clouds). Added after squeeze shading so clouds render above the wash.
+      // Uses close values (the basis for BB/KC calculations) to stay aligned with the price scale.
+      const hasBollinger = Boolean(series.bollinger20);
+      const hasKeltner = Boolean(series.keltner20);
+      const cloudAnchorSeries = hasBollinger || hasKeltner
+        ? chart.addSeries(
+            LineSeries,
+            {
+              color: "transparent",
+              lineWidth: 1,
+              lineVisible: false,
+              crosshairMarkerVisible: false,
+              priceScaleId: PRICE_SCALE_ID,
+              priceLineVisible: false,
+              lastValueVisible: false
             },
             MAIN_PANE_INDEX
           )
@@ -824,7 +887,7 @@ export function ReportChart(props: {
         lastValueVisible: false
       }, MAIN_PANE_INDEX);
 
-      const bbUpperSeries = series.bollinger20
+      const bbUpperSeries = hasBollinger
         ? chart.addSeries(LineSeries, {
             color: bollingerColor,
             lineWidth: 1,
@@ -834,7 +897,7 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
-      const bbLowerSeries = series.bollinger20
+      const bbLowerSeries = hasBollinger
         ? chart.addSeries(LineSeries, {
             color: bollingerColor,
             lineWidth: 1,
@@ -844,7 +907,7 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
-      const kcUpperSeries = series.keltner20
+      const kcUpperSeries = hasKeltner
         ? chart.addSeries(LineSeries, {
             color: keltnerColor,
             lineWidth: 1,
@@ -854,7 +917,7 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
-      const kcLowerSeries = series.keltner20
+      const kcLowerSeries = hasKeltner
         ? chart.addSeries(LineSeries, {
             color: keltnerColor,
             lineWidth: 1,
@@ -864,6 +927,26 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
+
+      const bbCloud = cloudAnchorSeries && bbUpperSeries && bbLowerSeries
+        ? new BandCloudPrimitive({
+            fillColor: withAlpha(muted, 0.18),
+            zOrder: "normal"
+          })
+        : null;
+      const kcCloud = cloudAnchorSeries && kcUpperSeries && kcLowerSeries
+        ? new BandCloudPrimitive({
+            fillColor: withAlpha(warn, 0.16),
+            zOrder: "normal"
+          })
+        : null;
+
+      if (bbCloud && cloudAnchorSeries) {
+        cloudAnchorSeries.attachPrimitive(bbCloud);
+      }
+      if (kcCloud && cloudAnchorSeries) {
+        cloudAnchorSeries.attachPrimitive(kcCloud);
+      }
 
       const volumeSeries = hasVolume
         ? chart.addSeries(HistogramSeries, {
@@ -933,6 +1016,7 @@ export function ReportChart(props: {
       const ha = toHeikinAshiCandles({ t: series.t, open, high: series.high, low: series.low, close: series.close });
 
       priceSeries.setData(ha.candles);
+      cloudAnchorSeries?.setData(toLineSeriesData(series.t, series.close));
       smaSeries.setData(toLineSeriesData(series.t, series.sma20));
       emaSeries.setData(toLineSeriesData(series.t, series.ema20));
       bbUpperSeries?.setData(toLineSeriesData(series.t, series.bollinger20?.upper ?? []));
@@ -940,6 +1024,13 @@ export function ReportChart(props: {
       kcUpperSeries?.setData(toLineSeriesData(series.t, series.keltner20?.upper ?? []));
       kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
       rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
+
+      bbCloud?.setData(
+        toBandCloudPoints(series.t, series.bollinger20?.upper ?? [], series.bollinger20?.lower ?? [])
+      );
+      kcCloud?.setData(
+        toBandCloudPoints(series.t, series.keltner20?.upper ?? [], series.keltner20?.lower ?? [])
+      );
 
       if (hasSqueeze && series.ttmSqueeze20?.squeezeState) {
         squeezeOnShadeSeries?.setData(
@@ -1165,8 +1256,22 @@ export function ReportChart(props: {
       });
 
       cleanup = () => {
+        if (didCleanup) {
+          return;
+        }
+        didCleanup = true;
+
         watermarkPlugin?.detach();
         squeezeMarkerPlugin?.detach();
+        if (cloudAnchorSeries) {
+          if (bbCloud) {
+            cloudAnchorSeries.detachPrimitive(bbCloud);
+          }
+          if (kcCloud) {
+            cloudAnchorSeries.detachPrimitive(kcCloud);
+          }
+          chart.removeSeries(cloudAnchorSeries);
+        }
         chart.remove();
       };
     }
