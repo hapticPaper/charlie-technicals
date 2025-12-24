@@ -786,8 +786,9 @@ export function ReportChart(props: {
 
       // Hidden host series for primitives (band clouds). Added after squeeze shading so clouds render above the wash.
       // Uses close values (the basis for BB/KC calculations) to stay aligned with the price scale.
-      const wantsClouds = Boolean(series.bollinger20) || Boolean(series.keltner20);
-      const cloudAnchorSeries = wantsClouds
+      const hasBollinger = Boolean(series.bollinger20);
+      const hasKeltner = Boolean(series.keltner20);
+      const cloudAnchorSeries = hasBollinger || hasKeltner
         ? chart.addSeries(
             LineSeries,
             {
@@ -871,7 +872,7 @@ export function ReportChart(props: {
         lastValueVisible: false
       }, MAIN_PANE_INDEX);
 
-      const bbUpperSeries = series.bollinger20
+      const bbUpperSeries = hasBollinger
         ? chart.addSeries(LineSeries, {
             color: bollingerColor,
             lineWidth: 1,
@@ -881,7 +882,7 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
-      const bbLowerSeries = series.bollinger20
+      const bbLowerSeries = hasBollinger
         ? chart.addSeries(LineSeries, {
             color: bollingerColor,
             lineWidth: 1,
@@ -891,7 +892,7 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
-      const kcUpperSeries = series.keltner20
+      const kcUpperSeries = hasKeltner
         ? chart.addSeries(LineSeries, {
             color: keltnerColor,
             lineWidth: 1,
@@ -901,7 +902,7 @@ export function ReportChart(props: {
             lastValueVisible: false
           }, MAIN_PANE_INDEX)
         : null;
-      const kcLowerSeries = series.keltner20
+      const kcLowerSeries = hasKeltner
         ? chart.addSeries(LineSeries, {
             color: keltnerColor,
             lineWidth: 1,
@@ -912,13 +913,13 @@ export function ReportChart(props: {
           }, MAIN_PANE_INDEX)
         : null;
 
-      const bbCloud = bbUpperSeries && bbLowerSeries
+      const bbCloud = cloudAnchorSeries && bbUpperSeries && bbLowerSeries
         ? new BandCloudPrimitive({
             fillColor: withAlpha(muted, 0.18),
             zOrder: "normal"
           })
         : null;
-      const kcCloud = kcUpperSeries && kcLowerSeries
+      const kcCloud = cloudAnchorSeries && kcUpperSeries && kcLowerSeries
         ? new BandCloudPrimitive({
             fillColor: withAlpha(warn, 0.16),
             zOrder: "normal"
