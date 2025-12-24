@@ -963,62 +963,7 @@ export function ReportChart(props: {
         tooltip.style.opacity = "1";
       });
 
-      const alertTimeouts = new Set<number>();
-      const alertLines = new Set<ReturnType<typeof priceSeries.createPriceLine>>();
-
-      chart.subscribeClick((param) => {
-        const sourceEvent = (param as { sourceEvent?: unknown }).sourceEvent;
-        const hasShift =
-          sourceEvent &&
-          typeof sourceEvent === "object" &&
-          "shiftKey" in sourceEvent &&
-          Boolean((sourceEvent as { shiftKey?: unknown }).shiftKey);
-        if (!hasShift) {
-          return;
-        }
-
-        if (!param.point) {
-          return;
-        }
-
-        const price = priceSeries.coordinateToPrice(param.point.y);
-        if (typeof price !== "number" || !Number.isFinite(price)) {
-          return;
-        }
-
-        const line = priceSeries.createPriceLine({
-          price,
-          color: warn,
-          lineWidth: 1,
-          lineStyle: LineStyle.Dashed,
-          title: `Alert ${price.toFixed(2)}`
-        });
-
-        alertLines.add(line);
-        const timeoutId = window.setTimeout(() => {
-          try {
-            priceSeries.removePriceLine(line);
-          } catch {
-            // Ignore if chart was disposed.
-          }
-          alertLines.delete(line);
-          alertTimeouts.delete(timeoutId);
-        }, 5000);
-        alertTimeouts.add(timeoutId);
-      });
-
       cleanup = () => {
-        for (const id of alertTimeouts) {
-          window.clearTimeout(id);
-        }
-        for (const line of alertLines) {
-          try {
-            priceSeries.removePriceLine(line);
-          } catch {
-            // Ignore if chart was disposed.
-          }
-        }
-
         watermarkPlugin?.detach();
         squeezeMarkerPlugin?.detach();
         chart.remove();
