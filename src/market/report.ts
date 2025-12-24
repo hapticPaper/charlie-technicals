@@ -159,10 +159,11 @@ const REGIME_POLICY = {
   }
 } as const;
 
-const WATCHLIST_BIAS_MIN_TOTAL = 4;
-const WATCHLIST_BIAS_MIN_MARGIN = 2;
+// Narrative-only bias: intentionally conservative to avoid overconfident stance on small watchlists.
+const WATCHLIST_NARRATIVE_BIAS_MIN_TOTAL = 4;
+const WATCHLIST_NARRATIVE_BIAS_MIN_MARGIN = 2;
 
-function getWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" {
+function getNarrativeWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" {
   let buyCount = 0;
   let sellCount = 0;
   for (const p of picks) {
@@ -178,7 +179,7 @@ function getWatchlistBias(picks: ReportPick[]): "bullish" | "bearish" | "mixed" 
   const margin = Math.abs(buyCount - sellCount);
 
   // Avoid overconfident narrative on small watchlists.
-  if (total >= WATCHLIST_BIAS_MIN_TOTAL && margin >= WATCHLIST_BIAS_MIN_MARGIN) {
+  if (total >= WATCHLIST_NARRATIVE_BIAS_MIN_TOTAL && margin >= WATCHLIST_NARRATIVE_BIAS_MIN_MARGIN) {
     return buyCount > sellCount ? "bullish" : "bearish";
   }
 
@@ -1488,7 +1489,7 @@ function buildSummaries(
       return "Watchlist stance: none flagged; staying selective into the next few sessions.";
     }
 
-    const bias = getWatchlistBias(watchlist);
+    const bias = getNarrativeWatchlistBias(watchlist);
     return `Watchlist stance: ${bias} bias, watching ${watchlist
       .slice(0, REPORT_MAX_WATCHLIST)
       .map((p) => p.symbol)
