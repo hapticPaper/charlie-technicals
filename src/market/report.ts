@@ -1226,18 +1226,16 @@ function buildPicks(args: {
         a.symbol.localeCompare(b.symbol)
       );
     })
-    .slice(0, REPORT_MAX_WATCHLIST * 4);
+    .slice(0, remainingSlots);
 
   const withoutDollarVolume = watchlistCandidates
     .filter((c) => !signalSymbols.has(c.symbol) && c.dollarVolume1d === null)
-    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
+    .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol))
+    .slice(0, remainingSlots);
 
   const byDollarVolume = withDollarVolume.concat(withoutDollarVolume).slice(0, remainingSlots);
 
-  const watchlist = signalCandidates
-    .concat(byDollarVolume)
-    .slice(0, REPORT_MAX_WATCHLIST)
-    .map(stripCandidate);
+  const watchlist = signalCandidates.concat(byDollarVolume).map(stripCandidate);
 
   return { picks, watchlist };
 }
