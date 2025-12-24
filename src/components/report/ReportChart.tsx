@@ -155,7 +155,7 @@ function resolveChartLocale(): string | undefined {
   }
 }
 
-// Converts common color formats to rgba with the requested alpha.
+// Converts common color formats to rgba with a fixed alpha (overwrites any existing alpha).
 function withAlpha(color: string, alpha: number): string {
   if (alpha >= 1) {
     return color;
@@ -179,19 +179,34 @@ function withAlpha(color: string, alpha: number): string {
   }
 
   const raw = hex.slice(1);
-  const normalized = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
-  if (normalized.length !== 6) {
-    return color;
+
+  if (raw.length === 3 || raw.length === 4) {
+    const expanded = raw
+      .split("")
+      .map((c) => c + c)
+      .join("");
+    const r = Number.parseInt(expanded.slice(0, 2), 16);
+    const g = Number.parseInt(expanded.slice(2, 4), 16);
+    const b = Number.parseInt(expanded.slice(4, 6), 16);
+    if (![r, g, b].every((n) => Number.isFinite(n))) {
+      return color;
+    }
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  if (![r, g, b].every((n) => Number.isFinite(n))) {
-    return color;
+  if (raw.length === 6 || raw.length === 8) {
+    const r = Number.parseInt(raw.slice(0, 2), 16);
+    const g = Number.parseInt(raw.slice(2, 4), 16);
+    const b = Number.parseInt(raw.slice(4, 6), 16);
+    if (![r, g, b].every((n) => Number.isFinite(n))) {
+      return color;
+    }
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return color;
 }
 
 function toUtcTimestamp(t: number): UTCTimestamp | null {
@@ -605,14 +620,19 @@ export function ReportChart(props: {
         return typeof value === "number" && Number.isFinite(value) ? Math.max(max, value) : max;
       }, Number.NEGATIVE_INFINITY);
       const maxTradePrice = tradePrices.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
+      const hasFiniteHigh = Number.isFinite(maxCandleHigh);
 
       const priceScaleTopMargin =
-        tradePrices.length > 0 && maxTradePrice >= maxCandleHigh ? TRADE_PRICE_SCALE_TOP_MARGIN : 0;
+        tradePrices.length > 0 && hasFiniteHigh && maxTradePrice >= maxCandleHigh
+          ? TRADE_PRICE_SCALE_TOP_MARGIN
+          : 0;
       const priceScaleMargins = hasVolume
         ? { top: priceScaleTopMargin, bottom: 0.38 }
         : { top: priceScaleTopMargin, bottom: 0.3 };
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
       const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
+
+      const chartLocale = resolveChartLocale();
 
       const chart = createChart(chartElement, {
         autoSize: true,
