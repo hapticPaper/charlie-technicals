@@ -1012,6 +1012,8 @@ export function ReportChart(props: {
       kcLowerSeries?.setData(toLineSeriesData(series.t, series.keltner20?.lower ?? []));
       rsiSeries.setData(toLineSeriesData(series.t, series.rsi14));
 
+      bbCloud?.setOptions({ fillColor: withAlpha(muted, 0.18) });
+      kcCloud?.setOptions({ fillColor: withAlpha(warn, 0.16) });
       bbCloud?.setData(
         toBandCloudPoints(series.t, series.bollinger20?.upper ?? [], series.bollinger20?.lower ?? [])
       );

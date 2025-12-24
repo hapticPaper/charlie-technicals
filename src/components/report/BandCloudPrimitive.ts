@@ -97,7 +97,7 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
   #attached: SeriesAttachedParameter<Time> | null = null;
   #data: readonly BandCloudPoint[] = [];
   #fillColor: string;
-  readonly zOrder: PrimitivePaneViewZOrder;
+  zOrder: PrimitivePaneViewZOrder;
 
   constructor(options: BandCloudPrimitiveOptions) {
     this.#view = new BandCloudView(this);
@@ -108,6 +108,27 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
   // Points must be provided in ascending time order, consistent with Lightweight Charts series data.
   setData(points: readonly BandCloudPoint[]): void {
     this.#data = points;
+    this.updateAllViews();
+    this.#attached?.requestUpdate();
+  }
+
+  setOptions(next: Partial<BandCloudPrimitiveOptions>): void {
+    let changed = false;
+
+    if (typeof next.fillColor === "string" && next.fillColor !== this.#fillColor) {
+      this.#fillColor = next.fillColor;
+      changed = true;
+    }
+
+    if (typeof next.zOrder === "string" && next.zOrder !== this.zOrder) {
+      this.zOrder = next.zOrder;
+      changed = true;
+    }
+
+    if (!changed) {
+      return;
+    }
+
     this.updateAllViews();
     this.#attached?.requestUpdate();
   }
