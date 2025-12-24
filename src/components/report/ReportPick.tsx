@@ -48,6 +48,7 @@ export function ReportPick(props: { symbol: string }) {
   const report = useReport();
   const pick = report.picks.find((p) => p.symbol === props.symbol);
   const watch = report.watchlist?.find((p) => p.symbol === props.symbol);
+  const hasDuplicateSetup = Boolean(pick && watch);
   const setup = pick ?? watch;
   if (!setup) {
     return <p>Missing setup data for {props.symbol}.</p>;
@@ -62,7 +63,7 @@ export function ReportPick(props: { symbol: string }) {
     series1d = mustGetSeries(report, props.symbol, "1d");
     series15m = mustGetSeries(report, props.symbol, "15m");
   } catch {
-    return <p>Missing series for pick.</p>;
+    return <p>Missing series for setup.</p>;
   }
 
   return (
@@ -70,7 +71,13 @@ export function ReportPick(props: { symbol: string }) {
       <div className={styles.pickHeader}>
         <div className={styles.badges}>
           <span className={isBuy ? styles.badgeBuy : styles.badgeSell}>{formatted.sideLabel}</span>
-          {pick ? <span className={styles.badgeNeutral}>Trade</span> : <span className={styles.badgeNeutral}>Watchlist</span>}
+          {hasDuplicateSetup ? (
+            <span className={styles.badgeNeutral}>Trade + Watchlist</span>
+          ) : pick ? (
+            <span className={styles.badgeNeutral}>Trade</span>
+          ) : (
+            <span className={styles.badgeNeutral}>Watchlist</span>
+          )}
           <span className={styles.badgeNeutral}>Score {setup.score}</span>
         </div>
         <div className={styles.tradeSummary}>
