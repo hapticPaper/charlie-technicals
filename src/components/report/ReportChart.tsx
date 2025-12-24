@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
-  AreaData,
+  AutoscaleInfo,
   CandlestickData,
   HistogramData,
   LineData,
@@ -28,6 +28,16 @@ const VOLUME_SCALE_ID = "volume" as const;
 const RSI_SCALE_ID = "rsi" as const;
 const MOMENTUM_SCALE_ID = "momentum" as const;
 const SHADE_SCALE_ID = "shade" as const;
+
+// Trade-level autoscaling padding when trade levels extend the candle range (tuned for equities).
+// - `spanPadRatio`: symmetric pad as a % of the expanded range (2%).
+// - `zeroSpanPadRatio`: when the expanded range is degenerate, pad as a % of price magnitude (0.2%).
+// - `minPad`: absolute floor so very tight ranges don't look flat.
+const TRADE_AUTOSCALE_PAD = {
+  spanPadRatio: 0.02,
+  zeroSpanPadRatio: 0.002,
+  minPad: 0.001
+} as const;
 
 function formatChartTime(time: Time | undefined): string {
   if (!time) {
@@ -518,6 +528,12 @@ export function ReportChart(props: {
       const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
       const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
 
+      const tradePrices = trade
+        ? [trade.entry, trade.stop, ...(trade.targets ?? [])].filter(
+            (value): value is number => typeof value === "number" && Number.isFinite(value)
+          )
+        : [];
+
       const chart = createChart(chartElement, {
         autoSize: true,
         layout: {
@@ -606,7 +622,50 @@ export function ReportChart(props: {
         borderVisible: false,
         priceScaleId: PRICE_SCALE_ID,
         priceLineVisible: false,
-        lastValueVisible: false
+        lastValueVisible: false,
+        autoscaleInfoProvider: (baseImplementation: () => AutoscaleInfo | null) => {
+          const base = baseImplementation();
+          if (!base || !base.priceRange || tradePrices.length === 0) {
+            return base;
+          }
+
+          const baseMin = base.priceRange.minValue;
+          const baseMax = base.priceRange.maxValue;
+
+          let minValue = baseMin;
+          let maxValue = baseMax;
+
+          for (const value of tradePrices) {
+            minValue = Math.min(minValue, value);
+            maxValue = Math.max(maxValue, value);
+          }
+
+          if (minValue === baseMin && maxValue === baseMax) {
+            return base;
+          }
+
+          // Only apply additional padding when trades extend beyond the base candle range.
+          const span = maxValue - minValue;
+          let pad: number;
+          if (span > 0) {
+            const rawPad = span * TRADE_AUTOSCALE_PAD.spanPadRatio;
+            pad = Math.max(rawPad, TRADE_AUTOSCALE_PAD.minPad);
+          } else {
+            const maxMagnitude = Math.max(Math.abs(minValue), Math.abs(maxValue));
+            pad =
+              maxMagnitude === 0
+                ? TRADE_AUTOSCALE_PAD.minPad
+                : Math.max(TRADE_AUTOSCALE_PAD.minPad, maxMagnitude * TRADE_AUTOSCALE_PAD.zeroSpanPadRatio);
+          }
+
+          return {
+            ...base,
+            priceRange: {
+              minValue: minValue - pad,
+              maxValue: maxValue + pad
+            }
+          };
+        }
       });
       const smaSeries = chart.addSeries(LineSeries, {
         color: smaColor,

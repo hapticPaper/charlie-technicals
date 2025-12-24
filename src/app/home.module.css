@@ -5,6 +5,10 @@
   margin-top: 16px;
 }
 
+.latestCard {
+  margin: 10px 0 18px;
+}
+
 @media (min-width: 900px) {
   .grid {
     grid-template-columns: 1fr 1fr;
@@ -43,6 +47,13 @@
 }
 
 .mainIdea {
+  margin: 10px 0 0;
+  color: var(--rp-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.veryShort {
   margin: 10px 0 0;
   color: var(--rp-muted);
   font-size: 13px;
