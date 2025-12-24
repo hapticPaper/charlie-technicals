@@ -1590,7 +1590,7 @@ export function buildReportMdx(report: MarketReport): string {
     for (const pick of report.watchlist.slice(0, REPORT_MAX_WATCHLIST)) {
       lines.push(`### ${pick.symbol}`);
       lines.push("");
-      lines.push(`<ReportPick symbol=\"${pick.symbol}\" />`);
+      lines.push(`<ReportPick symbol="${pick.symbol}" />`);
       lines.push("");
     }
   }
