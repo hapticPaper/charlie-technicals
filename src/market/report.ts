@@ -142,10 +142,10 @@ const PICK_SCORE = {
 
 const PICK_NON_SELECTABLE_SYMBOL_PREFIXES = ["^"] as const;
 
-function isSelectableSymbol(symbol: string): boolean {
-  // Pick/watchlist selection should be limited to tradeable names.
+// Single source of truth for pick/watchlist symbol eligibility.
+function isNonSelectableSymbol(symbol: string): boolean {
   // Market context symbols (e.g. indices like ^VIX) are still allowed elsewhere (regime readout, most active).
-  return PICK_NON_SELECTABLE_SYMBOL_PREFIXES.every((prefix) => !symbol.startsWith(prefix));
+  return PICK_NON_SELECTABLE_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix));
 }
 
 const REGIME_POLICY = {
@@ -922,7 +922,7 @@ function buildPicks(args: {
   const candidates: Candidate[] = [];
 
   for (const symbol of Object.keys(args.analyzedBySymbol)) {
-    if (!isSelectableSymbol(symbol)) {
+    if (isNonSelectableSymbol(symbol)) {
       continue;
     }
 
