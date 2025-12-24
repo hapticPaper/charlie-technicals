@@ -40,7 +40,11 @@ const TRADE_AUTOSCALE_PAD = {
   minPad: 0.001
 } as const;
 
+const TRADE_PRICE_SCALE_TOP_MARGIN = 0.08 as const;
+
 function formatChartTime(time: Time | undefined): string {
+  const locale = getChartLocale();
+
   if (!time) {
     return "";
   }
@@ -52,7 +56,7 @@ function formatChartTime(time: Time | undefined): string {
     }
 
     const dt = new Date(millis);
-    return dt.toLocaleString(undefined, {
+    return dt.toLocaleString(locale, {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -67,7 +71,7 @@ function formatChartTime(time: Time | undefined): string {
       return "";
     }
 
-    return dt.toLocaleDateString(undefined, { month: "2-digit", day: "2-digit" });
+    return dt.toLocaleDateString(locale, { month: "2-digit", day: "2-digit" });
   }
 
   return "";
@@ -125,6 +129,81 @@ function promoteAlpha(color: string, minAlpha = 0.85): string {
   }
 
   return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${minAlpha})`;
+}
+
+let cachedChartLocale: string | null | undefined;
+
+function getChartLocale(): string | undefined {
+  if (cachedChartLocale !== undefined) {
+    return cachedChartLocale ?? undefined;
+  }
+
+  const raw =
+    typeof navigator !== "undefined"
+      ? (navigator.languages && navigator.languages.length > 0 ? navigator.languages[0] : navigator.language)
+      : undefined;
+  if (typeof raw !== "string" || raw.length === 0) {
+    cachedChartLocale = null;
+    return undefined;
+  }
+
+  try {
+    const normalized = raw.replace(/_/g, "-").split("@")[0];
+    if (normalized.length === 0) {
+      cachedChartLocale = null;
+      return undefined;
+    }
+
+    const canonical =
+      typeof Intl !== "undefined" && typeof Intl.getCanonicalLocales === "function"
+        ? Intl.getCanonicalLocales(normalized)[0]
+        : normalized;
+
+    cachedChartLocale = typeof canonical === "string" && canonical.length > 0 ? canonical : null;
+  } catch {
+    cachedChartLocale = null;
+  }
+
+  return cachedChartLocale ?? undefined;
+}
+
+// Converts common color formats to rgba with the requested alpha.
+function withAlpha(color: string, alpha: number): string {
+  if (alpha >= 1) {
+    return color;
+  }
+
+  const rgbaMatch = color.match(
+    /^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/i
+  );
+  if (rgbaMatch) {
+    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`;
+  }
+
+  const rgbMatch = color.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+  if (rgbMatch) {
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+  }
+
+  const hex = color.trim();
+  if (!hex.startsWith("#")) {
+    return color;
+  }
+
+  const raw = hex.slice(1);
+  const normalized = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  if (normalized.length !== 6) {
+    return color;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  if (![r, g, b].every((n) => Number.isFinite(n))) {
+    return color;
+  }
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function toUtcTimestamp(t: number): UTCTimestamp | null {
@@ -509,8 +588,8 @@ export function ReportChart(props: {
       const warn = readCssVar("--rp-warn", "#f59e0b");
       const target = readCssVar("--rp-target", "#38bdf8");
 
-      const squeezeOnShade = promoteAlpha(warn, 0.08);
-      const squeezeOffShade = promoteAlpha(bull, 0.08);
+      const squeezeOnShade = withAlpha(warn, 0.08);
+      const squeezeOffShade = withAlpha(bull, 0.08);
 
       const hasVolume =
         Array.isArray(series.volume) &&
@@ -525,15 +604,25 @@ export function ReportChart(props: {
         series.ttmSqueeze20.momentum.length === series.t.length &&
         series.ttmSqueeze20.momentum.some((v) => typeof v === "number" && Number.isFinite(v));
 
-      const priceScaleMargins = hasVolume ? { top: 0, bottom: 0.38 } : { top: 0, bottom: 0.3 };
-      const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
-      const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
-
       const tradePrices = trade
         ? [trade.entry, trade.stop, ...(trade.targets ?? [])].filter(
             (value): value is number => typeof value === "number" && Number.isFinite(value)
           )
         : [];
+
+      const candleHighs = Array.isArray(series.high) ? series.high : [];
+      const maxCandleHigh = candleHighs.reduce((max, value) => {
+        return typeof value === "number" && Number.isFinite(value) ? Math.max(max, value) : max;
+      }, Number.NEGATIVE_INFINITY);
+      const maxTradePrice = tradePrices.reduce((max, value) => Math.max(max, value), Number.NEGATIVE_INFINITY);
+
+      const priceScaleTopMargin =
+        tradePrices.length > 0 && maxTradePrice >= maxCandleHigh ? TRADE_PRICE_SCALE_TOP_MARGIN : 0;
+      const priceScaleMargins = hasVolume
+        ? { top: priceScaleTopMargin, bottom: 0.38 }
+        : { top: priceScaleTopMargin, bottom: 0.3 };
+      const volumeScaleMargins = hasVolume ? { top: 0.62, bottom: 0.2 } : null;
+      const rsiScaleMargins = hasVolume ? { top: 0.8, bottom: 0 } : { top: 0.7, bottom: 0 };
 
       const chart = createChart(chartElement, {
         autoSize: true,
@@ -557,6 +646,9 @@ export function ReportChart(props: {
           timeVisible: true,
           secondsVisible: false,
           rightOffset: 0
+        },
+        localization: {
+          locale: getChartLocale()
         },
         crosshair: {
           mode: CrosshairMode.Magnet

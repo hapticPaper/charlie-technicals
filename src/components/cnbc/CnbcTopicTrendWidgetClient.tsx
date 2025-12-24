@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { CnbcVideoCards } from "./CnbcVideoCards";
 import type { CnbcVideosByDate } from "./types";
+import { getRechartsInitialDimension } from "../report/rechartsConfig";
 
 export type CnbcTopicTrendDatum = {
   date: string;
@@ -300,7 +301,7 @@ export function CnbcTopicTrendWidgetClient(props: {
       <div className="rpSplitMain">
         <div className="rpPanelSurface">
           <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer minWidth={0}>
+            <ResponsiveContainer minWidth={0} initialDimension={getRechartsInitialDimension()}>
               <AreaChart
                 data={chartData}
                 margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
