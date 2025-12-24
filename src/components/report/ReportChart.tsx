@@ -783,8 +783,9 @@ export function ReportChart(props: {
       }
 
       const trendCandles = series.interval === "15m" ? 96 : 55;
-      if (series.close.length >= 2) {
-        const end = series.close.length - 1;
+      const trendLen = Math.min(series.t.length, series.close.length);
+      if (trendLen >= 2) {
+        const end = trendLen - 1;
         const start = Math.max(0, end - trendCandles);
         const startTime = toUtcTimestamp(series.t[start]);
         const endTime = toUtcTimestamp(series.t[end]);
