@@ -1220,11 +1220,12 @@ function buildPicks(args: {
   const withDollarVolume = watchlistCandidates
     .filter((c) => !signalSymbols.has(c.symbol) && c.dollarVolume1d !== null)
     .sort((a, b) => {
-      return (
-        b.dollarVolume1d! - a.dollarVolume1d! ||
-        b.score - a.score ||
-        a.symbol.localeCompare(b.symbol)
-      );
+      const dvA = a.dollarVolume1d;
+      const dvB = b.dollarVolume1d;
+      if (dvA === null || dvB === null) {
+        return 0;
+      }
+      return dvB - dvA || b.score - a.score || a.symbol.localeCompare(b.symbol);
     })
     .slice(0, remainingSlots);
 
