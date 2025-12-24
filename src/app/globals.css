@@ -29,6 +29,8 @@ body {
   --rp-squeeze-on: rgba(245, 158, 11, 0.12);
   --rp-squeeze-off: rgba(34, 197, 94, 0.12);
   --rp-grid: rgba(255, 255, 255, 0.08);
+
+  --rp-content-max: 1600px;
 }
 
 body {
@@ -62,6 +64,74 @@ body {
 .rpAppContent {
   width: 100%;
   min-width: 0;
+  max-width: var(--rp-content-max);
+  margin: 0 auto;
+}
+
+.rpSplitLayout {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.rpSplitMain,
+.rpSplitSide {
+  min-width: 0;
+}
+
+.rpPanelSurface,
+.rpPanelSkeleton {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface);
+}
+
+.rpPanelSurface {
+  padding: 12px;
+}
+
+.rpPanelSurfaceSide {
+  padding: 14px;
+}
+
+.rpToolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.rpToolbarButton {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface-2);
+  color: var(--rp-text);
+  cursor: pointer;
+}
+
+.rpToolbarButton[disabled] {
+  cursor: not-allowed;
+}
+
+.rpToolbarButton:focus-visible {
+  outline: 2px solid var(--rp-target);
+  outline-offset: 2px;
+}
+
+.rpToolbarButton.rpToolbarButtonSecondary {
+  background: transparent;
+  color: var(--rp-muted);
+}
+
+@media (min-width: 900px) {
+  .rpSplitLayout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  }
 }
 
 @media (max-width: 640px) {
