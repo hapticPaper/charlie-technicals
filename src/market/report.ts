@@ -1462,9 +1462,25 @@ function buildSummaries(
       return "Watchlist stance: none flagged; staying selective into the next few sessions.";
     }
 
-    const buyCount = watchlist.filter((p) => p.trade.side === "buy").length;
-    const sellCount = watchlist.filter((p) => p.trade.side === "sell").length;
-    const bias = buyCount > sellCount ? "bullish" : sellCount > buyCount ? "bearish" : "mixed";
+    let buyCount = 0;
+    let sellCount = 0;
+    for (const p of watchlist) {
+      if (p.trade.side === "buy") {
+        buyCount += 1;
+      } else if (p.trade.side === "sell") {
+        sellCount += 1;
+      }
+    }
+
+    const total = buyCount + sellCount;
+    const margin = Math.abs(buyCount - sellCount);
+
+    const bias =
+      total >= 4 && margin >= 2
+        ? buyCount > sellCount
+          ? "bullish"
+          : "bearish"
+        : "mixed";
     return `Watchlist stance: ${bias} bias, watching ${watchlist
       .slice(0, REPORT_MAX_WATCHLIST)
       .map((p) => p.symbol)
