@@ -24,6 +24,7 @@ export type BandCloudPrimitiveOptions = {
   zOrder?: PrimitivePaneViewZOrder;
 };
 
+// `fillColor` may change at runtime (e.g. theme changes). z-order is fixed by chart layering.
 export type BandCloudPrimitiveMutableOptions = Partial<Pick<BandCloudPrimitiveOptions, "fillColor">>;
 
 type BandCloudCoord = {
