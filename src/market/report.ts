@@ -1199,6 +1199,10 @@ function buildPicks(args: {
     return candidate.basis === "trend" || subAtr;
   }
 
+  function hasDollarVolume1d(candidate: Candidate): candidate is Candidate & { dollarVolume1d: number } {
+    return candidate.dollarVolume1d !== null;
+  }
+
   const picks = candidates.filter(isTechnicalTrade).slice(0, REPORT_MAX_PICKS).map(stripCandidate);
 
   const pickSymbols = new Set(picks.map((p) => p.symbol));
@@ -1217,16 +1221,10 @@ function buildPicks(args: {
 
   // Bucket 2: fill the remainder with the most-liquid names (dollar volume), biasing toward momentum/score.
   // When dollar volume is missing, fall back to score-based ordering (but rank those names last).
-  const withDollarVolume = watchlistCandidates
-    .filter((c) => !signalSymbols.has(c.symbol) && c.dollarVolume1d !== null)
-    .sort((a, b) => {
-      const dvA = a.dollarVolume1d;
-      const dvB = b.dollarVolume1d;
-      if (dvA === null || dvB === null) {
-        return 0;
-      }
-      return dvB - dvA || b.score - a.score || a.symbol.localeCompare(b.symbol);
-    })
+  const withDollarVolume: Candidate[] = watchlistCandidates
+    .filter((c) => !signalSymbols.has(c.symbol))
+    .filter(hasDollarVolume1d)
+    .sort((a, b) => b.dollarVolume1d - a.dollarVolume1d || b.score - a.score || a.symbol.localeCompare(b.symbol))
     .slice(0, remainingSlots);
 
   const withoutDollarVolume = watchlistCandidates
