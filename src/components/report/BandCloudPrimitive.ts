@@ -109,7 +109,6 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
   #renderer: BandCloudRenderer | null = null;
   #lastViewport: {
     timeScaleWidth: number;
-    scrollPosition: number;
     visibleLogicalRange: LogicalRange | null;
     priceVisibleRange: IRange<number> | null;
     fillColor: string;
@@ -171,14 +170,12 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     const priceScale: IPriceScaleApi = series.priceScale();
 
     const timeScaleWidth = timeScale.width();
-    const scrollPosition = timeScale.scrollPosition();
     const visibleLogicalRange = timeScale.getVisibleLogicalRange();
     const priceVisibleRange = priceScale.getVisibleRange();
 
     const cacheKeyUnchanged =
       this.#lastViewport !== null &&
       this.#lastViewport.timeScaleWidth === timeScaleWidth &&
-      this.#lastViewport.scrollPosition === scrollPosition &&
       logicalRangesEqual(this.#lastViewport.visibleLogicalRange, visibleLogicalRange) &&
       numericRangesEqual(this.#lastViewport.priceVisibleRange, priceVisibleRange) &&
       this.#lastViewport.fillColor === this.#fillColor &&
@@ -227,7 +224,6 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
 
     this.#lastViewport = {
       timeScaleWidth,
-      scrollPosition,
       visibleLogicalRange,
       priceVisibleRange,
       fillColor: this.#fillColor,
