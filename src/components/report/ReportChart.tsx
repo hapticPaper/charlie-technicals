@@ -42,9 +42,7 @@ const TRADE_AUTOSCALE_PAD = {
 
 const TRADE_PRICE_SCALE_TOP_MARGIN = 0.08 as const;
 
-function formatChartTime(time: Time | undefined): string {
-  const locale = getChartLocale();
-
+function formatChartTime(time: Time | undefined, locale?: string): string {
   if (!time) {
     return "";
   }
@@ -131,26 +129,18 @@ function promoteAlpha(color: string, minAlpha = 0.85): string {
   return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${minAlpha})`;
 }
 
-let cachedChartLocale: string | null | undefined;
-
-function getChartLocale(): string | undefined {
-  if (cachedChartLocale !== undefined) {
-    return cachedChartLocale ?? undefined;
-  }
-
+function resolveChartLocale(): string | undefined {
   const raw =
     typeof navigator !== "undefined"
       ? (navigator.languages && navigator.languages.length > 0 ? navigator.languages[0] : navigator.language)
       : undefined;
   if (typeof raw !== "string" || raw.length === 0) {
-    cachedChartLocale = null;
     return undefined;
   }
 
   try {
     const normalized = raw.replace(/_/g, "-").split("@")[0];
     if (normalized.length === 0) {
-      cachedChartLocale = null;
       return undefined;
     }
 
@@ -159,12 +149,10 @@ function getChartLocale(): string | undefined {
         ? Intl.getCanonicalLocales(normalized)[0]
         : normalized;
 
-    cachedChartLocale = typeof canonical === "string" && canonical.length > 0 ? canonical : null;
+    return typeof canonical === "string" && canonical.length > 0 ? canonical : undefined;
   } catch {
-    cachedChartLocale = null;
+    return undefined;
   }
-
-  return cachedChartLocale ?? undefined;
 }
 
 // Converts common color formats to rgba with the requested alpha.
@@ -572,6 +560,8 @@ export function ReportChart(props: {
         return;
       }
 
+      const chartLocale = resolveChartLocale();
+
       const surface = readCssVar("--rp-surface", "rgba(255, 255, 255, 0.06)");
       const border = readCssVar("--rp-border", "rgba(255, 255, 255, 0.12)");
       const grid = readCssVar("--rp-grid", "rgba(255, 255, 255, 0.08)");
@@ -648,7 +638,7 @@ export function ReportChart(props: {
           rightOffset: 0
         },
         localization: {
-          locale: getChartLocale()
+          locale: chartLocale
         },
         crosshair: {
           mode: CrosshairMode.Magnet
@@ -1042,7 +1032,7 @@ export function ReportChart(props: {
           return;
         }
 
-        const timeLabel = formatChartTime(param.time);
+        const timeLabel = formatChartTime(param.time, chartLocale);
         if (!param.point || !timeLabel) {
           tooltip.style.opacity = "0";
           return;
