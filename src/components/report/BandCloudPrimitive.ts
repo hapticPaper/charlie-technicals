@@ -105,6 +105,7 @@ export class BandCloudPrimitive implements ISeriesPrimitive<Time> {
     this.zOrder = options.zOrder ?? "bottom";
   }
 
+  // Points must be provided in ascending time order, consistent with Lightweight Charts series data.
   setData(points: readonly BandCloudPoint[]): void {
     this.#data = points;
     this.updateAllViews();
