@@ -1464,7 +1464,7 @@ function buildSummaries(
       // Bias is based on directional trade setups only.
       if (p.trade.side === "buy") {
         buyCount += 1;
-      } else {
+      } else if (p.trade.side === "sell") {
         sellCount += 1;
       }
     }
@@ -1473,10 +1473,10 @@ function buildSummaries(
     const margin = Math.abs(buyCount - sellCount);
 
     // Avoid overconfident narrative on small watchlists.
-    const minTotal = 4;
-    const minMargin = 2;
+    const WATCHLIST_BIAS_MIN_TOTAL = 4;
+    const WATCHLIST_BIAS_MIN_MARGIN = 2;
 
-    if (total >= minTotal && margin >= minMargin) {
+    if (total >= WATCHLIST_BIAS_MIN_TOTAL && margin >= WATCHLIST_BIAS_MIN_MARGIN) {
       return buyCount > sellCount ? "bullish" : "bearish";
     }
 
