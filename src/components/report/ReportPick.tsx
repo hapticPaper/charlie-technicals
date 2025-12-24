@@ -54,7 +54,7 @@ export function ReportPick(props: { symbol: string }) {
     return <p>Missing setup data for {props.symbol}.</p>;
   }
 
-  const setupTypeLabel = hasDuplicateSetup ? "Trade + Watchlist" : pick ? "Trade" : "Watchlist";
+  const setupTypeLabel = hasDuplicateSetup ? "Trade (also on Watchlist)" : pick ? "Trade" : "Watchlist";
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
