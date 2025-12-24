@@ -509,8 +509,8 @@ export function ReportChart(props: {
       const warn = readCssVar("--rp-warn", "#f59e0b");
       const target = readCssVar("--rp-target", "#38bdf8");
 
-      const squeezeOnShade = promoteAlpha(warn, 0.08);
-      const squeezeOffShade = promoteAlpha(bull, 0.08);
+      const squeezeOnShade = readCssVar("--rp-squeeze-on", "rgba(245, 158, 11, 0.08)");
+      const squeezeOffShade = readCssVar("--rp-squeeze-off", "rgba(34, 197, 94, 0.08)");
 
       const hasVolume =
         Array.isArray(series.volume) &&
