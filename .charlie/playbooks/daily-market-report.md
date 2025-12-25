@@ -65,6 +65,7 @@ Invariants:
 Failure behavior:
 
 - Prefer safe defaults/coercions (e.g., truncation, nulling optional sections) over throwing during summarization so report generation stays robust.
+- If `sentiment.tone` is invalid/unrecognized, coerce it to `"mixed"`.
 
 Edge cases:
 
@@ -77,8 +78,10 @@ Edge cases:
 The report generator embeds a precomputed `summary` prop into the MDX:
 
 ```mdx
-<ReportSummary summary={...} />
+<ReportSummary summary={/* generated MarketReportSummaryWidgets */} />
 ```
+
+The `summary` prop is injected by the report generator; MDX authors must not construct or modify it manually.
 
 This `summary` object is a persisted, versioned schema (historical MDX keeps whatever was embedded at generation time).
 
@@ -90,7 +93,7 @@ Consumers should treat the payload as data-only input (not something to be parse
   - `veryShort`: ultra-compact summary (<= `REPORT_VERY_SHORT_MAX_WORDS`).
 - `sentiment`: `null` or `{ tone, lines }`.
   - `tone`: one of `"risk-on" | "risk-off" | "mixed"`.
-  - `lines`: 1–3 bullets, already trimmed/capped.
+  - `lines`: 1–3 items, each `{ key, text }`, already trimmed/capped.
 - `technicalTrades`:
   - `total`: total number of picks.
   - `preview`: up to `REPORT_MAX_PICKS` items, each containing `{ symbol, trade: { side, entry, stop } }`.
@@ -150,6 +153,10 @@ Versioning policy:
 - Compatibility logic should live in the report renderer (`src/components/report/ReportSummary.tsx`), and we should keep support for all historical versions unless we also provide a migration that rewrites older MDX.
 
 All invariants in this section apply to `version = "v1-summary-widgets"`. Future versions may refine these rules but must maintain compatibility for historical reports.
+
+Maintenance:
+
+- Any change to `MarketReportSummaryWidgets` or its invariants should update this playbook in the same PR.
 
 ## Creates
 
