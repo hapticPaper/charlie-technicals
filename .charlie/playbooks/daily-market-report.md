@@ -88,6 +88,8 @@ The report generator embeds a precomputed `summary` prop into the MDX:
 
 The `summary` prop is injected by the report generator; MDX authors must not construct or modify it manually.
 
+Implementation note: the report generator serializes the literal `MarketReportSummaryWidgets` object into the MDX file at generation time (as a JSX prop expression). Treat this as generated output.
+
 **Do not** copy-paste or hand-edit example payloads into MDX; they are for documentation only and will be overwritten by the generator.
 
 This `summary` object is a persisted, versioned schema (historical MDX keeps whatever was embedded at generation time).
@@ -172,15 +174,20 @@ Versioning policy:
 
 To keep UI components simple, prefer putting version normalization/upconversion into a small helper that the renderer calls (instead of scattering version checks through the view code).
 
+Suggested pattern: implement a helper like `normalizeMarketReportSummaryWidgets(payload)` and keep all `payload.version` branching inside that helper.
+
 All invariants in this section apply to `version = "v1-summary-widgets"`. Future versions may refine these rules but must maintain compatibility for historical reports.
 
 Maintenance:
 
 - Any change to `MarketReportSummaryWidgets` or its invariants should update this playbook in the same PR.
+- Any change to summary-generation behavior (normalization, truncation, defaulting, failure handling) should update the “Generator invariants” section in the same PR.
 - Reviewers should always cross-check changes across:
   - `src/market/types.ts`
   - `src/market/summaryWidgets.ts`
   - `src/components/report/ReportSummary.tsx`
+
+PR review rule: if `src/market/summaryWidgets.ts` changes in a way that affects the summary payload contract, the playbook update is part of the change.
 
 ## Creates
 
