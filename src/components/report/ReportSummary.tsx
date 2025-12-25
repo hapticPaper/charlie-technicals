@@ -49,61 +49,8 @@ function getStructuredSentiment(report: MarketReport): { tone: RiskTone; lines: 
   return structured && structuredLines.length > 0 ? { tone: structuredTone, lines: structuredLines } : null;
 }
 
-// Legacy compatibility fallback for older persisted reports that don't have structured sentiment.
-function getNarrativeSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
-  const rawMainIdea = typeof report.summaries.mainIdea === "string" ? report.summaries.mainIdea : "";
-  const mainIdea = rawMainIdea.trim();
-  if (!mainIdea) {
-    return null;
-  }
-
-  const sentences = mainIdea
-    .split(/(?<=\.)\s+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-
-  const firstSentence = sentences.at(0) ?? "";
-  const toneFromNarrative = firstSentence.match(/\brisk-(?:on|off)\b|\bmixed\b/i)?.[0] ?? null;
-
-  const lines: string[] = [];
-  const colonIdx = firstSentence.indexOf(":");
-  if (colonIdx !== -1) {
-    const afterColon = firstSentence.slice(colonIdx + 1).replace(/\.$/, "").trim();
-    if (afterColon) {
-      lines.push(
-        ...afterColon
-          .split(",")
-          .map((part) => part.trim())
-          .filter(Boolean)
-      );
-    }
-  }
-
-  const volatilitySentence = sentences.find((sentence) => {
-    const lower = sentence.toLowerCase();
-    return lower.startsWith("volatility") || lower.includes(" volatility ");
-  });
-  if (volatilitySentence) {
-    lines.push(volatilitySentence.replace(/\.$/, ""));
-  }
-
-  if (lines.length === 0) {
-    lines.push(...sentences.slice(0, 2).map((sentence) => sentence.replace(/\.$/, "")));
-  }
-
-  const trimmed = lines.slice(0, 3);
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  return {
-    tone: coerceRiskTone(toneFromNarrative),
-    lines: trimmed
-  };
-}
-
 function extractSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
-  return getStructuredSentiment(report) ?? getNarrativeSentiment(report);
+  return getStructuredSentiment(report);
 }
 
 function toneBadgeClass(tone: RiskTone): string {
