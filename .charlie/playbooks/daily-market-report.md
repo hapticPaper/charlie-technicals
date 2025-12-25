@@ -34,6 +34,20 @@ Key intent:
 - The MDX should not embed any UI output. It only includes component invocations (e.g. `<ReportSummary ... />`) and props.
 - The report page should not need to “re-aggregate” or parse narrative text just to render summary widgets.
 
+#### Summarize step contract
+
+The summarize step MUST take a `MarketReport` and produce a `MarketReportSummaryWidgets` object (see schema below) with these invariants enforced **before** persisting to MDX:
+
+- `narrative.mainIdea` and `narrative.veryShort` come directly from `report.summaries`.
+- `sentiment` is `null` unless `report.summaries.sentiment.lines` produces 1–3 non-empty lines after trimming/capping.
+- `technicalTrades.total` is `report.picks.length`, and `technicalTrades.preview` is the first `REPORT_MAX_PICKS` entries (no extra UI-side sorting/parsing).
+- `watchlist.total` is `report.watchlist.length`, and `watchlist.preview` is the first `REPORT_MAX_WATCHLIST` entries (no extra UI-side sorting/parsing).
+- `mostActive` is derived from `report.mostActive.byDollarVolume1d` + `report.mostActive.byDollarVolume5d`.
+  - `day.top` + `day.overflow` must preserve rank order and form a single ranked list (overflow is a continuation).
+  - `week.top` must preserve rank order.
+- `fullContext` comes directly from `report.summaries.summary`.
+- Every list item must include a stable `key` (use rank + symbol), so the UI is a pure renderer.
+
 #### `ReportSummary` embedded payload (`MarketReportSummaryWidgets`)
 
 The report generator embeds a precomputed `summary` prop into the MDX:
