@@ -23,6 +23,26 @@ export const REPORT_MAX_WATCHLIST = 8;
 */
 export const REPORT_VERY_SHORT_MAX_WORDS = 30;
 
+/**
+* Canonical set of risk tones used across report generation and UI widgets.
+*/
+export const RISK_TONES = ["risk-on", "risk-off", "mixed"] as const;
+
+export type RiskTone = (typeof RISK_TONES)[number];
+
+export function normalizeRiskTone(value: unknown): RiskTone | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return (RISK_TONES as readonly string[]).includes(normalized) ? (normalized as RiskTone) : null;
+}
+
+export function coerceRiskTone(value: unknown): RiskTone {
+  return normalizeRiskTone(value) ?? "mixed";
+}
+
 export type MarketBar = {
   t: string;
   o: number;
@@ -232,6 +252,17 @@ export type MarketReport = {
     veryShort: string;
     mainIdea: string;
     summary: string;
+    /**
+    * Compact, structured sentiment summary for UI widgets.
+    *
+    * When present, `lines` contains 1–3 short bullet points.
+    *
+    * Optional to preserve compatibility with older persisted report JSON artifacts.
+    */
+    sentiment?: {
+      tone: RiskTone;
+      lines: string[];
+    };
   };
 };
 

@@ -12,7 +12,7 @@ import type {
   TtmSqueezeSeries
 } from "./types";
 
-import { REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHORT_MAX_WORDS, SQUEEZE_STATES } from "./types";
+import { coerceRiskTone, REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHORT_MAX_WORDS, SQUEEZE_STATES } from "./types";
 
 import type { TradePlan, TradeSide } from "./types";
 
@@ -1445,6 +1445,8 @@ function buildSummaries(
 
   const { regimeParts, regimeLabel } = computeRegimeReadout(analyzedBySymbol);
 
+  const sentimentTone = coerceRiskTone(regimeLabel);
+
   const absMoveAtrValues: number[] = [];
   for (const symbol of Object.keys(analyzedBySymbol)) {
     const series1d = analyzedBySymbol[symbol]?.["1d"];
@@ -1461,6 +1463,15 @@ function buildSummaries(
   const medAbsMoveAtr = median(absMoveAtrValues);
   const movedAtLeast1Atr = absMoveAtrValues.filter((v) => v >= 1).length;
   const movedAtLeast2Atr = absMoveAtrValues.filter((v) => v >= 2).length;
+
+  const sentimentLines: string[] = [];
+  if (regimeParts.length > 0) {
+    sentimentLines.push(...regimeParts.slice(0, 2));
+  }
+  if (typeof medAbsMoveAtr === "number" && Number.isFinite(medAbsMoveAtr)) {
+    const label = describeVolatility(medAbsMoveAtr);
+    sentimentLines.push(`volatility ${label} (median ${medAbsMoveAtr.toFixed(1)} ATR)`);
+  }
 
   const mainIdeaParts: string[] = [];
   if (regimeParts.length > 0) {
@@ -1543,7 +1554,14 @@ function buildSummaries(
     veryShort,
     mainIdea: capWords(mainIdeaParts.join(" ").trim(), 80),
     // 500-word cap per requirements.
-    summary: capWords(rawSummary, 500)
+    summary: capWords(rawSummary, 500),
+    sentiment:
+      sentimentLines.length > 0
+        ? {
+            tone: sentimentTone,
+            lines: sentimentLines.slice(0, 3)
+          }
+        : undefined
   };
 }
 
