@@ -195,6 +195,12 @@ Maintenance:
 
 PR review rule: if `src/market/summaryWidgets.ts` changes in a way that affects the summary payload contract, the playbook update is part of the change.
 
+PR checklist for summary payload changes:
+
+- [ ] If `MarketReportSummaryWidgets` (or related types) changed, this playbook section was updated to match.
+- [ ] If `buildReportSummaryWidgets` behavior changed (normalization, truncation, defaults), the “Generator invariants” section was updated.
+- [ ] The PR description includes a brief note summarizing the change to the summary payload contract.
+
 ## Creates
 
 - Artifact: PR
