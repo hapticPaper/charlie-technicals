@@ -11,7 +11,8 @@ const nextConfig = {
   trailingSlash: true,
   basePath,
   assetPrefix: basePath,
-  images: { unoptimized: true }
+  images: { unoptimized: true },
+  staticPageGenerationTimeout: 180
 };
 
 export default nextConfig;
