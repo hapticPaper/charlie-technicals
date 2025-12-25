@@ -122,6 +122,8 @@ All list entries include a precomputed `key` field; consumers must not derive al
 
 Example payload (shape only; values are illustrative):
 
+This example is non-authoritative for exact values and may lag behind the generator implementation; treat it as a shape + intent reference only.
+
 ```json
 {
   "version": "v1-summary-widgets",
@@ -175,6 +177,10 @@ Versioning policy:
 To keep UI components simple, prefer putting version normalization/upconversion into a small helper that the renderer calls (instead of scattering version checks through the view code).
 
 Suggested pattern: implement a helper like `normalizeMarketReportSummaryWidgets(payload)` and keep all `payload.version` branching inside that helper.
+
+Renderer behavior for unknown versions:
+
+- If `payload.version` is missing or unrecognized, treat the embedded payload as incompatible. Prefer a deterministic fallback (e.g., rebuild from `MarketReport` when available) over guessing/silent coercion.
 
 All invariants in this section apply to `version = "v1-summary-widgets"`. Future versions may refine these rules but must maintain compatibility for historical reports.
 
