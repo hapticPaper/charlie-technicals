@@ -30,13 +30,16 @@ The **summarize** step is where we convert the computed `MarketReport` into a sm
 
 Key intent:
 
-- The MDX should remain **declarative**: it includes *what to render* plus *the data to render it*.
+- The MDX should remain **declarative**: it declares *what to render* and passes through any human-authored content.
+- All computed/aggregated payloads (like `MarketReportSummaryWidgets`) must be produced by the report generator and injected as props.
 - The MDX should not embed any UI output. It only includes component invocations (e.g. `<ReportSummary ... />`) and props.
 - The report page should not need to “re-aggregate” or parse narrative text just to render summary widgets.
 
 #### Summarize step contract
 
 The summarize step MUST take a `MarketReport` and produce a `MarketReportSummaryWidgets` object.
+
+This is exactly the type of the `summary` prop passed into `<ReportSummary />`; no alternate shapes are supported.
 
 The canonical schema lives in `src/market/types.ts`. This playbook documents intent + invariants; if it diverges from the TypeScript types, the code is authoritative and this doc should be updated.
 
@@ -66,6 +69,8 @@ Failure behavior:
 
 - Prefer safe defaults/coercions (e.g., truncation, nulling optional sections) over throwing during summarization so report generation stays robust.
 - If `sentiment.tone` is invalid/unrecognized, coerce it to `"mixed"`.
+- If `report.summaries` fields are missing/incomplete, prefer empty strings for `narrative`/`fullContext` over throwing.
+- If `report.mostActive` is missing/incomplete, treat `mostActive` as `null`.
 
 Edge cases:
 
@@ -82,6 +87,8 @@ The report generator embeds a precomputed `summary` prop into the MDX:
 ```
 
 The `summary` prop is injected by the report generator; MDX authors must not construct or modify it manually.
+
+**Do not** copy-paste or hand-edit example payloads into MDX; they are for documentation only and will be overwritten by the generator.
 
 This `summary` object is a persisted, versioned schema (historical MDX keeps whatever was embedded at generation time).
 
@@ -162,6 +169,8 @@ Versioning policy:
 - Additive changes (adding optional fields) can stay on the same `version`, but should be documented here.
 - Compatibility logic should live in the report renderer (`src/components/report/ReportSummary.tsx`), and we should keep support for all historical versions unless we also provide a migration that rewrites older MDX.
 - The report generator should only emit the latest schema version; historical MDX is not rewritten in-place.
+
+To keep UI components simple, prefer putting version normalization/upconversion into a small helper that the renderer calls (instead of scattering version checks through the view code).
 
 All invariants in this section apply to `version = "v1-summary-widgets"`. Future versions may refine these rules but must maintain compatibility for historical reports.
 
