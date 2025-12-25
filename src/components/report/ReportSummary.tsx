@@ -9,6 +9,15 @@ import { buildReportSummaryWidgets } from "../../market/summaryWidgets";
 import { useReport } from "./ReportProvider";
 import styles from "./report.module.css";
 
+function isMarketReportSummaryWidgets(value: unknown): value is MarketReportSummaryWidgets {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as { version?: unknown };
+  return candidate.version === "v1-summary-widgets";
+}
+
 function toneBadgeClass(tone: RiskTone): string {
   if (tone === "risk-on") {
     return styles.badgeBuy;
@@ -44,12 +53,14 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 }
 
 type ReportSummaryProps = {
-  summary?: MarketReportSummaryWidgets;
+  summary?: unknown;
 };
 
 export function ReportSummary(props: ReportSummaryProps) {
   const report = useReport();
-  const summary = props.summary ?? buildReportSummaryWidgets(report);
+  const summary = isMarketReportSummaryWidgets(props.summary)
+    ? props.summary
+    : buildReportSummaryWidgets(report);
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";
   const sentimentLines = summary.sentiment?.lines ?? [];
@@ -118,7 +129,9 @@ export function ReportSummary(props: ReportSummaryProps) {
                 <li key={p.key}>
                   <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()}
                   {p.basis === "trend" ? " [trend]" : p.basis === "signal" ? " [sub-ATR signal]" : ""}
-                  {typeof p.move1dAtr14 === "number" ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR` : ""}
+                  {typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
+                    ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR`
+                    : ""}
                 </li>
               ))}
             </ul>

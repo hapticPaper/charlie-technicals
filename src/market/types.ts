@@ -325,6 +325,12 @@ export type MarketReportSummaryMostActive = {
   };
 };
 
+/**
+* Precomputed summary-widget payload embedded into generated report MDX.
+*
+* The `version` field is part of the persisted schema (historical reports keep their embedded payload).
+* Renderers should treat unknown versions as untrusted and fall back to deriving widgets from `MarketReport`.
+*/
 export type MarketReportSummaryWidgets = {
   version: "v1-summary-widgets";
   narrative: Pick<MarketReport["summaries"], "mainIdea" | "veryShort">;
