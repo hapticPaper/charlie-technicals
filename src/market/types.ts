@@ -278,3 +278,67 @@ export type MarketReportHighlights = {
   picks: HighlightPick[];
   summaries: Pick<MarketReport["summaries"], "veryShort" | "mainIdea">;
 };
+
+export type MarketReportSummarySentimentLine = {
+  key: string;
+  text: string;
+};
+
+export type MarketReportSummarySentiment = {
+  tone: RiskTone;
+  lines: MarketReportSummarySentimentLine[];
+};
+
+export type MarketReportSummaryPick = {
+  key: string;
+  symbol: string;
+  trade: Pick<TradePlan, "side" | "entry" | "stop">;
+};
+
+export type MarketReportSummaryWatchlistEntry = {
+  key: string;
+  symbol: string;
+  trade: Pick<TradePlan, "side">;
+  basis: ReportPick["basis"] | null;
+  move1dAtr14: number | null;
+};
+
+export type MarketReportSummaryMostActiveRow = {
+  key: string;
+  symbol: string;
+  bias: "bullish" | "bearish" | "neutral";
+  dollarVolumeLabel: string;
+  moveLabel: string | null;
+  atrLabel: string | null;
+};
+
+export type MarketReportSummaryMostActive = {
+  day: {
+    total: number;
+    visibleCount: number;
+    top: MarketReportSummaryMostActiveRow[];
+    overflow: MarketReportSummaryMostActiveRow[];
+  };
+  week: {
+    total: number;
+    top: MarketReportSummaryMostActiveRow[];
+  };
+};
+
+export type MarketReportSummaryWidgets = {
+  version: "v1-summary-widgets";
+  narrative: Pick<MarketReport["summaries"], "mainIdea" | "veryShort">;
+  sentiment: MarketReportSummarySentiment | null;
+  technicalTrades: {
+    total: number;
+    preview: MarketReportSummaryPick[];
+    hasMore: boolean;
+  };
+  watchlist: {
+    total: number;
+    preview: MarketReportSummaryWatchlistEntry[];
+    hasMore: boolean;
+  };
+  mostActive: MarketReportSummaryMostActive | null;
+  fullContext: string;
+};

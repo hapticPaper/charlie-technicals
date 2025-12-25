@@ -1,4 +1,4 @@
-# Daily market report (acquire → analyze → report)
+# Daily market report (acquire → analyze → aggregate → report → summarize → commit)
 
 ## Overview
 Generate a daily MDX report (plus supporting JSON artifacts) for the configured universe and time windows.
@@ -59,7 +59,7 @@ The rendered report is split into:
    ```bash
    bun --version
    bun install
-   # Runs acquire → analyze → report for the given date
+   # Runs acquire → analyze → aggregate → report → summarize for the given date
    bun run market:run --date=<DATE>
    ```
 
@@ -67,6 +67,8 @@ The rendered report is split into:
    - `content/reports/<DATE>.mdx`
    - `content/reports/<DATE>.json`
    - (Optional cache) `content/reports/<DATE>.highlights.json`
+
+   Note: the generated MDX includes a precomputed `ReportSummary` payload so the UI can render the summary widgets without additional client-side aggregation.
 4. Create a PR containing:
 
    - `content/data/**/<YYYYMMDD>.json` snapshots for the run date (OHLCV + news + CNBC)

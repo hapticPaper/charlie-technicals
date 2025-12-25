@@ -14,6 +14,8 @@ import type {
 
 import { coerceRiskTone, REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHORT_MAX_WORDS, SQUEEZE_STATES } from "./types";
 
+import { buildReportSummaryWidgets } from "./summaryWidgets";
+
 import type { TradePlan, TradeSide } from "./types";
 
 function activeSignalLabels(series: AnalyzedSeries): string[] {
@@ -1617,7 +1619,8 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push(`version: ${formatFrontmatterString("v2-highlights")}`);
   lines.push("---");
   lines.push("");
-  lines.push("<ReportSummary />");
+  const summaryWidgets = buildReportSummaryWidgets(report);
+  lines.push(`<ReportSummary summary={${JSON.stringify(summaryWidgets)}} />`);
   lines.push("");
   lines.push(`<CnbcVideoWidget date="${report.date}" />`);
   lines.push("");

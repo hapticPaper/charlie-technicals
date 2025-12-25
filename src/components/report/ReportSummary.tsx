@@ -1,57 +1,13 @@
 "use client";
 
 import {
-  coerceRiskTone,
-  REPORT_MAX_PICKS,
-  REPORT_MAX_WATCHLIST,
-  type MarketReport,
+  type MarketReportSummaryMostActiveRow,
+  type MarketReportSummaryWidgets,
   type RiskTone
 } from "../../market/types";
+import { buildReportSummaryWidgets } from "../../market/summaryWidgets";
 import { useReport } from "./ReportProvider";
 import styles from "./report.module.css";
-
-const MOST_ACTIVE_DAY_VISIBLE = 5;
-const MOST_ACTIVE_WEEK_VISIBLE = 5;
-
-type MostActiveDayEntry = NonNullable<MarketReport["mostActive"]>["byDollarVolume1d"][number];
-type MostActiveWeekEntry = NonNullable<MarketReport["mostActive"]>["byDollarVolume5d"][number];
-
-function formatDollarsCompact(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e12) {
-    return `${(value / 1e12).toFixed(2)}T`;
-  }
-  if (abs >= 1e9) {
-    return `${(value / 1e9).toFixed(2)}B`;
-  }
-  if (abs >= 1e6) {
-    return `${(value / 1e6).toFixed(2)}M`;
-  }
-  if (abs >= 1e3) {
-    return `${(value / 1e3).toFixed(2)}K`;
-  }
-  return value.toFixed(0);
-}
-
-function formatSignedPct(value: number): string {
-  return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(2)}%`;
-}
-
-function getStructuredSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
-  const structured = report.summaries.sentiment;
-  const structuredTone = coerceRiskTone(structured?.tone);
-  const structuredLines = Array.isArray(structured?.lines)
-    ? structured.lines
-        .map((line) => (typeof line === "string" ? line.trim() : ""))
-        .filter(Boolean)
-    : [];
-
-  return structured && structuredLines.length > 0 ? { tone: structuredTone, lines: structuredLines } : null;
-}
-
-function extractSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
-  return getStructuredSentiment(report);
-}
 
 function toneBadgeClass(tone: RiskTone): string {
   if (tone === "risk-on") {
@@ -69,72 +25,57 @@ const RISK_TONE_LABEL: Record<RiskTone, string> = {
   mixed: "Mixed"
 };
 
-function renderMostActiveDayRow(entry: MostActiveDayEntry, keyPrefix: string, idx: number) {
-  const bias = entry.trendBias1d === "buy" ? "bullish" : entry.trendBias1d === "sell" ? "bearish" : "neutral";
-  const moveLabel =
-    typeof entry.change1dPct === "number" && Number.isFinite(entry.change1dPct) ? formatSignedPct(entry.change1dPct) : "";
-  const atrLabel =
-    typeof entry.change1dAtr14 === "number" && Number.isFinite(entry.change1dAtr14)
-      ? ` (${Math.abs(entry.change1dAtr14).toFixed(1)} ATR)`
-      : "";
-
+function renderMostActiveDayRow(row: MarketReportSummaryMostActiveRow) {
   return (
-    <li key={`${keyPrefix}-${idx}-${entry.symbol}`}>
-      <strong>{entry.symbol}</strong>: {bias} | {`$${formatDollarsCompact(entry.dollarVolume1d)}`}
-      {moveLabel ? ` | ${moveLabel}` : ""}
-      {atrLabel}
+    <li key={row.key}>
+      <strong>{row.symbol}</strong>: {row.bias} | {row.dollarVolumeLabel}
+      {row.moveLabel ? ` | ${row.moveLabel}` : ""}
+      {row.atrLabel ? ` ${row.atrLabel}` : ""}
     </li>
   );
 }
 
-function renderMostActiveWeekRow(entry: MostActiveWeekEntry, keyPrefix: string, idx: number) {
+function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
   return (
-    <li key={`${keyPrefix}-${idx}-${entry.symbol}`}>
-      <strong>{entry.symbol}</strong>: {`$${formatDollarsCompact(entry.dollarVolume5d)}`}
+    <li key={row.key}>
+      <strong>{row.symbol}</strong>: {row.dollarVolumeLabel}
     </li>
   );
 }
 
-function buildSentimentLineKeys(lines: string[]): string[] {
-  const seen = new Map<string, number>();
-  return lines.map((line) => {
-    const count = seen.get(line) ?? 0;
-    seen.set(line, count + 1);
-    return count === 0 ? line : `${line}-${count}`;
-  });
-}
+type ReportSummaryProps = {
+  summary?: MarketReportSummaryWidgets;
+};
 
-export function ReportSummary() {
+export function ReportSummary(props: ReportSummaryProps) {
   const report = useReport();
-  const sentiment = extractSentiment(report);
-  const tone = sentiment?.tone ?? "mixed";
-  const sentimentLines = sentiment?.lines ?? [];
-  const sentimentLineKeys = buildSentimentLineKeys(sentimentLines);
-  const picks = Array.isArray(report.picks) ? report.picks : [];
-  const visiblePicks = picks.slice(0, REPORT_MAX_PICKS);
-  const hasMorePicks = picks.length > visiblePicks.length;
-  const mostActiveDay = report.mostActive?.byDollarVolume1d ?? [];
-  const mostActiveWeek = report.mostActive?.byDollarVolume5d ?? [];
-  const mostActiveTopCount = Math.min(MOST_ACTIVE_DAY_VISIBLE, mostActiveDay.length);
+  const summary = props.summary ?? buildReportSummaryWidgets(report);
+
+  const sentimentTone = summary.sentiment?.tone ?? "mixed";
+  const sentimentLines = summary.sentiment?.lines ?? [];
+  const mostActive = summary.mostActive;
+  const mostActiveTopCount = mostActive?.day.visibleCount ?? 0;
 
   return (
     <section className={styles.summary}>
       <div className={styles.narrative}>
-        <p className={styles.narrativeMain}>{report.summaries.mainIdea}</p>
-        <p className="report-muted">{report.summaries.veryShort}</p>
+        <p className={styles.narrativeMain}>{summary.narrative.mainIdea}</p>
+        <p className="report-muted">{summary.narrative.veryShort}</p>
       </div>
 
       <div className={styles.widgetGrid}>
         <section className={styles.widget}>
           <div className={styles.widgetHeader}>
             <h3 className={styles.widgetTitle}>Market sentiment</h3>
-            {sentiment ? <span className={toneBadgeClass(tone)}>{RISK_TONE_LABEL[tone]}</span> : null}
+            {summary.sentiment ? (
+              <span className={toneBadgeClass(sentimentTone)}>{RISK_TONE_LABEL[sentimentTone]}</span>
+            ) : null}
           </div>
 
           {sentimentLines.length > 0 ? (
             <ul className={styles.widgetList}>
-              {sentimentLines.map((line, idx) => (
-                <li key={sentimentLineKeys[idx]}>{line}</li>
+              {sentimentLines.map((line) => (
+                <li key={line.key}>{line.text}</li>
               ))}
             </ul>
           ) : (
@@ -145,13 +86,13 @@ export function ReportSummary() {
         <section className={styles.widget}>
           <div className={styles.widgetHeader}>
             <h3 className={styles.widgetTitle}>Technical trades</h3>
-            <span className={styles.widgetCount}>{picks.length}</span>
+            <span className={styles.widgetCount}>{summary.technicalTrades.total}</span>
           </div>
 
-          {visiblePicks.length > 0 ? (
+          {summary.technicalTrades.preview.length > 0 ? (
             <ul className={styles.widgetList}>
-              {visiblePicks.map((p) => (
-                <li key={`pick-${p.symbol}`}>
+              {summary.technicalTrades.preview.map((p) => (
+                <li key={p.key}>
                   <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()} {p.trade.entry.toFixed(2)} / stop {p.trade.stop.toFixed(2)}
                 </li>
               ))}
@@ -160,32 +101,34 @@ export function ReportSummary() {
             <p className="report-muted">No technical trades met the filter today.</p>
           )}
 
-          {hasMorePicks ? (
-            <p className="report-muted">Showing first {visiblePicks.length}.</p>
+          {summary.technicalTrades.hasMore ? (
+            <p className="report-muted">Showing first {summary.technicalTrades.preview.length}.</p>
           ) : null}
         </section>
 
         <section className={styles.widget}>
           <div className={styles.widgetHeader}>
             <h3 className={styles.widgetTitle}>Watchlist</h3>
-            <span className={styles.widgetCount}>{report.watchlist?.length ?? 0}</span>
+            <span className={styles.widgetCount}>{summary.watchlist.total}</span>
           </div>
 
-          {report.watchlist?.length ? (
+          {summary.watchlist.preview.length > 0 ? (
             <ul className={styles.widgetList}>
-              {report.watchlist.slice(0, REPORT_MAX_WATCHLIST).map((p) => (
-                <li key={`watch-${p.symbol}`}>
+              {summary.watchlist.preview.map((p) => (
+                <li key={p.key}>
                   <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()}
                   {p.basis === "trend" ? " [trend]" : p.basis === "signal" ? " [sub-ATR signal]" : ""}
-                  {typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
-                    ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR`
-                    : ""}
+                  {typeof p.move1dAtr14 === "number" ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR` : ""}
                 </li>
               ))}
             </ul>
           ) : (
             <p className="report-muted">No watchlist names stood out today.</p>
           )}
+
+          {summary.watchlist.hasMore ? (
+            <p className="report-muted">Showing first {summary.watchlist.preview.length}.</p>
+          ) : null}
         </section>
 
         <section className={styles.widget}>
@@ -195,45 +138,39 @@ export function ReportSummary() {
             </h3>
           </div>
 
-          {mostActiveDay.length > 0 ? (
+          {mostActive?.day.top.length ? (
             <>
               <p className={styles.widgetMuted}>
                 <strong>Last day</strong>
               </p>
               <ul className={styles.widgetList}>
-                {mostActiveDay
-                  .slice(0, MOST_ACTIVE_DAY_VISIBLE)
-                  .map((entry, idx) => renderMostActiveDayRow(entry, "day", idx))}
+                {mostActive.day.top.map(renderMostActiveDayRow)}
               </ul>
 
-              {mostActiveDay.length > MOST_ACTIVE_DAY_VISIBLE || mostActiveWeek.length > 0 ? (
+              {mostActive.day.overflow.length > 0 || mostActive.week.top.length > 0 ? (
                 <details className={styles.widgetDetails}>
                   <summary className="report-muted">More</summary>
 
-                  {mostActiveDay.length > MOST_ACTIVE_DAY_VISIBLE ? (
+                  {mostActive.day.overflow.length > 0 ? (
                     <>
                       <p className={styles.widgetMuted}>
                         <strong>
-                          Last day ({MOST_ACTIVE_DAY_VISIBLE + 1}–{mostActiveDay.length})
+                          Last day ({mostActive.day.visibleCount + 1}–{mostActive.day.total})
                         </strong>
                       </p>
                       <ul className={styles.widgetList}>
-                        {mostActiveDay
-                          .slice(MOST_ACTIVE_DAY_VISIBLE)
-                          .map((entry, idx) => renderMostActiveDayRow(entry, "day-more", idx))}
+                        {mostActive.day.overflow.map(renderMostActiveDayRow)}
                       </ul>
                     </>
                   ) : null}
 
-                  {mostActiveWeek.length > 0 ? (
+                  {mostActive.week.top.length > 0 ? (
                     <>
                       <p className={styles.widgetMuted}>
                         <strong>Last week</strong>
                       </p>
                       <ul className={styles.widgetList}>
-                        {mostActiveWeek
-                          .slice(0, MOST_ACTIVE_WEEK_VISIBLE)
-                          .map((entry, idx) => renderMostActiveWeekRow(entry, "week", idx))}
+                        {mostActive.week.top.map(renderMostActiveWeekRow)}
                       </ul>
                     </>
                   ) : null}
@@ -248,7 +185,7 @@ export function ReportSummary() {
 
       <details className={styles.contextDetails}>
         <summary className="report-muted">Full context</summary>
-        <pre>{report.summaries.summary}</pre>
+        <pre>{summary.fullContext}</pre>
       </details>
     </section>
   );
