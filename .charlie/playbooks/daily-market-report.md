@@ -36,7 +36,9 @@ Key intent:
 
 #### Summarize step contract
 
-The summarize step MUST take a `MarketReport` and produce a `MarketReportSummaryWidgets` object (see schema below) with these invariants enforced **before** persisting to MDX.
+The summarize step MUST take a `MarketReport` and produce a `MarketReportSummaryWidgets` object.
+
+The canonical schema lives in `src/market/types.ts`. This playbook documents intent + invariants; if it diverges from the TypeScript types, the code is authoritative and this doc should be updated.
 
 Ownership:
 
@@ -51,7 +53,7 @@ References:
 Invariants:
 
 - `narrative.mainIdea` and `narrative.veryShort` come directly from `report.summaries`.
-- `sentiment` is `null` unless `report.summaries.sentiment.lines` produces 1–3 non-empty lines after trimming/capping.
+- `sentiment.lines` must be normalized by the generator: trim whitespace, drop empty lines, and truncate to the first 1–3 valid lines. If no valid lines remain, `sentiment` must be `null`.
 - `technicalTrades.total` is `report.picks.length`, and `technicalTrades.preview` is the first `REPORT_MAX_PICKS` entries (no extra UI-side sorting/parsing).
 - `watchlist.total` is `report.watchlist.length`, and `watchlist.preview` is the first `REPORT_MAX_WATCHLIST` entries (no extra UI-side sorting/parsing).
 - `mostActive` is derived from `report.mostActive.byDollarVolume1d` + `report.mostActive.byDollarVolume5d`.
@@ -60,10 +62,15 @@ Invariants:
 - `fullContext` comes directly from `report.summaries.summary`.
 - Every list item must include a stable `key` field, precomputed by the generator (e.g. rank + symbol), so the UI is a pure renderer.
 
+Failure behavior:
+
+- Prefer safe defaults/coercions (e.g., truncation, nulling optional sections) over throwing during summarization so report generation stays robust.
+
 Edge cases:
 
 - If there are no picks/watchlist names, the corresponding `preview` must be `[]` and `hasMore` must be `false`.
 - If `mostActive` data is missing/empty, `mostActive` must be `null`.
+- If the summary payload needs to change for a rerun, do not edit MDX directly. Re-run `bun run market:run --date=<DATE>` to regenerate.
 
 #### `ReportSummary` embedded payload (`MarketReportSummaryWidgets`)
 
@@ -141,6 +148,8 @@ Versioning policy:
 - Breaking changes (rename/remove fields, change required/optional status, change meanings) must bump `version` and keep the renderer compatible with historical versions.
 - Additive changes (adding optional fields) can stay on the same `version`, but should be documented here.
 - Compatibility logic should live in the report renderer (`src/components/report/ReportSummary.tsx`), and we should keep support for all historical versions unless we also provide a migration that rewrites older MDX.
+
+All invariants in this section apply to `version = "v1-summary-widgets"`. Future versions may refine these rules but must maintain compatibility for historical reports.
 
 ## Creates
 
