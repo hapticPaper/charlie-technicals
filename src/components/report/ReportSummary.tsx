@@ -50,7 +50,7 @@ function getStructuredSentiment(report: MarketReport): { tone: RiskTone; lines: 
 }
 
 // Legacy compatibility fallback for older persisted reports that don't have structured sentiment.
-function getNarrativeSentiment(report: MarketReport, preferredTone: RiskTone | null): { tone: RiskTone; lines: string[] } | null {
+function getNarrativeSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
   const rawMainIdea = typeof report.summaries.mainIdea === "string" ? report.summaries.mainIdea : "";
   const mainIdea = rawMainIdea.trim();
   if (!mainIdea) {
@@ -97,14 +97,13 @@ function getNarrativeSentiment(report: MarketReport, preferredTone: RiskTone | n
   }
 
   return {
-    tone: preferredTone ?? coerceRiskTone(toneFromNarrative),
+    tone: coerceRiskTone(toneFromNarrative),
     lines: trimmed
   };
 }
 
 function extractSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
-  const structured = getStructuredSentiment(report);
-  return structured ?? getNarrativeSentiment(report, null);
+  return getStructuredSentiment(report) ?? getNarrativeSentiment(report);
 }
 
 function toneBadgeClass(tone: RiskTone): string {
