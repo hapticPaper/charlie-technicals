@@ -24,6 +24,51 @@ The rendered report is split into:
 - Keep it clean and concise (human-readable).
 - Do not dump per-symbol indicator hits (e.g., "AIG: RSI overbought | …") into the narrative; keep that detail on the technical analysis charts/sections.
 
+### Summarize step (required)
+
+The **summarize** step is where we convert the computed `MarketReport` into a small, UI-ready payload that can be embedded into the MDX.
+
+Key intent:
+
+- The MDX should remain **declarative**: it includes *what to render* plus *the data to render it*.
+- The MDX should not embed any UI output. It only includes component invocations (e.g. `<ReportSummary ... />`) and props.
+- The report page should not need to “re-aggregate” or parse narrative text just to render summary widgets.
+
+#### `ReportSummary` embedded payload (`MarketReportSummaryWidgets`)
+
+The report generator embeds a precomputed `summary` prop into the MDX:
+
+```mdx
+<ReportSummary summary={...} />
+```
+
+This `summary` object is a persisted, versioned schema (historical MDX keeps whatever was embedded at generation time). The current schema is:
+
+- `version`: must be `"v1-summary-widgets"`.
+- `narrative`:
+  - `mainIdea`: the top narrative headline.
+  - `veryShort`: ultra-compact summary (<= `REPORT_VERY_SHORT_MAX_WORDS`).
+- `sentiment`: `null` or `{ tone, lines }`.
+  - `tone`: one of `"risk-on" | "risk-off" | "mixed"`.
+  - `lines`: 1–3 bullets, already trimmed/capped.
+- `technicalTrades`:
+  - `total`: total number of picks.
+  - `preview`: up to `REPORT_MAX_PICKS` items, each containing `{ symbol, trade: { side, entry, stop } }`.
+  - `hasMore`: whether more than the preview exists.
+- `watchlist`:
+  - `total`: total number of watchlist names.
+  - `preview`: up to `REPORT_MAX_WATCHLIST` items, each containing `{ symbol, trade: { side }, basis, move1dAtr14 }`.
+  - `hasMore`: whether more than the preview exists.
+- `mostActive`: `null` or `{ day, week }` where:
+  - `day.top`: top-ranked (visible) 1d dollar volume rows.
+  - `day.overflow`: the remainder as a ranked continuation.
+  - `week.top`: top-ranked 5d dollar volume rows.
+- `fullContext`: the long-form summary text used by the “Full context” expander.
+
+All list entries include a precomputed `key` field so the UI can render stable lists without recomputing identifiers.
+
+If we change this schema, we must bump `version` and keep the renderer compatible with historical versions.
+
 ## Creates
 
 - Artifact: PR
