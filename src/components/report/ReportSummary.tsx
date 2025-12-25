@@ -103,8 +103,8 @@ function getNarrativeSentiment(report: MarketReport, preferredTone: RiskTone | n
 }
 
 function extractSentiment(report: MarketReport): { tone: RiskTone; lines: string[] } | null {
-  const structuredTone = report.summaries.sentiment ? coerceRiskTone(report.summaries.sentiment.tone) : null;
-  return getStructuredSentiment(report) ?? getNarrativeSentiment(report, structuredTone);
+  const structured = getStructuredSentiment(report);
+  return structured ?? getNarrativeSentiment(report, null);
 }
 
 function toneBadgeClass(tone: RiskTone): string {
@@ -123,7 +123,7 @@ const RISK_TONE_LABEL: Record<RiskTone, string> = {
   mixed: "Mixed"
 };
 
-function renderMostActiveDayRow(entry: MostActiveDayEntry, keyPrefix: string) {
+function renderMostActiveDayRow(entry: MostActiveDayEntry, keyPrefix: string, idx: number) {
   const bias = entry.trendBias1d === "buy" ? "bullish" : entry.trendBias1d === "sell" ? "bearish" : "neutral";
   const moveLabel =
     typeof entry.change1dPct === "number" && Number.isFinite(entry.change1dPct) ? formatSignedPct(entry.change1dPct) : "";
@@ -133,19 +133,29 @@ function renderMostActiveDayRow(entry: MostActiveDayEntry, keyPrefix: string) {
       : "";
 
   return (
-    <li key={`${keyPrefix}-${entry.symbol}`}>
-      <strong>{entry.symbol}</strong>: {bias} | {`$${formatDollarsCompact(entry.dollarVolume1d)}`} | {moveLabel}
+    <li key={`${keyPrefix}-${idx}-${entry.symbol}`}>
+      <strong>{entry.symbol}</strong>: {bias} | {`$${formatDollarsCompact(entry.dollarVolume1d)}`}
+      {moveLabel ? ` | ${moveLabel}` : ""}
       {atrLabel}
     </li>
   );
 }
 
-function renderMostActiveWeekRow(entry: MostActiveWeekEntry, keyPrefix: string) {
+function renderMostActiveWeekRow(entry: MostActiveWeekEntry, keyPrefix: string, idx: number) {
   return (
-    <li key={`${keyPrefix}-${entry.symbol}`}>
+    <li key={`${keyPrefix}-${idx}-${entry.symbol}`}>
       <strong>{entry.symbol}</strong>: {`$${formatDollarsCompact(entry.dollarVolume5d)}`}
     </li>
   );
+}
+
+function buildSentimentLineKeys(lines: string[]): string[] {
+  const seen = new Map<string, number>();
+  return lines.map((line) => {
+    const count = seen.get(line) ?? 0;
+    seen.set(line, count + 1);
+    return count === 0 ? line : `${line}-${count}`;
+  });
 }
 
 export function ReportSummary() {
@@ -153,6 +163,7 @@ export function ReportSummary() {
   const sentiment = extractSentiment(report);
   const tone = sentiment?.tone ?? "mixed";
   const sentimentLines = sentiment?.lines ?? [];
+  const sentimentLineKeys = buildSentimentLineKeys(sentimentLines);
   const picks = Array.isArray(report.picks) ? report.picks : [];
   const visiblePicks = picks.slice(0, REPORT_MAX_PICKS);
   const hasMorePicks = picks.length > visiblePicks.length;
@@ -177,7 +188,7 @@ export function ReportSummary() {
           {sentimentLines.length > 0 ? (
             <ul className={styles.widgetList}>
               {sentimentLines.map((line, idx) => (
-                <li key={idx}>{line}</li>
+                <li key={sentimentLineKeys[idx]}>{line}</li>
               ))}
             </ul>
           ) : (
@@ -244,7 +255,9 @@ export function ReportSummary() {
                 <strong>Last day</strong>
               </p>
               <ul className={styles.widgetList}>
-                {mostActiveDay.slice(0, MOST_ACTIVE_DAY_VISIBLE).map((entry) => renderMostActiveDayRow(entry, "day"))}
+                {mostActiveDay
+                  .slice(0, MOST_ACTIVE_DAY_VISIBLE)
+                  .map((entry, idx) => renderMostActiveDayRow(entry, "day", idx))}
               </ul>
 
               {mostActiveDay.length > MOST_ACTIVE_DAY_VISIBLE || mostActiveWeek.length > 0 ? (
@@ -261,7 +274,7 @@ export function ReportSummary() {
                       <ul className={styles.widgetList}>
                         {mostActiveDay
                           .slice(MOST_ACTIVE_DAY_VISIBLE)
-                          .map((entry) => renderMostActiveDayRow(entry, "day-more"))}
+                          .map((entry, idx) => renderMostActiveDayRow(entry, "day-more", idx))}
                       </ul>
                     </>
                   ) : null}
@@ -274,7 +287,7 @@ export function ReportSummary() {
                       <ul className={styles.widgetList}>
                         {mostActiveWeek
                           .slice(0, MOST_ACTIVE_WEEK_VISIBLE)
-                          .map((entry) => renderMostActiveWeekRow(entry, "week"))}
+                          .map((entry, idx) => renderMostActiveWeekRow(entry, "week", idx))}
                       </ul>
                     </>
                   ) : null}
