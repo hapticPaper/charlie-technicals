@@ -1,126 +1,204 @@
 "use client";
 
-import { REPORT_MAX_WATCHLIST } from "../../market/types";
+import {
+  type MarketReportSummaryMostActiveRow,
+  type MarketReportSummaryWidgets,
+  type RiskTone
+} from "../../market/types";
+import { buildReportSummaryWidgets } from "../../market/summaryWidgets";
 import { useReport } from "./ReportProvider";
+import styles from "./report.module.css";
 
-function formatDollarsCompact(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e12) {
-    return `${(value / 1e12).toFixed(2)}T`;
+function isMarketReportSummaryWidgets(value: unknown): value is MarketReportSummaryWidgets {
+  if (!value || typeof value !== "object") {
+    return false;
   }
-  if (abs >= 1e9) {
-    return `${(value / 1e9).toFixed(2)}B`;
-  }
-  if (abs >= 1e6) {
-    return `${(value / 1e6).toFixed(2)}M`;
-  }
-  if (abs >= 1e3) {
-    return `${(value / 1e3).toFixed(2)}K`;
-  }
-  return value.toFixed(0);
+
+  const candidate = value as { version?: unknown };
+  return candidate.version === "v1-summary-widgets";
 }
 
-function formatSignedPct(value: number): string {
-  return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(2)}%`;
+function toneBadgeClass(tone: RiskTone): string {
+  if (tone === "risk-on") {
+    return styles.badgeBuy;
+  }
+  if (tone === "risk-off") {
+    return styles.badgeSell;
+  }
+  return styles.badgeNeutral;
 }
 
-export function ReportSummary() {
+const RISK_TONE_LABEL: Record<RiskTone, string> = {
+  "risk-on": "Risk-on",
+  "risk-off": "Risk-off",
+  mixed: "Mixed"
+};
+
+function renderMostActiveDayRow(row: MarketReportSummaryMostActiveRow) {
+  return (
+    <li key={row.key}>
+      <strong>{row.symbol}</strong>: {row.bias} | {row.dollarVolumeLabel}
+      {row.moveLabel ? ` | ${row.moveLabel}` : ""}
+      {row.atrLabel ? ` ${row.atrLabel}` : ""}
+    </li>
+  );
+}
+
+function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
+  return (
+    <li key={row.key}>
+      <strong>{row.symbol}</strong>: {row.dollarVolumeLabel}
+    </li>
+  );
+}
+
+type ReportSummaryProps = {
+  summary?: unknown;
+};
+
+export function ReportSummary(props: ReportSummaryProps) {
   const report = useReport();
+  const summary = isMarketReportSummaryWidgets(props.summary)
+    ? props.summary
+    : buildReportSummaryWidgets(report);
+
+  const sentimentTone = summary.sentiment?.tone ?? "mixed";
+  const sentimentLines = summary.sentiment?.lines ?? [];
+  const mostActive = summary.mostActive;
+  const mostActiveTopCount = mostActive?.day.visibleCount ?? 0;
 
   return (
-    <section>
-      <h2>Highlights</h2>
+    <section className={styles.summary}>
+      <div className={styles.narrative}>
+        <p className={styles.narrativeMain}>{summary.narrative.mainIdea}</p>
+        <p className="report-muted">{summary.narrative.veryShort}</p>
+      </div>
 
-      {report.picks.length > 0 ? (
-        <>
-          <p className="report-muted">
-            <strong>Technical trades:</strong>
-          </p>
-          <ul>
-            {report.picks.map((p) => (
-              <li key={p.symbol}>
-                <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()} entry {p.trade.entry.toFixed(2)}, stop{" "}
-                {p.trade.stop.toFixed(2)}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+      <div className={styles.widgetGrid}>
+        <section className={styles.widget}>
+          <div className={styles.widgetHeader}>
+            <h3 className={styles.widgetTitle}>Market sentiment</h3>
+            {summary.sentiment ? (
+              <span className={toneBadgeClass(sentimentTone)}>{RISK_TONE_LABEL[sentimentTone]}</span>
+            ) : null}
+          </div>
 
-      {report.watchlist?.length ? (
-        <>
-          <h3>Watchlist</h3>
-          <p className="report-muted">
-            Trend-following or low-volatility names that didn’t meet the technical-trade filter.
-          </p>
-          <ul>
-            {report.watchlist.slice(0, REPORT_MAX_WATCHLIST).map((p) => (
-              <li key={`watch-${p.symbol}`}>
-                <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()}
-                {p.basis === "trend" ? " [trend]" : p.basis === "signal" ? " [sub-ATR signal]" : ""}
-                {typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
-                  ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR`
-                  : ""}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+          {sentimentLines.length > 0 ? (
+            <ul className={styles.widgetList}>
+              {sentimentLines.map((line) => (
+                <li key={line.key}>{line.text}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="report-muted">No sentiment readout available.</p>
+          )}
+        </section>
 
-      {report.mostActive?.byDollarVolume1d?.length ? (
-        <>
-          <h3>Most active (dollar volume)</h3>
-          <p className="report-muted">
-            Ranked by last daily bar close×volume (within this universe). Moves are shown in ATR14 when available.
-          </p>
+        <section className={styles.widget}>
+          <div className={styles.widgetHeader}>
+            <h3 className={styles.widgetTitle}>Technical trades</h3>
+            <span className={styles.widgetCount}>{summary.technicalTrades.total}</span>
+          </div>
 
-          <p className="report-muted">
-            <strong>Last day</strong>
-          </p>
-          <ul>
-            {report.mostActive.byDollarVolume1d.slice(0, 10).map((e) => {
-              const bias = e.trendBias1d === "buy" ? "bullish" : e.trendBias1d === "sell" ? "bearish" : "neutral";
-              const moveLabel =
-                typeof e.change1dPct === "number" && Number.isFinite(e.change1dPct)
-                  ? formatSignedPct(e.change1dPct)
-                  : "";
-              const atrLabel =
-                typeof e.change1dAtr14 === "number" && Number.isFinite(e.change1dAtr14)
-                  ? ` (${Math.abs(e.change1dAtr14).toFixed(1)} ATR)`
-                  : "";
-
-              return (
-                <li key={`day-${e.symbol}`}>
-                  <strong>{e.symbol}</strong>: {bias} | {`$${formatDollarsCompact(e.dollarVolume1d)}`} | {moveLabel}
-                  {atrLabel}
+          {summary.technicalTrades.preview.length > 0 ? (
+            <ul className={styles.widgetList}>
+              {summary.technicalTrades.preview.map((p) => (
+                <li key={p.key}>
+                  <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()} {p.trade.entry.toFixed(2)} / stop {p.trade.stop.toFixed(2)}
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          ) : (
+            <p className="report-muted">No technical trades met the filter today.</p>
+          )}
 
-          <p className="report-muted">
-            <strong>Last week</strong>
-          </p>
-          <ul>
-            {report.mostActive.byDollarVolume5d.slice(0, 10).map((e) => (
-              <li key={`week-${e.symbol}`}>
-                <strong>{e.symbol}</strong>: {`$${formatDollarsCompact(e.dollarVolume5d)}`}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+          {summary.technicalTrades.hasMore ? (
+            <p className="report-muted">Showing first {summary.technicalTrades.preview.length}.</p>
+          ) : null}
+        </section>
 
-      <p>
-        <strong>Market:</strong> {report.summaries.mainIdea}
-      </p>
-      <p className="report-muted">
-        <strong>Watchlist:</strong> {report.summaries.veryShort}
-      </p>
+        <section className={styles.widget}>
+          <div className={styles.widgetHeader}>
+            <h3 className={styles.widgetTitle}>Watchlist</h3>
+            <span className={styles.widgetCount}>{summary.watchlist.total}</span>
+          </div>
 
-      <details className="report-muted">
-        <summary>Full context</summary>
-        <pre style={{ whiteSpace: "pre-wrap" }}>{report.summaries.summary}</pre>
+          {summary.watchlist.preview.length > 0 ? (
+            <ul className={styles.widgetList}>
+              {summary.watchlist.preview.map((p) => (
+                <li key={p.key}>
+                  <strong>{p.symbol}</strong>: {p.trade.side.toUpperCase()}
+                  {p.basis === "trend" ? " [trend]" : p.basis === "signal" ? " [sub-ATR signal]" : ""}
+                  {typeof p.move1dAtr14 === "number" && Number.isFinite(p.move1dAtr14)
+                    ? ` | ${Math.abs(p.move1dAtr14).toFixed(1)} ATR`
+                    : ""}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="report-muted">No watchlist names stood out today.</p>
+          )}
+
+          {summary.watchlist.hasMore ? (
+            <p className="report-muted">Showing first {summary.watchlist.preview.length}.</p>
+          ) : null}
+        </section>
+
+        <section className={styles.widget}>
+          <div className={styles.widgetHeader}>
+            <h3 className={styles.widgetTitle}>
+              Most active{mostActiveTopCount > 0 ? ` (top ${mostActiveTopCount})` : ""}
+            </h3>
+          </div>
+
+          {mostActive?.day.top.length ? (
+            <>
+              <p className={styles.widgetMuted}>
+                <strong>Last day</strong>
+              </p>
+              <ul className={styles.widgetList}>
+                {mostActive.day.top.map(renderMostActiveDayRow)}
+              </ul>
+
+              {mostActive.day.overflow.length > 0 || mostActive.week.top.length > 0 ? (
+                <details className={styles.widgetDetails}>
+                  <summary className="report-muted">More</summary>
+
+                  {mostActive.day.overflow.length > 0 ? (
+                    <>
+                      <p className={styles.widgetMuted}>
+                        <strong>
+                          Last day ({mostActive.day.visibleCount + 1}–{mostActive.day.total})
+                        </strong>
+                      </p>
+                      <ul className={styles.widgetList}>
+                        {mostActive.day.overflow.map(renderMostActiveDayRow)}
+                      </ul>
+                    </>
+                  ) : null}
+
+                  {mostActive.week.top.length > 0 ? (
+                    <>
+                      <p className={styles.widgetMuted}>
+                        <strong>Last week</strong>
+                      </p>
+                      <ul className={styles.widgetList}>
+                        {mostActive.week.top.map(renderMostActiveWeekRow)}
+                      </ul>
+                    </>
+                  ) : null}
+                </details>
+              ) : null}
+            </>
+          ) : (
+            <p className="report-muted">Most-active data unavailable.</p>
+          )}
+        </section>
+      </div>
+
+      <details className={styles.contextDetails}>
+        <summary className="report-muted">Full context</summary>
+        <pre>{summary.fullContext}</pre>
       </details>
     </section>
   );
