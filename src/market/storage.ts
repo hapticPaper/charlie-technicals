@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import path from "node:path";
 
 import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
+import { getReportSummaryWidgetsJsonPath as getValidatedReportSummaryWidgetsJsonPath } from "./reportStorage";
 import type {
   AnalyzedSeries,
   CnbcVideoArticle,
@@ -183,8 +184,14 @@ export function getReportHighlightsJsonPath(date: string): string {
   return path.join(getReportsDir(), `${date}.highlights.json`);
 }
 
+/**
+* Resolve the validated on-disk path for the report summary widgets cache.
+*
+* Delegates to `reportStorage.getReportSummaryWidgetsJsonPath` so date validation and naming
+* conventions stay consistent across the codebase.
+*/
 export function getReportSummaryWidgetsJsonPath(date: string): string {
-  return path.join(getReportsDir(), `${date}.summary.json`);
+  return getValidatedReportSummaryWidgetsJsonPath(date);
 }
 
 export function toReportHighlights(report: MarketReport): MarketReportHighlights {
@@ -931,57 +938,11 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
   await writeJson(jsonTmp, report);
   await writeFile(mdxTmp, mdx, "utf8");
 
-  let highlightsWritten = false;
-  try {
-    await writeJson(highlightsTmp, toReportHighlights(report));
-    highlightsWritten = true;
-  } catch (error) {
-    await rm(highlightsTmp, { force: true });
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[market:storage] Failed writing highlights for ${date}: ${message}`);
-  }
-
-  let summaryWidgetsWritten = false;
-  try {
-    await writeJson(summaryWidgetsTmp, buildReportSummaryWidgets(report));
-    summaryWidgetsWritten = true;
-  } catch (error) {
-    await rm(summaryWidgetsTmp, { force: true });
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[market:storage] Failed writing summary widgets for ${date}: ${message}`);
-  }
-
-  // Each file swap is atomic, but cross-file atomicity is best-effort.
+  // Commit canonical report artifacts first; derived caches (highlights/summary widgets) are best-effort
+  // and should not block publishing the report.
   try {
     await rename(jsonTmp, jsonPath);
     await rename(mdxTmp, mdxPath);
-    if (highlightsWritten) {
-      try {
-        await rename(highlightsTmp, highlightsPath);
-      } catch (error) {
-        // Highlights are a derived cache. Prefer a missing cache over a potentially stale cache.
-        await Promise.allSettled([
-          rm(highlightsTmp, { force: true }),
-          rm(highlightsPath, { force: true })
-        ]);
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[market:storage] Highlights cache not updated for ${date}: ${message}`);
-      }
-    }
-
-    if (summaryWidgetsWritten) {
-      try {
-        await rename(summaryWidgetsTmp, summaryWidgetsPath);
-      } catch (error) {
-        // Summary widgets are a derived cache. Prefer a missing cache over a potentially stale cache.
-        await Promise.allSettled([
-          rm(summaryWidgetsTmp, { force: true }),
-          rm(summaryWidgetsPath, { force: true })
-        ]);
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[market:storage] Summary widgets cache not updated for ${date}: ${message}`);
-      }
-    }
   } catch (error) {
     await Promise.allSettled([
       rm(jsonTmp, { force: true }),
@@ -990,5 +951,48 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
       rm(mdxTmp, { force: true })
     ]);
     throw error;
+  }
+
+  const cleanupTmp = async (tmpPath: string) => {
+    await rm(tmpPath, { force: true }).catch(() => {
+      // Best-effort cleanup.
+    });
+  };
+
+  const cleanupTmpAndFinal = async (tmpPath: string, finalPath: string) => {
+    await Promise.allSettled([rm(tmpPath, { force: true }), rm(finalPath, { force: true })]);
+  };
+
+  const safeRenameCache = async (tmpPath: string, finalPath: string, label: string) => {
+    try {
+      await rename(tmpPath, finalPath);
+    } catch (error) {
+      // Prefer a missing cache over a potentially stale cache.
+      await cleanupTmpAndFinal(tmpPath, finalPath);
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[market:storage] ${label} cache not updated for ${date}: ${finalPath}: ${message}`);
+    }
+  };
+
+  try {
+    await writeJson(highlightsTmp, toReportHighlights(report));
+    await safeRenameCache(highlightsTmp, highlightsPath, "Highlights");
+  } catch (error) {
+    // Preserve the last known-good cache when writing a new tmp file fails.
+    await cleanupTmp(highlightsTmp);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[market:storage] Failed writing highlights cache for ${date}: ${highlightsPath}: ${message}`);
+  }
+
+  try {
+    await writeJson(summaryWidgetsTmp, buildReportSummaryWidgets(report));
+    await safeRenameCache(summaryWidgetsTmp, summaryWidgetsPath, "Summary widgets");
+  } catch (error) {
+    // Preserve the last known-good cache when writing a new tmp file fails.
+    await cleanupTmp(summaryWidgetsTmp);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[market:storage] Failed writing summary widgets cache for ${date}: ${summaryWidgetsPath}: ${message}`
+    );
   }
 }

@@ -232,6 +232,11 @@ export type MostActiveEntry = {
   signals1d: string[];
 };
 
+/**
+* Source-of-truth market report payload.
+*
+* Summary widgets are stored separately as a derived `content/reports/<date>.summary.json` cache.
+*/
 export type MarketReport = {
   date: string;
   generatedAt: string;
@@ -264,12 +269,15 @@ export type MarketReport = {
       lines: string[];
     };
   };
+
   /**
-  * Optional, precomputed summary-widget payload for renderers.
-  *
-  * Stored separately from the MDX so report content stays readable, and typically loaded
-  * from a sibling `*.summary.json` file.
-  */
+   * @deprecated Summary widgets are now stored separately as a derived cache
+   * (`content/reports/<date>.summary.json`). This field is preserved for backward
+   * compatibility with historical artifacts.
+   *
+   * Writers must not populate this field for new reports. Renderers should prefer the
+   * sidecar cache (and the UI `ReportProvider` context) instead.
+   */
   summaryWidgets?: MarketReportSummaryWidgets;
 };
 
@@ -333,10 +341,12 @@ export type MarketReportSummaryMostActive = {
 };
 
 /**
-* Precomputed summary-widget payload embedded into generated report MDX.
+* Precomputed summary-widget payload for report renderers.
 *
-* The `version` field is part of the persisted schema (historical reports keep their embedded payload).
-* Renderers should treat unknown versions as untrusted and fall back to deriving widgets from `MarketReport`.
+* The source-of-truth report JSON does not include this payload; it is typically stored as a sibling
+* `content/reports/<date>.summary.json` cache to keep MDX readable.
+*
+* The `version` field is part of the persisted schema. Renderers should treat unknown versions as untrusted.
 */
 export type MarketReportSummaryWidgets = {
   version: "v1-summary-widgets";

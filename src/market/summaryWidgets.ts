@@ -15,6 +15,173 @@ import {
 const MOST_ACTIVE_DAY_VISIBLE = 5;
 const MOST_ACTIVE_WEEK_VISIBLE = 5;
 
+export function isMarketReportSummaryWidgets(value: unknown): value is MarketReportSummaryWidgets {
+  const isObject = (candidate: unknown): candidate is Record<string, unknown> =>
+    !!candidate && typeof candidate === "object";
+
+  const isFiniteNumber = (candidate: unknown): candidate is number =>
+    typeof candidate === "number" && Number.isFinite(candidate);
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<MarketReportSummaryWidgets> & { version?: unknown };
+  if (candidate.version !== "v1-summary-widgets") {
+    return false;
+  }
+
+  const narrative = candidate.narrative as unknown;
+  if (!isObject(narrative)) {
+    return false;
+  }
+
+  const narrativeCandidate = narrative as { mainIdea?: unknown; veryShort?: unknown };
+  if (typeof narrativeCandidate.mainIdea !== "string" || typeof narrativeCandidate.veryShort !== "string") {
+    return false;
+  }
+
+  const technicalTrades = candidate.technicalTrades as unknown;
+  if (!isObject(technicalTrades)) {
+    return false;
+  }
+
+  const technicalTradesCandidate = technicalTrades as {
+    total?: unknown;
+    preview?: unknown;
+    hasMore?: unknown;
+  };
+  if (!isFiniteNumber(technicalTradesCandidate.total)) {
+    return false;
+  }
+
+  if (!Array.isArray(technicalTradesCandidate.preview) || typeof technicalTradesCandidate.hasMore !== "boolean") {
+    return false;
+  }
+
+  for (const item of technicalTradesCandidate.preview) {
+    if (!isObject(item)) {
+      return false;
+    }
+    if (typeof item.key !== "string" || typeof item.symbol !== "string") {
+      return false;
+    }
+    if (!isObject(item.trade) || typeof item.trade.side !== "string") {
+      return false;
+    }
+  }
+
+  const watchlist = candidate.watchlist as unknown;
+  if (!isObject(watchlist)) {
+    return false;
+  }
+
+  const watchlistCandidate = watchlist as {
+    total?: unknown;
+    preview?: unknown;
+    hasMore?: unknown;
+  };
+  if (!isFiniteNumber(watchlistCandidate.total)) {
+    return false;
+  }
+  if (!Array.isArray(watchlistCandidate.preview) || typeof watchlistCandidate.hasMore !== "boolean") {
+    return false;
+  }
+
+  for (const item of watchlistCandidate.preview) {
+    if (!isObject(item)) {
+      return false;
+    }
+    if (typeof item.key !== "string" || typeof item.symbol !== "string") {
+      return false;
+    }
+    if (!isObject(item.trade) || typeof item.trade.side !== "string") {
+      return false;
+    }
+    if (item.basis !== null && item.basis !== "signal" && item.basis !== "trend") {
+      return false;
+    }
+    if (item.move1dAtr14 !== null && !isFiniteNumber(item.move1dAtr14)) {
+      return false;
+    }
+  }
+
+  const sentiment = candidate.sentiment as unknown;
+  if (sentiment !== null) {
+    if (!isObject(sentiment)) {
+      return false;
+    }
+
+    const sentimentCandidate = sentiment as { tone?: unknown; lines?: unknown };
+    if (typeof sentimentCandidate.tone !== "string" || !Array.isArray(sentimentCandidate.lines)) {
+      return false;
+    }
+
+    for (const item of sentimentCandidate.lines) {
+      if (!isObject(item)) {
+        return false;
+      }
+      if (typeof item.key !== "string" || typeof item.text !== "string") {
+        return false;
+      }
+    }
+  }
+
+  const mostActive = candidate.mostActive as unknown;
+  if (mostActive !== null) {
+    if (!isObject(mostActive)) {
+      return false;
+    }
+
+    const day = (mostActive as { day?: unknown }).day;
+    const week = (mostActive as { week?: unknown }).week;
+    if (!isObject(day) || !isObject(week)) {
+      return false;
+    }
+
+    const dayCandidate = day as {
+      total?: unknown;
+      visibleCount?: unknown;
+      top?: unknown;
+      overflow?: unknown;
+    };
+    if (!isFiniteNumber(dayCandidate.total) || !isFiniteNumber(dayCandidate.visibleCount)) {
+      return false;
+    }
+    if (!Array.isArray(dayCandidate.top) || !Array.isArray(dayCandidate.overflow)) {
+      return false;
+    }
+    for (const row of [...dayCandidate.top, ...dayCandidate.overflow]) {
+      if (!isObject(row)) {
+        return false;
+      }
+      if (typeof row.key !== "string" || typeof row.symbol !== "string" || typeof row.dollarVolumeLabel !== "string") {
+        return false;
+      }
+    }
+
+    const weekCandidate = week as { total?: unknown; top?: unknown };
+    if (!isFiniteNumber(weekCandidate.total) || !Array.isArray(weekCandidate.top)) {
+      return false;
+    }
+    for (const row of weekCandidate.top) {
+      if (!isObject(row)) {
+        return false;
+      }
+      if (typeof row.key !== "string" || typeof row.symbol !== "string" || typeof row.dollarVolumeLabel !== "string") {
+        return false;
+      }
+    }
+  }
+
+  const fullContext = candidate.fullContext as unknown;
+  if (typeof fullContext !== "string") {
+    return false;
+  }
+
+  return true;
+}
+
 function formatDollarsCompact(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1e12) {

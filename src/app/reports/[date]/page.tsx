@@ -12,6 +12,10 @@ import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
 import { parseIsoDateYmd } from "../../../market/date";
 import {
+  buildReportSummaryWidgets,
+  isMarketReportSummaryWidgets
+} from "../../../market/summaryWidgets";
+import {
   getReportJsonPath,
   getReportMdxPath,
   getReportSummaryWidgetsJsonPath,
@@ -45,6 +49,18 @@ function getReportTitle(date: string): string {
   return `Market Report: ${date}`;
 }
 
+function nodeErrorCode(error: unknown): string | undefined {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const { code } = error as { code?: unknown };
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  return undefined;
+}
+
+
 export async function generateStaticParams() {
   const dates = await listReportDates();
   return dates.map((date) => ({ date }));
@@ -61,15 +77,11 @@ export default async function ReportPage(props: ReportPageProps) {
 
   let report: MarketReport;
   let mdxRaw: string;
-  let summaryWidgets: MarketReportSummaryWidgets | null = null;
   try {
     report = await readJson<MarketReport>(getReportJsonPath(date));
     mdxRaw = await readFile(getReportMdxPath(date), "utf8");
   } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
+    const code = nodeErrorCode(error);
 
     if (code === "ENOENT") {
       notFound();
@@ -78,21 +90,25 @@ export default async function ReportPage(props: ReportPageProps) {
     throw error;
   }
 
+  const summaryWidgetsPath = getReportSummaryWidgetsJsonPath(date);
+  let summaryWidgets: MarketReportSummaryWidgets;
   try {
-    summaryWidgets = await readJson<MarketReportSummaryWidgets>(getReportSummaryWidgetsJsonPath(date));
+    const candidate = await readJson<unknown>(summaryWidgetsPath);
+    if (!isMarketReportSummaryWidgets(candidate)) {
+      throw new Error(`Unexpected summary widgets schema (expected v1-summary-widgets): ${summaryWidgetsPath}`);
+    }
+    summaryWidgets = candidate;
   } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
-
+    const code = nodeErrorCode(error);
     if (code !== "ENOENT") {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[reports] Summary widgets cache unavailable for ${date}: ${message}`);
+      console.warn(
+        `[reports] Summary widgets cache invalid or unreadable; rebuilding from report JSON: ${summaryWidgetsPath} (${date}): ${message}`
+      );
     }
-  }
 
-  const reportForRender: MarketReport = summaryWidgets ? { ...report, summaryWidgets } : report;
+    summaryWidgets = buildReportSummaryWidgets(report);
+  }
 
   let content: ReactNode;
   try {
@@ -113,7 +129,7 @@ export default async function ReportPage(props: ReportPageProps) {
   const title = getReportTitle(date);
 
   return (
-    <ReportProvider report={reportForRender}>
+    <ReportProvider report={report} summaryWidgets={summaryWidgets}>
       <>
         <h1>{title}</h1>
         {content}

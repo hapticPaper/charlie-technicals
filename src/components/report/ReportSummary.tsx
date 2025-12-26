@@ -2,21 +2,10 @@
 
 import {
   type MarketReportSummaryMostActiveRow,
-  type MarketReportSummaryWidgets,
   type RiskTone
 } from "../../market/types";
-import { buildReportSummaryWidgets } from "../../market/summaryWidgets";
-import { useReport } from "./ReportProvider";
+import { useReportSummaryWidgets } from "./ReportProvider";
 import styles from "./report.module.css";
-
-function isMarketReportSummaryWidgets(value: unknown): value is MarketReportSummaryWidgets {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as { version?: unknown };
-  return candidate.version === "v1-summary-widgets";
-}
 
 function toneBadgeClass(tone: RiskTone): string {
   if (tone === "risk-on") {
@@ -52,16 +41,14 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
   );
 }
 
-type ReportSummaryProps = {
-  summary?: unknown;
-};
-
-export function ReportSummary(props: ReportSummaryProps) {
-  const report = useReport();
-  const summary =
-    (isMarketReportSummaryWidgets(props.summary) ? props.summary : null) ??
-    (isMarketReportSummaryWidgets(report.summaryWidgets) ? report.summaryWidgets : null) ??
-    buildReportSummaryWidgets(report);
+/**
+* Renders the summary widget section for a report.
+*
+* This component is intentionally provider-bound: it must be rendered under `ReportProvider`,
+* and it does not accept a `summary` prop (to keep large generated payloads out of MDX).
+*/
+export function ReportSummary() {
+  const summary = useReportSummaryWidgets();
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";
   const sentimentLines = summary.sentiment?.lines ?? [];
