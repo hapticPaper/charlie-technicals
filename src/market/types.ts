@@ -267,7 +267,8 @@ export type MarketReport = {
   /**
   * Optional, precomputed summary-widget payload for renderers.
   *
-  * Stored separately from the MDX so report content stays readable.
+  * Stored separately from the MDX so report content stays readable, and typically loaded
+  * from a sibling `*.summary.json` file.
   */
   summaryWidgets?: MarketReportSummaryWidgets;
 };

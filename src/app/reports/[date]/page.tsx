@@ -87,7 +87,8 @@ export default async function ReportPage(props: ReportPageProps) {
         : undefined;
 
     if (code !== "ENOENT") {
-      throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[reports] Summary widgets cache unavailable for ${date}: ${message}`);
     }
   }
 
