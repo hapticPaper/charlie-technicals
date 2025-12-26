@@ -1617,6 +1617,8 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push(`version: ${formatFrontmatterString("v2-highlights")}`);
   lines.push("---");
   lines.push("");
+  // `ReportSummary` reads precomputed widgets from the report context (or derives them as a fallback).
+  // Keeping MDX free of large data blobs keeps diffs readable.
   lines.push("<ReportSummary />");
   lines.push("");
   lines.push(`<CnbcVideoWidget date="${report.date}" />`);

@@ -92,9 +92,7 @@ export default async function ReportPage(props: ReportPageProps) {
     }
   }
 
-  if (summaryWidgets) {
-    report.summaryWidgets = summaryWidgets;
-  }
+  const reportForRender: MarketReport = summaryWidgets ? { ...report, summaryWidgets } : report;
 
   let content: ReactNode;
   try {
@@ -115,7 +113,7 @@ export default async function ReportPage(props: ReportPageProps) {
   const title = getReportTitle(date);
 
   return (
-    <ReportProvider report={report}>
+    <ReportProvider report={reportForRender}>
       <>
         <h1>{title}</h1>
         {content}
