@@ -50,6 +50,11 @@ export function getReportHighlightsJsonPath(date: string): string {
   return path.join(REPORTS_DIR, `${date}.highlights.json`);
 }
 
+export function getReportSummaryWidgetsJsonPath(date: string): string {
+  assertReportDateIsoYmd(date);
+  return path.join(REPORTS_DIR, `${date}.summary.json`);
+}
+
 export function getReportMdxPath(date: string): string {
   assertReportDateIsoYmd(date);
   return path.join(REPORTS_DIR, `${date}.mdx`);

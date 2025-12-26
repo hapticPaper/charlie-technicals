@@ -3,18 +3,41 @@
 import type { ReactNode } from "react";
 import { createContext, useContext } from "react";
 
-import type { MarketReport } from "../../market/types";
+import type { MarketReport, MarketReportSummaryWidgets } from "../../market/types";
 
-const ReportContext = createContext<MarketReport | null>(null);
+type ReportContextValue = {
+  report: MarketReport;
+  summaryWidgets: MarketReportSummaryWidgets;
+};
 
-export function ReportProvider(props: { report: MarketReport; children: ReactNode }) {
-  return <ReportContext.Provider value={props.report}>{props.children}</ReportContext.Provider>;
+const ReportContext = createContext<ReportContextValue | null>(null);
+
+export function ReportProvider(props: {
+  report: MarketReport;
+  summaryWidgets: MarketReportSummaryWidgets;
+  children: ReactNode;
+}) {
+  return (
+    <ReportContext.Provider value={{ report: props.report, summaryWidgets: props.summaryWidgets }}>
+      {props.children}
+    </ReportContext.Provider>
+  );
 }
 
 export function useReport(): MarketReport {
-  const report = useContext(ReportContext);
-  if (!report) {
+  const ctx = useContext(ReportContext);
+  if (!ctx) {
     throw new Error("ReportProvider context is missing. Wrap the MDX render tree in <ReportProvider>.");
   }
-  return report;
+  return ctx.report;
+}
+
+export function useReportSummaryWidgets(): MarketReportSummaryWidgets {
+  const ctx = useContext(ReportContext);
+  if (!ctx) {
+    throw new Error(
+      "ReportProvider context is missing. Wrap report components in <ReportProvider> and supply summaryWidgets."
+    );
+  }
+  return ctx.summaryWidgets;
 }

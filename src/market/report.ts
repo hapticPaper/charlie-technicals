@@ -14,8 +14,6 @@ import type {
 
 import { coerceRiskTone, REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHORT_MAX_WORDS, SQUEEZE_STATES } from "./types";
 
-import { buildReportSummaryWidgets } from "./summaryWidgets";
-
 import type { TradePlan, TradeSide } from "./types";
 
 function activeSignalLabels(series: AnalyzedSeries): string[] {
@@ -1619,8 +1617,9 @@ export function buildReportMdx(report: MarketReport): string {
   lines.push(`version: ${formatFrontmatterString("v2-highlights")}`);
   lines.push("---");
   lines.push("");
-  const summaryWidgets = buildReportSummaryWidgets(report);
-  lines.push(`<ReportSummary summary={${JSON.stringify(summaryWidgets)}} />`);
+  // `ReportSummary` reads precomputed widgets from the report context (or derives them as a fallback).
+  // Keeping MDX free of large data blobs keeps diffs readable.
+  lines.push("<ReportSummary />");
   lines.push("");
   lines.push(`<CnbcVideoWidget date="${report.date}" />`);
   lines.push("");
