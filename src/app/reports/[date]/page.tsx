@@ -11,8 +11,14 @@ import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
 import { parseIsoDateYmd } from "../../../market/date";
-import { getReportJsonPath, getReportMdxPath, listReportDates, readJson } from "../../../market/reportStorage";
-import type { MarketReport } from "../../../market/types";
+import {
+  getReportJsonPath,
+  getReportMdxPath,
+  getReportSummaryWidgetsJsonPath,
+  listReportDates,
+  readJson
+} from "../../../market/reportStorage";
+import type { MarketReport, MarketReportSummaryWidgets } from "../../../market/types";
 
 type ReportPageParams = { date: string };
 type ReportPageProps = { params: ReportPageParams | PromiseLike<ReportPageParams> };
@@ -55,6 +61,7 @@ export default async function ReportPage(props: ReportPageProps) {
 
   let report: MarketReport;
   let mdxRaw: string;
+  let summaryWidgets: MarketReportSummaryWidgets | null = null;
   try {
     report = await readJson<MarketReport>(getReportJsonPath(date));
     mdxRaw = await readFile(getReportMdxPath(date), "utf8");
@@ -69,6 +76,23 @@ export default async function ReportPage(props: ReportPageProps) {
     }
 
     throw error;
+  }
+
+  try {
+    summaryWidgets = await readJson<MarketReportSummaryWidgets>(getReportSummaryWidgetsJsonPath(date));
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  if (summaryWidgets) {
+    report.summaryWidgets = summaryWidgets;
   }
 
   let content: ReactNode;

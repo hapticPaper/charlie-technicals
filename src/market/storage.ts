@@ -14,6 +14,8 @@ import type {
   RawSeries
 } from "./types";
 
+import { buildReportSummaryWidgets } from "./summaryWidgets";
+
 const CONTENT_DIR = path.join(process.cwd(), "content");
 
 function safeSymbol(symbol: string): string {
@@ -179,6 +181,10 @@ export function getReportJsonPath(date: string): string {
 
 export function getReportHighlightsJsonPath(date: string): string {
   return path.join(getReportsDir(), `${date}.highlights.json`);
+}
+
+export function getReportSummaryWidgetsJsonPath(date: string): string {
+  return path.join(getReportsDir(), `${date}.summary.json`);
 }
 
 export function toReportHighlights(report: MarketReport): MarketReportHighlights {
@@ -908,14 +914,17 @@ export async function writeAnalyzedSeries(date: string, series: AnalyzedSeries):
 export async function writeReport(date: string, report: MarketReport, mdx: string): Promise<void> {
   const jsonPath = getReportJsonPath(date);
   const highlightsPath = getReportHighlightsJsonPath(date);
+  const summaryWidgetsPath = getReportSummaryWidgetsJsonPath(date);
   const mdxPath = getReportMdxPath(date);
   const jsonTmp = `${jsonPath}.tmp`;
   const highlightsTmp = `${highlightsPath}.tmp`;
+  const summaryWidgetsTmp = `${summaryWidgetsPath}.tmp`;
   const mdxTmp = `${mdxPath}.tmp`;
 
   await Promise.allSettled([
     rm(jsonTmp, { force: true }),
     rm(highlightsTmp, { force: true }),
+    rm(summaryWidgetsTmp, { force: true }),
     rm(mdxTmp, { force: true })
   ]);
 
@@ -930,6 +939,16 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
     await rm(highlightsTmp, { force: true });
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[market:storage] Failed writing highlights for ${date}: ${message}`);
+  }
+
+  let summaryWidgetsWritten = false;
+  try {
+    await writeJson(summaryWidgetsTmp, buildReportSummaryWidgets(report));
+    summaryWidgetsWritten = true;
+  } catch (error) {
+    await rm(summaryWidgetsTmp, { force: true });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[market:storage] Failed writing summary widgets for ${date}: ${message}`);
   }
 
   // Each file swap is atomic, but cross-file atomicity is best-effort.
@@ -949,10 +968,25 @@ export async function writeReport(date: string, report: MarketReport, mdx: strin
         console.warn(`[market:storage] Highlights cache not updated for ${date}: ${message}`);
       }
     }
+
+    if (summaryWidgetsWritten) {
+      try {
+        await rename(summaryWidgetsTmp, summaryWidgetsPath);
+      } catch (error) {
+        // Summary widgets are a derived cache. Prefer a missing cache over a potentially stale cache.
+        await Promise.allSettled([
+          rm(summaryWidgetsTmp, { force: true }),
+          rm(summaryWidgetsPath, { force: true })
+        ]);
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[market:storage] Summary widgets cache not updated for ${date}: ${message}`);
+      }
+    }
   } catch (error) {
     await Promise.allSettled([
       rm(jsonTmp, { force: true }),
       rm(highlightsTmp, { force: true }),
+      rm(summaryWidgetsTmp, { force: true }),
       rm(mdxTmp, { force: true })
     ]);
     throw error;

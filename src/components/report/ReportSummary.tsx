@@ -58,9 +58,10 @@ type ReportSummaryProps = {
 
 export function ReportSummary(props: ReportSummaryProps) {
   const report = useReport();
-  const summary = isMarketReportSummaryWidgets(props.summary)
-    ? props.summary
-    : buildReportSummaryWidgets(report);
+  const summary =
+    (isMarketReportSummaryWidgets(props.summary) ? props.summary : null) ??
+    (isMarketReportSummaryWidgets(report.summaryWidgets) ? report.summaryWidgets : null) ??
+    buildReportSummaryWidgets(report);
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";
   const sentimentLines = summary.sentiment?.lines ?? [];

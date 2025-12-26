@@ -264,6 +264,12 @@ export type MarketReport = {
       lines: string[];
     };
   };
+  /**
+  * Optional, precomputed summary-widget payload for renderers.
+  *
+  * Stored separately from the MDX so report content stays readable.
+  */
+  summaryWidgets?: MarketReportSummaryWidgets;
 };
 
 export type HighlightPick = {
