@@ -1415,6 +1415,8 @@ function buildSummaries(
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>,
   missingSymbols: string[]
 ): MarketReport["summaries"] {
+  // `date` is expected to be an NY calendar date in `YYYY-MM-DD` (validated upstream).
+  // We pin to 12:00 UTC to avoid DST edge cases when mapping to America/New_York.
   const dateUtcNoon = parseDateUtcNoon(date);
 
   const isWeekendNy = (() => {
