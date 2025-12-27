@@ -1393,6 +1393,21 @@ function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<Ma
   return { regimeParts, regimeLabel };
 }
 
+const MS_PER_DAY_UTC = 24 * 60 * 60 * 1000;
+const YEAR_BOUNDARY_WINDOW_DAYS = 7;
+
+function parseDateUtcNoon(date: string): Date {
+  const d = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`Invalid report date: ${date}. Expected format YYYY-MM-DD.`);
+  }
+  return d;
+}
+
+function diffDaysUtc(a: Date, b: Date): number {
+  return Math.round((a.getTime() - b.getTime()) / MS_PER_DAY_UTC);
+}
+
 function buildSummaries(
   date: string,
   picks: ReportPick[],
@@ -1400,6 +1415,28 @@ function buildSummaries(
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>,
   missingSymbols: string[]
 ): MarketReport["summaries"] {
+  // `date` is expected to be an NY calendar date in `YYYY-MM-DD` (validated upstream).
+  // We pin to 12:00 UTC to avoid DST edge cases when mapping to America/New_York.
+  const dateUtcNoon = parseDateUtcNoon(date);
+
+  const isWeekendNy = (() => {
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short"
+    }).format(dateUtcNoon);
+    return weekday === "Sat" || weekday === "Sun";
+  })();
+
+  const year = Number(date.slice(0, 4));
+  const startOfYearUtcNoon = parseDateUtcNoon(`${year}-01-01`);
+  const startOfNextYearUtcNoon = parseDateUtcNoon(`${year + 1}-01-01`);
+
+  const daysSinceYearStart = diffDaysUtc(dateUtcNoon, startOfYearUtcNoon);
+  const daysUntilNextYear = diffDaysUtc(startOfNextYearUtcNoon, dateUtcNoon);
+
+  const isFirstWeekOfYear = daysSinceYearStart >= 0 && daysSinceYearStart <= YEAR_BOUNDARY_WINDOW_DAYS;
+  const isFinalWeekOfYear = daysUntilNextYear >= 0 && daysUntilNextYear <= YEAR_BOUNDARY_WINDOW_DAYS;
+
   function median(values: number[]): number | null {
     const sorted = values.slice().sort((a, b) => a - b);
     if (sorted.length === 0) {
@@ -1485,7 +1522,11 @@ function buildSummaries(
     );
   }
   if (picks.length === 0) {
-    mainIdeaParts.push("No high-conviction technical trades met the filter today; focus is on watchlist follow-through.");
+    mainIdeaParts.push(
+      isWeekendNy
+        ? "No high-conviction technical trades met the filter; focus is on broader context + watchlist levels for next week."
+        : "No high-conviction technical trades met the filter today; focus is on watchlist follow-through."
+    );
   } else {
     mainIdeaParts.push(
       `Top setups: ${picks
@@ -1497,10 +1538,20 @@ function buildSummaries(
 
   const watchlistTake = (() => {
     if (watchlist.length === 0) {
-      return "Watchlist stance: none flagged; staying selective into the next few sessions.";
+      return isWeekendNy
+        ? "Weekend stance: none flagged; staying selective into next week with a longer-term lens (weeks/months)."
+        : "Watchlist stance: none flagged; staying selective into the next few sessions.";
     }
 
     const bias = getNarrativeWatchlistBias(watchlist);
+
+    if (isWeekendNy) {
+      return `Weekend stance: ${bias} bias, watching ${watchlist
+        .slice(0, REPORT_MAX_WATCHLIST)
+        .map((p) => p.symbol)
+        .join(", ")} for follow-through over the next few weeks.`;
+    }
+
     return `Watchlist stance: ${bias} bias, watching ${watchlist
       .slice(0, REPORT_MAX_WATCHLIST)
       .map((p) => p.symbol)
@@ -1511,6 +1562,19 @@ function buildSummaries(
 
   const summaryParts: string[] = [];
   summaryParts.push(`Report date: ${date}.`);
+
+  if (isWeekendNy) {
+    summaryParts.push(
+      "Weekend note: focusing on broader market context and multi-week to quarterly levels (20/55/252d), not day-to-day noise."
+    );
+  }
+
+  if (isWeekendNy && (isFinalWeekOfYear || isFirstWeekOfYear)) {
+    const nextYearLabel = `${year + 1}-01-01`;
+    summaryParts.push(
+      `Calendar note: ${isFinalWeekOfYear ? `with ${nextYearLabel} coming up` : "early in the new year"}, expect positioning/rebalancing flows; prioritize clean weekly/monthly levels.`
+    );
+  }
 
   if (regimeParts.length > 0) {
     const label = regimeLabel ? `${regimeLabel}` : "mixed";
