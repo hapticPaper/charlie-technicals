@@ -1400,6 +1400,27 @@ function buildSummaries(
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>,
   missingSymbols: string[]
 ): MarketReport["summaries"] {
+  const dateUtcNoon = new Date(`${date}T12:00:00Z`);
+
+  const isWeekendNy = (() => {
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short"
+    }).format(dateUtcNoon);
+    return weekday === "Sat" || weekday === "Sun";
+  })();
+
+  const year = Number(date.slice(0, 4));
+  const startOfYearUtcNoon = new Date(`${year}-01-01T12:00:00Z`);
+  const startOfNextYearUtcNoon = new Date(`${year + 1}-01-01T12:00:00Z`);
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  const daysSinceYearStart = Math.round((dateUtcNoon.getTime() - startOfYearUtcNoon.getTime()) / MS_PER_DAY);
+  const daysUntilNextYear = Math.round((startOfNextYearUtcNoon.getTime() - dateUtcNoon.getTime()) / MS_PER_DAY);
+
+  const isFirstWeekOfYear = daysSinceYearStart >= 0 && daysSinceYearStart <= 7;
+  const isFinalWeekOfYear = daysUntilNextYear >= 0 && daysUntilNextYear <= 7;
+
   function median(values: number[]): number | null {
     const sorted = values.slice().sort((a, b) => a - b);
     if (sorted.length === 0) {
@@ -1485,7 +1506,11 @@ function buildSummaries(
     );
   }
   if (picks.length === 0) {
-    mainIdeaParts.push("No high-conviction technical trades met the filter today; focus is on watchlist follow-through.");
+    mainIdeaParts.push(
+      isWeekendNy
+        ? "No high-conviction technical trades met the filter; focus is on broader context + watchlist levels for next week."
+        : "No high-conviction technical trades met the filter today; focus is on watchlist follow-through."
+    );
   } else {
     mainIdeaParts.push(
       `Top setups: ${picks
@@ -1497,10 +1522,20 @@ function buildSummaries(
 
   const watchlistTake = (() => {
     if (watchlist.length === 0) {
-      return "Watchlist stance: none flagged; staying selective into the next few sessions.";
+      return isWeekendNy
+        ? "Weekend stance: none flagged; staying selective into next week with a longer-term lens (weeks/months)."
+        : "Watchlist stance: none flagged; staying selective into the next few sessions.";
     }
 
     const bias = getNarrativeWatchlistBias(watchlist);
+
+    if (isWeekendNy) {
+      return `Weekend stance: ${bias} bias, watching ${watchlist
+        .slice(0, REPORT_MAX_WATCHLIST)
+        .map((p) => p.symbol)
+        .join(", ")} for follow-through over the next 1–4 weeks.`;
+    }
+
     return `Watchlist stance: ${bias} bias, watching ${watchlist
       .slice(0, REPORT_MAX_WATCHLIST)
       .map((p) => p.symbol)
@@ -1511,6 +1546,19 @@ function buildSummaries(
 
   const summaryParts: string[] = [];
   summaryParts.push(`Report date: ${date}.`);
+
+  if (isWeekendNy) {
+    summaryParts.push(
+      "Weekend note: focusing on broader market context and multi-week to quarterly levels (20/55/252d), not day-to-day noise."
+    );
+  }
+
+  if (isWeekendNy && (isFinalWeekOfYear || isFirstWeekOfYear)) {
+    const nextYearLabel = `${year + 1}-01-01`;
+    summaryParts.push(
+      `Calendar note: ${isFinalWeekOfYear ? `with ${nextYearLabel} coming up` : "early in the new year"}, expect positioning/rebalancing flows; prioritize clean weekly/monthly levels.`
+    );
+  }
 
   if (regimeParts.length > 0) {
     const label = regimeLabel ? `${regimeLabel}` : "mixed";
