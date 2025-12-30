@@ -293,6 +293,17 @@ function safeBasename(value: string): string {
   return collapsed.length > 0 ? collapsed : "video";
 }
 
+function maxTimestamp(a: string, b: string): string {
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+
+  if (Number.isFinite(ta) && Number.isFinite(tb)) {
+    return ta >= tb ? a : b;
+  }
+
+  return a.localeCompare(b) >= 0 ? a : b;
+}
+
 function getCnbcVideoFilePath(date: string, stored: StoredCnbcVideoArticle): string {
   const dirPath = getCnbcVideoDateDir(date);
   const stem = safeBasename(stored.id);
@@ -387,8 +398,7 @@ export async function writeCnbcVideoSnapshot(
           ...mergedRes.merged,
           relatedTickers: mergedRelatedTickers,
           symbol: mergedRelatedTickers.length === 1 ? mergedRelatedTickers[0] ?? null : null,
-          fetchedAt:
-            existingStored.fetchedAt.localeCompare(snapshot.fetchedAt) >= 0 ? existingStored.fetchedAt : snapshot.fetchedAt
+          fetchedAt: maxTimestamp(existingStored.fetchedAt, snapshot.fetchedAt)
         };
 
         if (!mergedRes.changed && existingStored.fetchedAt === mergedStored.fetchedAt) {
