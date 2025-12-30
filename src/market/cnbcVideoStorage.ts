@@ -183,6 +183,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
     }
 
     const { provider: _provider, symbol, ...article } = stored;
+    void _provider;
     articles.push({
       ...article,
       symbol: normalizeCnbcSymbol(symbol)
