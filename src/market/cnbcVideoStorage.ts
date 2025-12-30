@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { withFileLock } from "./fileLock";
 import { fileExists } from "./fsUtils";
+import { mergeNewsArticles } from "./newsMerge";
 import type { ExistingSnapshotMode } from "./snapshotTypes";
 import type { CnbcVideoArticle, MarketNewsArticle, MarketNewsSnapshot, StoredCnbcVideoArticle } from "./types";
 
@@ -156,39 +157,39 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
     .filter((name) => name.endsWith(".json"))
     .sort();
 
-  const articles: CnbcVideoArticle[] = [];
+  const articles = await Promise.all(
+    files.map(async (name) => {
+      const filePath = path.join(dirPath, name);
+      const stored = await readJson<StoredCnbcVideoArticle>(filePath);
 
-  for (const name of files) {
-    const filePath = path.join(dirPath, name);
-    const stored = await readJson<StoredCnbcVideoArticle>(filePath);
+      if (stored.provider !== "cnbc" || stored.asOfDate !== date) {
+        throw new Error(
+          `[market:cnbc-storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+            id: stored.id,
+            provider: stored.provider,
+            asOfDate: stored.asOfDate,
+            expectedAsOfDate: date
+          })}`
+        );
+      }
 
-    if (stored.provider !== "cnbc" || stored.asOfDate !== date) {
-      throw new Error(
-        `[market:cnbc-storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
-          id: stored.id,
-          provider: stored.provider,
-          asOfDate: stored.asOfDate,
-          expectedAsOfDate: date
-        })}`
-      );
-    }
+      if (stored.symbol !== null && typeof stored.symbol !== "string") {
+        throw new Error(
+          `[market:cnbc-storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
+            id: stored.id,
+            symbol: stored.symbol
+          })}`
+        );
+      }
 
-    if (stored.symbol !== null && typeof stored.symbol !== "string") {
-      throw new Error(
-        `[market:cnbc-storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
-          id: stored.id,
-          symbol: stored.symbol
-        })}`
-      );
-    }
-
-    const { provider: _provider, symbol, ...article } = stored;
-    void _provider;
-    articles.push({
-      ...article,
-      symbol: normalizeCnbcSymbol(symbol)
-    });
-  }
+      const { provider: _provider, symbol, ...article } = stored;
+      void _provider;
+      return {
+        ...article,
+        symbol: normalizeCnbcSymbol(symbol)
+      } satisfies CnbcVideoArticle;
+    })
+  );
 
   cnbcReadCache.set(dirPath, articles);
   return articles;
@@ -252,51 +253,23 @@ export async function listCnbcVideoDates(): Promise<string[]> {
 }
 
 export async function cnbcVideoSnapshotExists(date: string): Promise<boolean> {
-  return fileExists(getCnbcVideoDateDir(date));
+  const dirPath = getCnbcVideoDateDir(date);
+  try {
+    const entries = await readdir(dirPath, { withFileTypes: true });
+    return entries.some((entry) => entry.isFile() && entry.name.endsWith(".json"));
+  } catch (error) {
+    const code = nodeErrorCode(error);
+    if (code === "ENOENT") {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 export type WriteCnbcVideoSnapshotResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
-
-function normalizeNewsArticleForMerge(article: MarketNewsArticle): MarketNewsArticle {
-  const normalizedThumbnailUrl =
-    typeof article.thumbnailUrl === "string"
-      ? article.thumbnailUrl.trim() !== ""
-        ? article.thumbnailUrl.trim()
-        : null
-      : article.thumbnailUrl;
-
-  return {
-    ...article,
-    thumbnailUrl: normalizedThumbnailUrl,
-    relatedTickers: Array.from(new Set(article.relatedTickers))
-  };
-}
-
-function mergeNewsArticles(existing: MarketNewsArticle, incoming: MarketNewsArticle): {
-  merged: MarketNewsArticle;
-  changed: boolean;
-} {
-  const normalizedIncoming = normalizeNewsArticleForMerge(incoming);
-  const existingTopic =
-    typeof existing.topic === "string" && existing.topic.trim() !== "" ? existing.topic : undefined;
-  const incomingTopic =
-    typeof normalizedIncoming.topic === "string" && normalizedIncoming.topic.trim() !== ""
-      ? normalizedIncoming.topic
-      : undefined;
-  const merged: MarketNewsArticle = {
-    ...normalizedIncoming,
-    thumbnailUrl: normalizedIncoming.thumbnailUrl ?? existing.thumbnailUrl,
-    topic: existingTopic ?? incomingTopic,
-    hype: normalizedIncoming.hype ?? existing.hype,
-    relatedTickers:
-      normalizedIncoming.relatedTickers.length > 0 ? normalizedIncoming.relatedTickers : existing.relatedTickers
-  };
-
-  const changed = JSON.stringify(merged) !== JSON.stringify(existing);
-  return { merged, changed };
-}
 
 function toStoredCnbcArticle(snapshot: MarketNewsSnapshot, article: MarketNewsArticle): StoredCnbcVideoArticle {
   const uniqRelatedTickers = Array.from(new Set(article.relatedTickers));

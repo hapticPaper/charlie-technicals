@@ -10,6 +10,7 @@ import {
 } from "./cnbcVideoStorage";
 import { withFileLock } from "./fileLock";
 import { fileExists } from "./fsUtils";
+import { mergeNewsArticles, normalizeNewsArticleForMerge } from "./newsMerge";
 import { getReportSummaryWidgetsJsonPath as getValidatedReportSummaryWidgetsJsonPath } from "./reportStorage";
 import type { ExistingSnapshotMode } from "./snapshotTypes";
 import type {
@@ -209,46 +210,6 @@ export async function newsSnapshotExists(date: string, symbol: string): Promise<
 export type WriteNewsSnapshotResult =
   | { status: "written"; path: string }
   | { status: "skipped_existing"; path: string };
-
-function normalizeNewsArticleForMerge(article: MarketNewsArticle): MarketNewsArticle {
-  const normalizedThumbnailUrl =
-    typeof article.thumbnailUrl === "string"
-      ? article.thumbnailUrl.trim() !== ""
-        ? article.thumbnailUrl.trim()
-        : null
-      : article.thumbnailUrl;
-
-  return {
-    ...article,
-    thumbnailUrl: normalizedThumbnailUrl,
-    relatedTickers: Array.from(new Set(article.relatedTickers))
-  };
-}
-
-function mergeNewsArticles(existing: MarketNewsArticle, incoming: MarketNewsArticle): {
-  merged: MarketNewsArticle;
-  changed: boolean;
-} {
-  const normalizedIncoming = normalizeNewsArticleForMerge(incoming);
-  const existingTopic =
-    typeof existing.topic === "string" && existing.topic.trim() !== "" ? existing.topic : undefined;
-  const incomingTopic =
-    typeof normalizedIncoming.topic === "string" && normalizedIncoming.topic.trim() !== ""
-      ? normalizedIncoming.topic
-      : undefined;
-  const merged: MarketNewsArticle = {
-    ...normalizedIncoming,
-    thumbnailUrl: normalizedIncoming.thumbnailUrl ?? existing.thumbnailUrl,
-    // Preserve any previously-enriched topic values (they may be human-curated or hand-corrected).
-    topic: existingTopic ?? incomingTopic,
-    hype: normalizedIncoming.hype ?? existing.hype,
-    relatedTickers:
-      normalizedIncoming.relatedTickers.length > 0 ? normalizedIncoming.relatedTickers : existing.relatedTickers
-  };
-
-  const changed = JSON.stringify(merged) !== JSON.stringify(existing);
-  return { merged, changed };
-}
 
 function sortNewsArticles(articles: MarketNewsArticle[]): MarketNewsArticle[] {
   return [...articles].sort((a, b) => {
