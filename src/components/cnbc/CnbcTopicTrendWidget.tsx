@@ -1,4 +1,4 @@
-import { listCnbcVideoDates, readCnbcVideoArticles } from "../../market/storage";
+import { listCnbcVideoDates, readCnbcVideoArticles } from "../../market/cnbcVideoStorage";
 import type { CnbcVideoArticle } from "../../market/types";
 
 import type { CnbcVideosByDate, CnbcVideosByTopic } from "./types";
