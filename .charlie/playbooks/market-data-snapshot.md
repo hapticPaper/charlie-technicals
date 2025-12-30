@@ -36,7 +36,7 @@ None. This playbook writes local artifacts under `content/data/` for downstream 
    - Yahoo news:
      - `content/data/<SYMBOL>/news/<YYYYMMDD>.json`
    - CNBC videos:
-     - `content/data/cnbc/news/<YYYYMMDD>.json`
+     - `content/data/cnbc/<YYYYMMDD>/*.json`
 
 4. Do not open a PR (these are intermediate artifacts).
 
@@ -48,7 +48,7 @@ None. This playbook writes local artifacts under `content/data/` for downstream 
 
   - `content/data/SPY/1d/<YYYYMMDD>.json`
   - `content/data/SPY/news/<YYYYMMDD>.json`
-  - `content/data/cnbc/news/<YYYYMMDD>.json`
+  - `content/data/cnbc/<YYYYMMDD>/*.json`
 
 ## Rollback
 
@@ -56,6 +56,6 @@ None. This playbook writes local artifacts under `content/data/` for downstream 
 
   - `content/data/<SYMBOL>/<INTERVAL>/`
   - `content/data/<SYMBOL>/news/`
-  - `content/data/cnbc/news/`
+  - `content/data/cnbc/<YYYYMMDD>/`
 
 - For historical dates, do not delete or overwrite existing snapshots unless you are explicitly regenerating a known-bad snapshot (and you should document the incident in the PR description).

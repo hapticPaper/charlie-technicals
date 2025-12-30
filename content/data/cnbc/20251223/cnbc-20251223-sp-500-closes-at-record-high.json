@@ -1,0 +1,17 @@
+{
+  "id": "cnbc:20251223:sp-500-closes-at-record-high",
+  "title": "S&P 500 closes at record high",
+  "url": "https://www.cnbc.com/video/2025/12/23/sp-500-closes-at-record-high.html",
+  "thumbnailUrl": "https://image.cnbcfm.com/api/v1/image/108245400-17665249561766524954-43135202336-1080pnbcnews.jpg?v=1766524956",
+  "publisher": "CNBC",
+  "publishedAt": "2025-12-23T21:27:10.000Z",
+  "relatedTickers": [],
+  "topic": "markets",
+  "hype": 20,
+  "mainIdea": "S&P 500 closes at record high",
+  "summary": "CNBC: S&P 500 closes at record high.",
+  "symbol": null,
+  "provider": "cnbc",
+  "fetchedAt": "2025-12-30T12:55:27.893Z",
+  "asOfDate": "2025-12-23"
+}

@@ -2,8 +2,6 @@ import type { MarketNewsArticle, MarketNewsSnapshot } from "../types";
 
 import { formatDateYYYYMMDD } from "../../lib/date";
 
-import { parseIsoDateYmd } from "../date";
-
 import {
   buildNewsMainIdea,
   buildNewsSummary,
@@ -13,10 +11,6 @@ import {
 
 const CNBC_PUBLISHER = "CNBC";
 const CNBC_WEBQL_URL = "https://webql-redesign.cnbcfm.com/graphql";
-
-// Keep a short rolling window so the daily report has enough videos to work with,
-// even when run early in the NY morning.
-const CNBC_LOOKBACK_DAYS = 14;
 
 const CNBC_SEARCH_QUERY = `query search($tag: String, $page: Int!, $pageSize: Int!, $contentType: [assetTypeValues]!) {
   search(tag: $tag, page: $page, pageSize: $pageSize, contentType: $contentType) {
@@ -73,19 +67,6 @@ function buildCnbcVideoId(url: string): string {
   }
 
   return `cnbc:${url}`;
-}
-
-/**
-* Shift a strict ISO `YYYY-MM-DD` date by `deltaDays` in UTC calendar days.
-*
-* Uses 12:00:00Z as the base time to avoid DST edge cases and returns a zero-padded ISO `YYYY-MM-DD` string.
-*/
-function shiftIsoDateYmd(date: string, deltaDays: number): string {
-  // `parseIsoDateYmd` validates `date` is a real calendar day in strict `YYYY-MM-DD` format.
-  const { year, month, day } = parseIsoDateYmd(date);
-  const base = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
-  base.setUTCDate(base.getUTCDate() + deltaDays);
-  return base.toISOString().slice(0, 10);
 }
 
 async function fetchJson(url: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
@@ -182,17 +163,15 @@ export class CnbcVideoProvider {
   }
 
   /**
-  * Fetch a rolling window of CNBC videos ending on `asOfDate` (NY calendar date).
+  * Fetch CNBC videos for `asOfDate` (NY calendar date).
+  *
+  * Note: this returns only videos whose NY-local calendar date matches `asOfDate`.
   */
   async fetchNews(args: {
     asOfDate: string;
     maxUrls?: number;
   }): Promise<{ snapshot: MarketNewsSnapshot; totalUrls: number; keptUrls: number }> {
     const fetchedAt = new Date().toISOString();
-
-    // Lookback window is computed in UTC ISO days; we only compare `YYYY-MM-DD` strings,
-    // so this remains stable even though bucketing is NY-local.
-    const windowStartYmd = shiftIsoDateYmd(args.asOfDate, -(CNBC_LOOKBACK_DAYS - 1));
 
     const maxAssets = Math.max(200, args.maxUrls ?? 2000);
     const pageSize = 100;
@@ -234,8 +213,7 @@ export class CnbcVideoProvider {
       // CNBC URLs embed NY-local calendar dates; we mirror that for day-level bucketing.
       // Note: this can diverge from the UTC date portion of `publishedAt` for videos near midnight.
       const effectiveYmd = ymd ?? formatDateYYYYMMDD(publishedAtDate, "America/New_York");
-      // ISO YMD strings are zero-padded, so lexicographic comparison matches chronological ordering.
-      if (effectiveYmd > args.asOfDate || effectiveYmd < windowStartYmd) {
+      if (effectiveYmd !== args.asOfDate) {
         continue;
       }
 

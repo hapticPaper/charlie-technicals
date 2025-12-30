@@ -1,13 +1,13 @@
 # CNBC video snapshot
 
 ## Overview
-Scrape the CNBC Latest Video feed and write a news snapshot under `content/data/cnbc/news/<YYYYMMDD>.json`.
+Scrape the CNBC Latest Video feed and write one JSON file per video under `content/data/cnbc/<YYYYMMDD>/*.json`.
 
 Note: this is also run as part of `bun run market:data` (the full acquisition stage).
 
 ## Creates
 
-None. This playbook writes local artifacts under `content/data/cnbc/news/`.
+None. This playbook writes local artifacts under `content/data/cnbc/`.
 
 ## Prerequisites
 
@@ -17,9 +17,9 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 ## Limits
 
 - Guardrails:
-  - Do not modify existing historical snapshot files for past dates unless you are explicitly regenerating a known-bad snapshot (e.g. a parsing bug).
-    In that case, delete the file first and re-run the command for that date, and reference the incident in the PR description.
-  - For today's date (America/New_York), reruns merge into the existing snapshot so late videos can be picked up without losing prior topic/ticker enrichment.
+  - Do not modify existing historical snapshot folders for past dates unless you are explicitly regenerating a known-bad snapshot (e.g. a parsing bug).
+    In that case, delete the folder first and re-run the command for that date, and reference the incident in the PR description.
+  - For today's date (America/New_York), reruns merge into the existing folder so late videos can be picked up without losing prior topic/ticker enrichment.
 
 ## Steps
 
@@ -31,7 +31,7 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
    bun run market:cnbc --date=<DATE>
    ```
 
-3. Confirm the file exists: `content/data/cnbc/news/<YYYYMMDD>.json`.
+3. Confirm the folder exists: `content/data/cnbc/<YYYYMMDD>/`.
 
 4. Enrich the snapshot by reading headlines and doing the dimensionality reduction:
 
@@ -54,11 +54,11 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 
 ## Verify
 
-- `content/data/cnbc/news/<YYYYMMDD>.json` exists.
+- `content/data/cnbc/<YYYYMMDD>/` exists and contains `*.json` files.
 - Spot-check topics (avoid the all-`other` failure mode):
 
   ```bash
-  jq -r '.[].topic // "other"' content/data/cnbc/news/<YYYYMMDD>.json | sort | uniq -c | sort -nr | head
+  jq -r '.topic // "other"' content/data/cnbc/<YYYYMMDD>/*.json | sort | uniq -c | sort -nr | head
   ```
 
   This command treats missing topics as `"other"` for display only. If you ever see `topic == "other"` in the raw JSON, that's a data bug and the snapshot should be fixed.
@@ -66,9 +66,9 @@ None. This playbook writes local artifacts under `content/data/cnbc/news/`.
 - Spot-check missing topics:
 
   ```bash
-  jq '[.[] | select(.topic == null or .topic == "")] | length' content/data/cnbc/news/<YYYYMMDD>.json
+  jq -s '[.[] | select(.topic == null or .topic == "")] | length' content/data/cnbc/<YYYYMMDD>/*.json
   ```
 
 ## Rollback
 
-- Delete `content/data/cnbc/news/<YYYYMMDD>.json` if you want to discard the fetched snapshot.
+- Delete `content/data/cnbc/<YYYYMMDD>/` if you want to discard the fetched snapshot.

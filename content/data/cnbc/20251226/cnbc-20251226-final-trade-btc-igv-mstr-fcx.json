@@ -1,0 +1,17 @@
+{
+  "id": "cnbc:20251226:final-trade-btc-igv-mstr-fcx",
+  "title": "Final Trade: BTC, IGV, MSTR, FCX",
+  "url": "https://www.cnbc.com/video/2025/12/26/final-trade-btc-igv-mstr-fcx.html",
+  "thumbnailUrl": "https://image.cnbcfm.com/api/v1/image/108246016-17667902661766790265-43184657778-1080pnbcnews.jpg?v=1766790266",
+  "publisher": "CNBC",
+  "publishedAt": "2025-12-26T23:06:14.000Z",
+  "relatedTickers": [],
+  "topic": "bitcoin",
+  "hype": 20,
+  "mainIdea": "Final Trade: BTC, IGV, MSTR, FCX",
+  "summary": "CNBC: Final Trade: BTC, IGV, MSTR, FCX.",
+  "symbol": null,
+  "provider": "cnbc",
+  "fetchedAt": "2025-12-30T12:55:30.565Z",
+  "asOfDate": "2025-12-26"
+}
