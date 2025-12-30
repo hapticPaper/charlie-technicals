@@ -6,14 +6,45 @@ import type { CnbcVideoArticle, StoredCnbcVideoArticle } from "./types";
 
 const CNBC_NEWS_DIR = path.join(process.cwd(), "content", "data", "cnbc", "news");
 
+function nodeErrorCode(error: unknown): string | undefined {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const { code } = error as { code?: unknown };
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  return undefined;
+}
+
 async function readJson<T>(filePath: string): Promise<T> {
-  const raw = await readFile(filePath, "utf8");
-  return JSON.parse(raw) as T;
+  try {
+    const raw = await readFile(filePath, "utf8");
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    const code = nodeErrorCode(error);
+    if (code === "ENOENT") {
+      const err = new Error(`[market:cnbc-storage] Missing CNBC video file: ${filePath}`);
+      (err as unknown as { code?: string }).code = code;
+      (err as unknown as { cause?: unknown }).cause = error;
+      throw err;
+    }
+
+    throw error;
+  }
 }
 
 function getCnbcVideoPath(date: string): string {
   const fileDate = formatRawDataFileDate(date);
   return path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
+}
+
+function normalizeCnbcSymbol(symbol: StoredCnbcVideoArticle["symbol"]): string | null {
+  if (typeof symbol === "string" && symbol.toLowerCase() === "cnbc") {
+    return null;
+  }
+
+  return symbol ?? null;
 }
 
 const MIN_CNBC_VIDEO_YEAR = 2000;
@@ -88,6 +119,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
 
   for (const article of stored) {
+    // Contract: the persistence layer must write consistent per-day metadata for every record.
     if (article.provider !== "cnbc" || article.asOfDate !== date) {
       throw new Error(
         `[market:cnbc-storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
@@ -109,21 +141,19 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   // Legacy snapshots persisted `symbol: "cnbc"` on each record; normalize that to `null`.
   return stored.map(({ provider: _provider, symbol, ...article }) => ({
     ...article,
-    symbol: typeof symbol === "string" && symbol.toLowerCase() === "cnbc" ? null : symbol ?? null
+    symbol: normalizeCnbcSymbol(symbol)
   }));
 }
 
 export async function listCnbcVideoDates(): Promise<string[]> {
   const dirKey = path.resolve(CNBC_NEWS_DIR);
 
-  let entries: string[] = [];
+  let entries: Array<{ name: string; isFile: boolean }> = [];
   try {
-    entries = await readdir(CNBC_NEWS_DIR);
+    const raw = await readdir(CNBC_NEWS_DIR, { withFileTypes: true });
+    entries = raw.map((entry) => ({ name: entry.name, isFile: entry.isFile() }));
   } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
+    const code = nodeErrorCode(error);
 
     if (code === "ENOENT") {
       return [];
@@ -133,6 +163,8 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   }
 
   const candidates = entries
+    .filter((e) => e.isFile)
+    .map((e) => e.name)
     .filter((e) => e.endsWith(".json"))
     .map((e) => e.replace(/\.json$/, ""))
     .filter((name) => /^\d{8}$/.test(name))
