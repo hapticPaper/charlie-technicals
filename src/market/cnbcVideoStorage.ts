@@ -46,12 +46,12 @@ function getCnbcVideoPath(date: string): string {
   return path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
 }
 
-function normalizeCnbcSymbol(symbol: StoredCnbcVideoArticle["symbol"]): string | null {
-  if (typeof symbol === "string" && symbol.toLowerCase() === "cnbc") {
+function normalizeCnbcSymbol(symbol: string | null): string | null {
+  if (symbol && symbol.toLowerCase() === "cnbc") {
     return null;
   }
 
-  return symbol ?? null;
+  return symbol;
 }
 
 const MIN_CNBC_VIDEO_YEAR = 2000;
@@ -114,7 +114,7 @@ function isValidIsoDateYmd(value: string, now = new Date()): boolean {
 }
 
 /**
-* Reads CNBC video articles for a day.
+* Reads CNBC video articles for a day (ISO `YYYY-MM-DD`).
 *
 * The on-disk schema includes `provider`, `fetchedAt`, and `asOfDate` on each object.
 *
@@ -152,6 +152,9 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
   }));
 }
 
+/**
+* Lists all available CNBC video dates as ISO `YYYY-MM-DD` strings.
+*/
 export async function listCnbcVideoDates(): Promise<string[]> {
   const dirKey = path.resolve(CNBC_NEWS_DIR);
 
@@ -195,7 +198,7 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   }
 
   if (invalidCount > 0) {
-    const message = `[market:cnbc-storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${CNBC_NEWS_DIR} (expected YYYYMMDD.json)`;
+    const message = `[market:cnbc-storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${CNBC_NEWS_DIR} (expected valid YYYYMMDD.json date)`;
     if (process.env.NODE_ENV !== "production") {
       console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
     } else if (!warnedInvalidCnbcVideoDateDirs.has(dirKey)) {
