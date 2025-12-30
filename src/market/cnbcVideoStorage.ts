@@ -1,7 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-import { formatRawDataFileDate } from "./dataConventions";
 import type { CnbcVideoArticle, StoredCnbcVideoArticle } from "./types";
 
 const CNBC_NEWS_DIR = path.join(process.cwd(), "content", "data", "cnbc", "news");
@@ -34,8 +33,16 @@ async function readJson<T>(filePath: string): Promise<T> {
   }
 }
 
+function formatCnbcVideoFileDate(date: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`[market:cnbc-storage] Invalid date: ${date}. Expected YYYY-MM-DD.`);
+  }
+
+  return date.replace(/-/g, "");
+}
+
 function getCnbcVideoPath(date: string): string {
-  const fileDate = formatRawDataFileDate(date);
+  const fileDate = formatCnbcVideoFileDate(date);
   return path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
 }
 
