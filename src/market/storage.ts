@@ -598,13 +598,17 @@ function mergeNewsArticles(existing: MarketNewsArticle, incoming: MarketNewsArti
   changed: boolean;
 } {
   const normalizedIncoming = normalizeNewsArticleForMerge(incoming);
+  const existingTopic =
+    typeof existing.topic === "string" && existing.topic.trim() !== "" ? existing.topic : undefined;
+  const incomingTopic =
+    typeof normalizedIncoming.topic === "string" && normalizedIncoming.topic.trim() !== ""
+      ? normalizedIncoming.topic
+      : undefined;
   const merged: MarketNewsArticle = {
     ...normalizedIncoming,
     thumbnailUrl: normalizedIncoming.thumbnailUrl ?? existing.thumbnailUrl,
-    topic:
-      normalizedIncoming.topic && normalizedIncoming.topic.trim() !== ""
-        ? normalizedIncoming.topic
-        : existing.topic,
+    // Preserve any previously-enriched topic values (they may be human-curated or hand-corrected).
+    topic: existingTopic ?? incomingTopic,
     hype: normalizedIncoming.hype ?? existing.hype,
     relatedTickers:
       normalizedIncoming.relatedTickers.length > 0 ? normalizedIncoming.relatedTickers : existing.relatedTickers
