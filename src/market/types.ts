@@ -89,9 +89,9 @@ export type MarketNewsSnapshot = {
 };
 
 /**
-* On-disk schema for CNBC video snapshots under content/data/cnbc/news/<YYYYMMDD>.json.
+* On-disk schema for CNBC video snapshots under `content/data/cnbc/<YYYYMMDD>/*.json`.
 *
-* Stored as a flat JSON array of `StoredCnbcVideoArticle` (no wrapper object).
+* Each video is stored as a single JSON file containing a `StoredCnbcVideoArticle`.
 *
 * Historically, snapshots stored `symbol: "cnbc"` on every record; the read path
 * normalizes that to `null`.

@@ -2,18 +2,16 @@ import { readFile, readdir } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 
-import { formatRawDataFileDate } from "./dataConventions";
 import { parseIsoDateYmd } from "./date";
+import { readCnbcVideoArticles as readCnbcVideoArticlesFromStorage } from "./cnbcVideoStorage";
 import type {
   CnbcVideoArticle,
   MarketReport,
-  MarketReportHighlights,
-  StoredCnbcVideoArticle
+  MarketReportHighlights
 } from "./types";
 
 const CONTENT_DIR = path.join(process.cwd(), "content");
 const REPORTS_DIR = path.join(CONTENT_DIR, "reports");
-const CNBC_NEWS_DIR = path.join(CONTENT_DIR, "data", "cnbc", "news");
 
 function normalizeAndValidateCnbcAsOfDate(date: string): string {
   const asOfDate = /^\d{8}$/.test(date)
@@ -107,32 +105,7 @@ export async function readJson<T>(filePath: string): Promise<T> {
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
   const asOfDate = normalizeAndValidateCnbcAsOfDate(date);
-
-  const fileDate = formatRawDataFileDate(asOfDate);
-  const filePath = path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
-  const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
-
-  for (const article of stored) {
-    if (article.provider !== "cnbc" || article.asOfDate !== asOfDate) {
-      throw new Error(
-        `[market:reportStorage] Unexpected CNBC article metadata in ${filePath}: provider=${article.provider}, asOfDate=${article.asOfDate}, expectedAsOfDate=${asOfDate}`
-      );
-    }
-
-    if (article.symbol !== null && typeof article.symbol !== "string") {
-      throw new Error(
-        `[market:reportStorage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
-          symbol: article.symbol
-        })}`
-      );
-    }
-  }
-
-  // Legacy snapshots persisted `symbol: "cnbc"` on each record; normalize that to `null`.
-  return stored.map(({ provider: _provider, symbol, ...article }) => ({
-    ...article,
-    symbol: typeof symbol === "string" && symbol.toLowerCase() === "cnbc" ? null : symbol ?? null
-  }));
+  return readCnbcVideoArticlesFromStorage(asOfDate);
 }
 
 export async function listReportDates(): Promise<string[]> {

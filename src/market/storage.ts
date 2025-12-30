@@ -2,6 +2,12 @@ import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promise
 import path from "node:path";
 
 import { formatRawDataFileDate } from "./dataConventions";
+import {
+  cnbcVideoSnapshotExists,
+  listCnbcVideoDates as listCnbcVideoDatesFromStorage,
+  readCnbcVideoArticles as readCnbcVideoArticlesFromStorage,
+  writeCnbcVideoSnapshot
+} from "./cnbcVideoStorage";
 import { withFileLock } from "./fileLock";
 import { fileExists } from "./fsUtils";
 import { getReportSummaryWidgetsJsonPath as getValidatedReportSummaryWidgetsJsonPath } from "./reportStorage";
@@ -12,7 +18,6 @@ import type {
   MarketInterval,
   MarketNewsArticle,
   MarketNewsSnapshot,
-  StoredCnbcVideoArticle,
   MarketReport,
   MarketReportHighlights
 } from "./types";
@@ -143,33 +148,7 @@ export async function readJson<T>(filePath: string): Promise<T> {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const filePath = getNewsPath(date, "cnbc");
-  const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
-
-  for (const article of stored) {
-    if (article.provider !== "cnbc" || article.asOfDate !== date) {
-      throw new Error(
-        `[market:storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
-          provider: article.provider,
-          asOfDate: article.asOfDate
-        })}`
-      );
-    }
-
-    if (article.symbol !== null && typeof article.symbol !== "string") {
-      throw new Error(
-        `[market:storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
-          symbol: article.symbol
-        })}`
-      );
-    }
-  }
-
-  // Legacy snapshots persisted `symbol: "cnbc"` on each record; normalize that to `null`.
-  return stored.map(({ provider: _provider, symbol, ...article }) => ({
-    ...article,
-    symbol: typeof symbol === "string" && symbol.toLowerCase() === "cnbc" ? null : symbol ?? null
-  }));
+  return readCnbcVideoArticlesFromStorage(date);
 }
 
 export type StoredNewsData =
@@ -179,7 +158,8 @@ export type StoredNewsData =
 /**
 * Preferred read API for news data.
 *
-* Note: `symbol === "cnbc"` is stored on disk as a flat array (not a `MarketNewsSnapshot`).
+* Note: `symbol === "cnbc"` is stored on disk as one JSON file per video under
+* `content/data/cnbc/<YYYYMMDD>/*.json`.
 */
 export async function readNewsData(date: string, symbol: string): Promise<StoredNewsData> {
   if (symbol === "cnbc") {
@@ -214,125 +194,15 @@ export async function listReportDates(): Promise<string[]> {
     .sort();
 }
 
-const MIN_CNBC_VIDEO_YEAR = 2000;
-const MAX_FUTURE_YEAR_OFFSET = 1;
-
-// Avoid noisy per-request warnings in production when the CNBC data directory contains junk files.
-// We still log a sample once per directory per process to keep it debuggable (subsequent calls won't warn again until restart).
-// Note: `listCnbcVideoDates` uses a fixed CNBC directory, so this Set should remain tiny.
-const warnedInvalidCnbcVideoDateDirs = new Set<string>();
-
-function isLeapYear(year: number): boolean {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-}
-
-function isValidIsoDateYmd(value: string, now = new Date()): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) {
-    return false;
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return false;
-  }
-
-  const currentYear = now.getUTCFullYear();
-  if (year < MIN_CNBC_VIDEO_YEAR || year > currentYear + MAX_FUTURE_YEAR_OFFSET) {
-    return false;
-  }
-
-  if (month < 1 || month > 12) {
-    return false;
-  }
-
-  if (day < 1 || day > 31) {
-    return false;
-  }
-
-  const daysInMonth = [
-    31,
-    isLeapYear(year) ? 29 : 28,
-    31,
-    30,
-    31,
-    30,
-    31,
-    31,
-    30,
-    31,
-    30,
-    31
-  ][month - 1];
-
-  if (typeof daysInMonth !== "number" || day > daysInMonth) {
-    return false;
-  }
-
-  const utc = new Date(Date.UTC(year, month - 1, day));
-  return utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day;
-}
-
 export async function listCnbcVideoDates(): Promise<string[]> {
-  const dir = getNewsDir("cnbc");
-  const dirKey = path.resolve(dir);
-  let entries: string[] = [];
-  try {
-    entries = await readdir(dir);
-  } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
-
-    if (code === "ENOENT") {
-      return [];
-    }
-
-    throw error;
-  }
-
-  const candidates = entries
-    .filter((e) => e.endsWith(".json"))
-    .map((e) => e.replace(/\.json$/, ""))
-    .filter((name) => /^\d{8}$/.test(name))
-    .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`);
-
-  const dates: string[] = [];
-  const invalidDatesSample: string[] = [];
-  let invalidCount = 0;
-
-  for (const date of candidates) {
-    if (isValidIsoDateYmd(date)) {
-      dates.push(date);
-      continue;
-    }
-
-    invalidCount += 1;
-
-    if (invalidDatesSample.length < 5) {
-      invalidDatesSample.push(date);
-    }
-  }
-
-  if (invalidCount > 0) {
-    const message = `[market:storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${dir} (expected YYYYMMDD.json)`;
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
-    } else if (!warnedInvalidCnbcVideoDateDirs.has(dirKey)) {
-      warnedInvalidCnbcVideoDateDirs.add(dirKey);
-      const sample = invalidDatesSample[0];
-      console.warn(sample ? `${message}: e.g. ${sample}` : message);
-    }
-  }
-
-  return dates.sort();
+  return listCnbcVideoDatesFromStorage();
 }
 
 export async function newsSnapshotExists(date: string, symbol: string): Promise<boolean> {
+  if (symbol === "cnbc") {
+    return cnbcVideoSnapshotExists(date);
+  }
+
   return fileExists(getNewsPath(date, symbol));
 }
 
@@ -390,50 +260,14 @@ function sortNewsArticles(articles: MarketNewsArticle[]): MarketNewsArticle[] {
   });
 }
 
-function toStoredCnbcArticles(snapshot: MarketNewsSnapshot): StoredCnbcVideoArticle[] {
-  if (snapshot.symbol !== "cnbc") {
-    throw new Error(
-      `[market:storage] toStoredCnbcArticles called with non-CNBC symbol: ${snapshot.symbol}`
-    );
-  }
-
-  return snapshot.articles.map((article) => {
-    const uniqRelatedTickers = Array.from(new Set(article.relatedTickers));
-
-    return {
-      // Intentional explicit mapping to keep the persisted CNBC schema stable and obvious.
-      id: article.id,
-      title: article.title,
-      url: article.url,
-      thumbnailUrl: article.thumbnailUrl,
-      publisher: article.publisher,
-      publishedAt: article.publishedAt,
-      relatedTickers: uniqRelatedTickers,
-      topic: article.topic,
-      hype: article.hype,
-      mainIdea: article.mainIdea,
-      summary: article.summary,
-      symbol: uniqRelatedTickers.length === 1 ? uniqRelatedTickers[0] ?? null : null,
-      provider: snapshot.provider,
-      fetchedAt: snapshot.fetchedAt,
-      asOfDate: snapshot.asOfDate
-    };
-  });
-}
-
 function serializeNewsSnapshotForStorage(snapshot: MarketNewsSnapshot): unknown {
-  if (snapshot.symbol === "cnbc") {
-    return toStoredCnbcArticles(snapshot);
-  }
-
   return snapshot;
 }
 
 /**
 * Writes a news snapshot for a given symbol/date.
 *
-* Note: `symbol === "cnbc"` snapshots are stored on disk as a flat array of
-* `StoredCnbcVideoArticle` instead of a `MarketNewsSnapshot`.
+* Note: `symbol === "cnbc"` snapshots are stored separately via `writeCnbcVideoSnapshot`.
 *
 * News snapshots are immutable: if the target file already exists, the write is
 * skipped and the existing snapshot is left untouched.
@@ -445,6 +279,10 @@ export async function writeNewsSnapshot(
     mode?: ExistingSnapshotMode;
   } = {}
 ): Promise<WriteNewsSnapshotResult> {
+  if (snapshot.symbol === "cnbc") {
+    return writeCnbcVideoSnapshot(date, snapshot, opts);
+  }
+
   if (snapshot.asOfDate !== date) {
     throw new Error(
       `[market:storage] News snapshot asOfDate mismatch for ${snapshot.symbol}: snapshot.asOfDate=${snapshot.asOfDate}, pathDate=${date}`
@@ -462,63 +300,7 @@ export async function writeNewsSnapshot(
         return { status: "skipped_existing" as const, path: filePath };
       }
 
-      let existingSnapshot: MarketNewsSnapshot;
-      if (snapshot.symbol === "cnbc") {
-        const existingStored = await readJson<StoredCnbcVideoArticle[]>(filePath);
-        for (const article of existingStored) {
-          if (article.asOfDate !== date) {
-            throw new Error(
-              `[market:storage] News snapshot asOfDate mismatch in ${filePath}: expected ${date}, got ${article.asOfDate}`
-            );
-          }
-        }
-
-        const providers = Array.from(
-          new Set(existingStored.map((a) => a.provider).filter((p) => typeof p === "string"))
-        );
-        if (providers.length > 1) {
-          throw new Error(
-            `[market:storage] Multiple providers detected for CNBC snapshot in ${filePath}: ${providers.join(", ")}`
-          );
-        }
-
-        const existingProvider = providers[0];
-        if (existingProvider && existingProvider !== snapshot.provider) {
-          throw new Error(
-            `[market:storage] News snapshot provider mismatch in ${filePath}: ${existingProvider} vs ${snapshot.provider}`
-          );
-        }
-
-        const existingArticles: MarketNewsArticle[] = existingStored.map((a) => ({
-          id: a.id,
-          title: a.title,
-          url: a.url,
-          thumbnailUrl: a.thumbnailUrl,
-          publisher: a.publisher,
-          publishedAt: a.publishedAt,
-          relatedTickers: a.relatedTickers,
-          topic: a.topic,
-          hype: a.hype,
-          mainIdea: a.mainIdea,
-          summary: a.summary
-        }));
-
-        const fetchedAt = existingStored
-          .map((a) => a.fetchedAt)
-          .filter((s) => typeof s === "string")
-          .sort()
-          .slice(-1)[0];
-
-        existingSnapshot = {
-          symbol: "cnbc",
-          provider: existingProvider ?? snapshot.provider,
-          fetchedAt: fetchedAt ?? snapshot.fetchedAt,
-          asOfDate: date,
-          articles: existingArticles
-        };
-      } else {
-        existingSnapshot = await readJson<MarketNewsSnapshot>(filePath);
-      }
+      const existingSnapshot = await readJson<MarketNewsSnapshot>(filePath);
 
       if (existingSnapshot.symbol !== snapshot.symbol) {
         throw new Error(

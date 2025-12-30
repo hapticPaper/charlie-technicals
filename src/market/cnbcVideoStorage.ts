@@ -1,9 +1,12 @@
-import { readFile, readdir } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { CnbcVideoArticle, StoredCnbcVideoArticle } from "./types";
+import { withFileLock } from "./fileLock";
+import { fileExists } from "./fsUtils";
+import type { ExistingSnapshotMode } from "./snapshotTypes";
+import type { CnbcVideoArticle, MarketNewsArticle, MarketNewsSnapshot, StoredCnbcVideoArticle } from "./types";
 
-const CNBC_NEWS_DIR = path.join(process.cwd(), "content", "data", "cnbc", "news");
+const CNBC_VIDEO_DIR = path.join(process.cwd(), "content", "data", "cnbc");
 
 function nodeErrorCode(error: unknown): string | undefined {
   if (typeof error === "object" && error !== null && "code" in error) {
@@ -41,9 +44,9 @@ function formatCnbcVideoFileDate(date: string): string {
   return date.replace(/-/g, "");
 }
 
-function getCnbcVideoPath(date: string): string {
+function getCnbcVideoDateDir(date: string): string {
   const fileDate = formatCnbcVideoFileDate(date);
-  return path.join(CNBC_NEWS_DIR, `${fileDate}.json`);
+  return path.join(CNBC_VIDEO_DIR, fileDate);
 }
 
 function normalizeCnbcSymbol(symbol: string | null): string | null {
@@ -122,14 +125,41 @@ function isValidIsoDateYmd(value: string, now = new Date()): boolean {
 * objects.
 */
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
-  const filePath = getCnbcVideoPath(date);
-  const stored = await readJson<StoredCnbcVideoArticle[]>(filePath);
+  const dirPath = getCnbcVideoDateDir(date);
+
+  let entries: Array<{ name: string; isFile: boolean }> = [];
+  try {
+    const raw = await readdir(dirPath, { withFileTypes: true });
+    entries = raw.map((entry) => ({ name: entry.name, isFile: entry.isFile() }));
+  } catch (error) {
+    const code = nodeErrorCode(error);
+    if (code === "ENOENT") {
+      const err = new Error(`[market:cnbc-storage] Missing CNBC video directory: ${dirPath}`);
+      (err as unknown as { code?: string }).code = code;
+      (err as unknown as { cause?: unknown }).cause = error;
+      throw err;
+    }
+
+    throw error;
+  }
+
+  const files = entries
+    .filter((e) => e.isFile)
+    .map((e) => e.name)
+    .filter((name) => name.endsWith(".json"))
+    .sort();
+
+  const stored: StoredCnbcVideoArticle[] = [];
+  for (const name of files) {
+    const filePath = path.join(dirPath, name);
+    stored.push(await readJson<StoredCnbcVideoArticle>(filePath));
+  }
 
   for (const article of stored) {
     // Contract: the persistence layer must write consistent per-day metadata for every record.
     if (article.provider !== "cnbc" || article.asOfDate !== date) {
       throw new Error(
-        `[market:cnbc-storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+        `[market:cnbc-storage] Unexpected CNBC article metadata in ${dirPath}: ${JSON.stringify({
           provider: article.provider,
           asOfDate: article.asOfDate
         })}`
@@ -138,7 +168,7 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
 
     if (article.symbol !== null && typeof article.symbol !== "string") {
       throw new Error(
-        `[market:cnbc-storage] Invalid CNBC symbol type in ${filePath}: ${JSON.stringify({
+        `[market:cnbc-storage] Invalid CNBC symbol type in ${dirPath}: ${JSON.stringify({
           symbol: article.symbol
         })}`
       );
@@ -156,12 +186,12 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
 * Lists all available CNBC video dates as ISO `YYYY-MM-DD` strings.
 */
 export async function listCnbcVideoDates(): Promise<string[]> {
-  const dirKey = path.resolve(CNBC_NEWS_DIR);
+  const dirKey = path.resolve(CNBC_VIDEO_DIR);
 
-  let entries: Array<{ name: string; isFile: boolean }> = [];
+  let entries: Array<{ name: string; isDir: boolean }> = [];
   try {
-    const raw = await readdir(CNBC_NEWS_DIR, { withFileTypes: true });
-    entries = raw.map((entry) => ({ name: entry.name, isFile: entry.isFile() }));
+    const raw = await readdir(CNBC_VIDEO_DIR, { withFileTypes: true });
+    entries = raw.map((entry) => ({ name: entry.name, isDir: entry.isDirectory() }));
   } catch (error) {
     const code = nodeErrorCode(error);
 
@@ -173,10 +203,8 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   }
 
   const candidates = entries
-    .filter((e) => e.isFile)
+    .filter((e) => e.isDir)
     .map((e) => e.name)
-    .filter((e) => e.endsWith(".json"))
-    .map((e) => e.replace(/\.json$/, ""))
     .filter((name) => /^\d{8}$/.test(name))
     .map((name) => `${name.slice(0, 4)}-${name.slice(4, 6)}-${name.slice(6, 8)}`);
 
@@ -198,7 +226,7 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   }
 
   if (invalidCount > 0) {
-    const message = `[market:cnbc-storage] Ignoring ${invalidCount} invalid CNBC video date file(s) in ${CNBC_NEWS_DIR} (expected valid YYYYMMDD.json date)`;
+    const message = `[market:cnbc-storage] Ignoring ${invalidCount} invalid CNBC video date folder(s) in ${CNBC_VIDEO_DIR} (expected valid YYYYMMDD folder)`;
     if (process.env.NODE_ENV !== "production") {
       console.warn(`${message}: ${invalidDatesSample.join(", ")}`);
     } else if (!warnedInvalidCnbcVideoDateDirs.has(dirKey)) {
@@ -209,4 +237,198 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   }
 
   return dates.sort();
+}
+
+export async function cnbcVideoSnapshotExists(date: string): Promise<boolean> {
+  return fileExists(getCnbcVideoDateDir(date));
+}
+
+export type WriteCnbcVideoSnapshotResult =
+  | { status: "written"; path: string }
+  | { status: "skipped_existing"; path: string };
+
+function normalizeNewsArticleForMerge(article: MarketNewsArticle): MarketNewsArticle {
+  const normalizedThumbnailUrl =
+    typeof article.thumbnailUrl === "string"
+      ? article.thumbnailUrl.trim() !== ""
+        ? article.thumbnailUrl.trim()
+        : null
+      : article.thumbnailUrl;
+
+  return {
+    ...article,
+    thumbnailUrl: normalizedThumbnailUrl,
+    relatedTickers: Array.from(new Set(article.relatedTickers))
+  };
+}
+
+function mergeNewsArticles(existing: MarketNewsArticle, incoming: MarketNewsArticle): {
+  merged: MarketNewsArticle;
+  changed: boolean;
+} {
+  const normalizedIncoming = normalizeNewsArticleForMerge(incoming);
+  const existingTopic =
+    typeof existing.topic === "string" && existing.topic.trim() !== "" ? existing.topic : undefined;
+  const incomingTopic =
+    typeof normalizedIncoming.topic === "string" && normalizedIncoming.topic.trim() !== ""
+      ? normalizedIncoming.topic
+      : undefined;
+  const merged: MarketNewsArticle = {
+    ...normalizedIncoming,
+    thumbnailUrl: normalizedIncoming.thumbnailUrl ?? existing.thumbnailUrl,
+    topic: existingTopic ?? incomingTopic,
+    hype: normalizedIncoming.hype ?? existing.hype,
+    relatedTickers:
+      normalizedIncoming.relatedTickers.length > 0 ? normalizedIncoming.relatedTickers : existing.relatedTickers
+  };
+
+  const changed = JSON.stringify(merged) !== JSON.stringify(existing);
+  return { merged, changed };
+}
+
+function toStoredCnbcArticle(snapshot: MarketNewsSnapshot, article: MarketNewsArticle): StoredCnbcVideoArticle {
+  const uniqRelatedTickers = Array.from(new Set(article.relatedTickers));
+
+  return {
+    id: article.id,
+    title: article.title,
+    url: article.url,
+    thumbnailUrl: article.thumbnailUrl,
+    publisher: article.publisher,
+    publishedAt: article.publishedAt,
+    relatedTickers: uniqRelatedTickers,
+    topic: article.topic,
+    hype: article.hype,
+    mainIdea: article.mainIdea,
+    summary: article.summary,
+    symbol: uniqRelatedTickers.length === 1 ? uniqRelatedTickers[0] ?? null : null,
+    provider: snapshot.provider,
+    fetchedAt: snapshot.fetchedAt,
+    asOfDate: snapshot.asOfDate
+  };
+}
+
+function safeBasename(value: string): string {
+  const trimmed = value.trim();
+  const sanitized = trimmed.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  const collapsed = sanitized.replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+  return collapsed.length > 0 ? collapsed : "video";
+}
+
+function getCnbcVideoFilePath(date: string, stored: StoredCnbcVideoArticle): string {
+  const dirPath = getCnbcVideoDateDir(date);
+  const stem = safeBasename(stored.id);
+  return path.join(dirPath, `${stem}.json`);
+}
+
+async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+export async function writeCnbcVideoSnapshot(
+  date: string,
+  snapshot: MarketNewsSnapshot,
+  opts: {
+    mode?: ExistingSnapshotMode;
+  } = {}
+): Promise<WriteCnbcVideoSnapshotResult> {
+  if (snapshot.symbol !== "cnbc") {
+    throw new Error(`[market:cnbc-storage] writeCnbcVideoSnapshot called with non-CNBC symbol: ${snapshot.symbol}`);
+  }
+  if (snapshot.asOfDate !== date) {
+    throw new Error(
+      `[market:cnbc-storage] CNBC snapshot asOfDate mismatch: snapshot.asOfDate=${snapshot.asOfDate}, pathDate=${date}`
+    );
+  }
+
+  const dirPath = getCnbcVideoDateDir(date);
+  await mkdir(CNBC_VIDEO_DIR, { recursive: true });
+
+  return withFileLock({ filePath: dirPath, logPrefix: "market:cnbc-storage" }, async () => {
+    if ((await fileExists(dirPath)) && opts.mode !== "fill_existing") {
+      return { status: "skipped_existing" as const, path: dirPath };
+    }
+
+    await mkdir(dirPath, { recursive: true });
+
+    let changed = false;
+
+    for (const article of snapshot.articles) {
+      const storedArticle = toStoredCnbcArticle(snapshot, article);
+      const filePath = getCnbcVideoFilePath(date, storedArticle);
+      const tmpPath = `${filePath}.tmp`;
+
+      if (await fileExists(filePath)) {
+        if (opts.mode !== "fill_existing") {
+          continue;
+        }
+
+        const existingStored = await readJson<StoredCnbcVideoArticle>(filePath);
+        if (existingStored.provider !== "cnbc" || existingStored.asOfDate !== date) {
+          throw new Error(
+            `[market:cnbc-storage] Unexpected CNBC article metadata in ${filePath}: ${JSON.stringify({
+              provider: existingStored.provider,
+              asOfDate: existingStored.asOfDate
+            })}`
+          );
+        }
+
+        const existingNews: MarketNewsArticle = {
+          id: existingStored.id,
+          title: existingStored.title,
+          url: existingStored.url,
+          thumbnailUrl: existingStored.thumbnailUrl,
+          publisher: existingStored.publisher,
+          publishedAt: existingStored.publishedAt,
+          relatedTickers: existingStored.relatedTickers,
+          topic: existingStored.topic,
+          hype: existingStored.hype,
+          mainIdea: existingStored.mainIdea,
+          summary: existingStored.summary
+        };
+
+        const incomingNews: MarketNewsArticle = {
+          id: storedArticle.id,
+          title: storedArticle.title,
+          url: storedArticle.url,
+          thumbnailUrl: storedArticle.thumbnailUrl,
+          publisher: storedArticle.publisher,
+          publishedAt: storedArticle.publishedAt,
+          relatedTickers: storedArticle.relatedTickers,
+          topic: storedArticle.topic,
+          hype: storedArticle.hype,
+          mainIdea: storedArticle.mainIdea,
+          summary: storedArticle.summary
+        };
+
+        const mergedRes = mergeNewsArticles(existingNews, incomingNews);
+        const mergedRelatedTickers = Array.from(new Set(mergedRes.merged.relatedTickers));
+        const mergedStored: StoredCnbcVideoArticle = {
+          ...existingStored,
+          ...mergedRes.merged,
+          relatedTickers: mergedRelatedTickers,
+          symbol: mergedRelatedTickers.length === 1 ? mergedRelatedTickers[0] ?? null : null,
+          fetchedAt:
+            existingStored.fetchedAt.localeCompare(snapshot.fetchedAt) >= 0 ? existingStored.fetchedAt : snapshot.fetchedAt
+        };
+
+        if (!mergedRes.changed && JSON.stringify(existingStored) === JSON.stringify(mergedStored)) {
+          continue;
+        }
+
+        await writeJsonFile(tmpPath, mergedStored);
+        await rename(tmpPath, filePath);
+        changed = true;
+        continue;
+      }
+
+      await writeJsonFile(tmpPath, storedArticle);
+      await rename(tmpPath, filePath);
+      changed = true;
+    }
+
+    return { status: changed ? ("written" as const) : ("skipped_existing" as const), path: dirPath };
+  });
 }

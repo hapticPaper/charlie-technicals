@@ -1,0 +1,17 @@
+{
+  "id": "cnbc:20251229:final-trade-serv-vrt-spot-xom",
+  "title": "Final Trade: SERV, VRT, SPOT, XOM",
+  "url": "https://www.cnbc.com/video/2025/12/29/final-trade-serv-vrt-spot-xom.html",
+  "thumbnailUrl": "https://image.cnbcfm.com/api/v1/image/108246481-17670492181767049216-43233159387-1080pnbcnews.jpg?v=1767049217",
+  "publisher": "CNBC",
+  "publishedAt": "2025-12-29T23:02:18.000Z",
+  "relatedTickers": [],
+  "topic": "markets",
+  "hype": 20,
+  "mainIdea": "Final Trade: SERV, VRT, SPOT, XOM",
+  "summary": "CNBC: Final Trade: SERV, VRT, SPOT, XOM.",
+  "symbol": null,
+  "provider": "cnbc",
+  "fetchedAt": "2025-12-30T12:55:33.633Z",
+  "asOfDate": "2025-12-29"
+}
