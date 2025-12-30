@@ -10,18 +10,20 @@ import { CnbcVideoProvider } from "./providers/cnbc";
 import { YahooMarketDataProvider } from "./providers/yahoo";
 import { buildMarketReport, buildReportMdx } from "./report";
 import {
+  loadRawSeriesWindow,
+  rawSeriesSnapshotExists,
+  writeRawSeries
+} from "./rawSeriesStorage";
+import {
   ensureAnalysisDir,
   ensureDataDir,
   ensureReportsDir,
   getAnalysisDir,
-  loadRawSeriesWindow,
   newsSnapshotExists,
-  rawSeriesSnapshotExists,
   readJson,
   writeReport,
   writeAnalyzedSeries,
-  writeNewsSnapshot,
-  writeRawSeries
+  writeNewsSnapshot
 } from "./storage";
 import type { AnalyzedSeries, MarketInterval } from "./types";
 

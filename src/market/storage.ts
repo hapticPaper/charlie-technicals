@@ -1,8 +1,11 @@
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { formatRawDataFileDate, rawDataWindowRequirementFor } from "./dataConventions";
+import { formatRawDataFileDate } from "./dataConventions";
+import { withFileLock } from "./fileLock";
+import { fileExists } from "./fsUtils";
 import { getReportSummaryWidgetsJsonPath as getValidatedReportSummaryWidgetsJsonPath } from "./reportStorage";
+import type { ExistingSnapshotMode } from "./snapshotTypes";
 import type {
   AnalyzedSeries,
   CnbcVideoArticle,
@@ -11,8 +14,7 @@ import type {
   MarketNewsSnapshot,
   StoredCnbcVideoArticle,
   MarketReport,
-  MarketReportHighlights,
-  RawSeries
+  MarketReportHighlights
 } from "./types";
 
 import { buildReportSummaryWidgets } from "./summaryWidgets";
@@ -39,137 +41,13 @@ export function getReportsDir(): string {
   return path.join(CONTENT_DIR, "reports");
 }
 
-export function getRawSeriesDir(symbol: string, interval: MarketInterval): string {
-  return path.join(getDataDir(), safeSymbol(symbol), interval);
-}
-
 export function getNewsDir(symbol: string): string {
   return path.join(getDataDir(), safeSymbol(symbol), "news");
-}
-
-export function getRawSeriesPath(date: string, symbol: string, interval: MarketInterval): string {
-  const fileDate = formatRawDataFileDate(date);
-  return path.join(getRawSeriesDir(symbol, interval), `${fileDate}.json`);
 }
 
 export function getNewsPath(date: string, symbol: string): string {
   const fileDate = formatRawDataFileDate(date);
   return path.join(getNewsDir(symbol), `${fileDate}.json`);
-}
-
-async function withFileLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
-  const lockPath = `${filePath}.lock`;
-  const start = Date.now();
-  const timeoutMs = 5000;
-
-  for (;;) {
-    try {
-      await mkdir(lockPath);
-      break;
-    } catch (error) {
-      const code =
-        typeof error === "object" && error !== null && "code" in error
-          ? (error as { code?: unknown }).code
-          : undefined;
-
-      if (code !== "EEXIST") {
-        throw error;
-      }
-      if (Date.now() - start > timeoutMs) {
-        console.error(
-          `[market:storage] Lock timeout for ${filePath}; possible stale lock at ${lockPath}`
-        );
-        throw new Error(`Timed out acquiring lock for ${filePath}`);
-      }
-
-      await new Promise((r) => setTimeout(r, 25));
-    }
-  }
-
-  try {
-    return await fn();
-  } finally {
-    await rm(lockPath, { recursive: true, force: true });
-  }
-}
-
-function mergeBars(
-  leftBars: RawSeries["bars"],
-  rightBars: RawSeries["bars"]
-): RawSeries["bars"] {
-  // Merge + dedupe bars by timestamp.
-  //
-  // Contract:
-  // - Output is sorted by `t`.
-  // - Duplicate timestamps are resolved by preferring `rightBars` values.
-  // - Callers that want to preserve persisted bar values should pass the on-disk
-  //   bars as `rightBars`.
-  //   Example: mergeBars(fetchedBars, persistedBars) keeps persisted values.
-  // `t` must be ISO-8601 so `localeCompare` keeps chronological ordering.
-  const ensureSorted = (bars: RawSeries["bars"], label: string): RawSeries["bars"] => {
-    for (let idx = 1; idx < bars.length; idx += 1) {
-      if (bars[idx - 1].t.localeCompare(bars[idx].t) > 0) {
-        console.error(
-          `[market:storage] Non-monotonic bar timestamps detected in ${label}; sorting before merge`
-        );
-        return [...bars].sort((a, b) => a.t.localeCompare(b.t));
-      }
-    }
-
-    return bars;
-  };
-
-  const left = ensureSorted(leftBars, "leftBars");
-  const right = ensureSorted(rightBars, "rightBars");
-
-  const out: RawSeries["bars"] = [];
-  let i = 0;
-  let j = 0;
-
-  function pushBar(bar: RawSeries["bars"][number]): void {
-    const last = out[out.length - 1];
-    if (last?.t === bar.t) {
-      out[out.length - 1] = bar;
-      return;
-    }
-
-    out.push(bar);
-  }
-
-  while (i < left.length && j < right.length) {
-    const e = left[i];
-    const n = right[j];
-    const cmp = e.t.localeCompare(n.t);
-
-    if (cmp < 0) {
-      pushBar(e);
-      i += 1;
-      continue;
-    }
-
-    if (cmp > 0) {
-      pushBar(n);
-      j += 1;
-      continue;
-    }
-
-    // Same timestamp: prefer incoming.
-    pushBar(n);
-    i += 1;
-    j += 1;
-  }
-
-  while (i < left.length) {
-    pushBar(left[i]);
-    i += 1;
-  }
-
-  while (j < right.length) {
-    pushBar(right[j]);
-    j += 1;
-  }
-
-  return out;
 }
 
 export function getAnalyzedSeriesPath(date: string, symbol: string, interval: MarketInterval): string {
@@ -454,124 +332,8 @@ export async function listCnbcVideoDates(): Promise<string[]> {
   return dates.sort();
 }
 
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await stat(filePath);
-    return true;
-  } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
-
-    if (code === "ENOENT") {
-      return false;
-    }
-
-    throw error;
-  }
-}
-
-export async function rawSeriesSnapshotExists(
-  date: string,
-  symbol: string,
-  interval: MarketInterval
-): Promise<boolean> {
-  return fileExists(getRawSeriesPath(date, symbol, interval));
-}
-
 export async function newsSnapshotExists(date: string, symbol: string): Promise<boolean> {
   return fileExists(getNewsPath(date, symbol));
-}
-
-export type ExistingSnapshotMode = "skip_existing" | "fill_existing";
-
-export type WriteRawSeriesResult =
-  | { status: "written"; path: string }
-  | { status: "skipped_existing"; path: string };
-
-/**
-* Writes a raw OHLCV snapshot for a given symbol/interval/date.
-*
-* Raw snapshots are immutable by default: if the target file already exists, the
-* write is skipped and the existing snapshot is left untouched.
-*
-* When `mode: "fill_existing"` is used, the write merges the incoming bars into
-* the existing file, adding only new timestamps.
-*/
-export async function writeRawSeries(
-  date: string,
-  series: RawSeries,
-  opts: {
-    mode?: ExistingSnapshotMode;
-  } = {}
-): Promise<WriteRawSeriesResult> {
-  const filePath = getRawSeriesPath(date, series.symbol, series.interval);
-  const tmpPath = `${filePath}.tmp`;
-
-  await mkdir(path.dirname(filePath), { recursive: true });
-
-  const res = await withFileLock(filePath, async () => {
-    if (await fileExists(filePath)) {
-      if (opts.mode !== "fill_existing") {
-        return { status: "skipped_existing" as const, path: filePath };
-      }
-
-      const existing = await readJson<RawSeries>(filePath);
-      if (existing.symbol !== series.symbol || existing.interval !== series.interval) {
-        throw new Error(
-          `[market:storage] Raw series metadata mismatch in ${filePath}: expected ${series.symbol}/${series.interval}, got ${existing.symbol}/${existing.interval}`
-        );
-      }
-
-      if (existing.provider !== series.provider) {
-        throw new Error(
-          `[market:storage] Raw series provider mismatch in ${filePath}: ${existing.provider} vs ${series.provider}`
-        );
-      }
-
-      // Preserve persisted bars on conflicts; only add missing timestamps.
-      const mergedBars = mergeBars(series.bars, existing.bars);
-      const isSameLength = mergedBars.length === existing.bars.length;
-      const barsUnchanged =
-        isSameLength &&
-        mergedBars.every((b, idx) => {
-          const prev = existing.bars[idx];
-          return (
-            prev !== undefined &&
-            prev.t === b.t &&
-            prev.o === b.o &&
-            prev.h === b.h &&
-            prev.l === b.l &&
-            prev.c === b.c &&
-            prev.v === b.v
-          );
-        });
-
-      if (barsUnchanged) {
-        return { status: "skipped_existing" as const, path: filePath };
-      }
-
-      const merged: RawSeries = {
-        ...existing,
-        fetchedAt:
-          existing.fetchedAt.localeCompare(series.fetchedAt) >= 0
-            ? existing.fetchedAt
-            : series.fetchedAt,
-        bars: mergedBars
-      };
-
-      await writeJson(tmpPath, merged);
-      await rename(tmpPath, filePath);
-      return { status: "written" as const, path: filePath };
-    }
-
-    await writeJson(tmpPath, series);
-    await rename(tmpPath, filePath);
-    return { status: "written" as const, path: filePath };
-  });
-
-  return res;
 }
 
 export type WriteNewsSnapshotResult =
@@ -690,7 +452,7 @@ export async function writeNewsSnapshot(
 
   await mkdir(path.dirname(filePath), { recursive: true });
 
-  const res = await withFileLock(filePath, async () => {
+  const res = await withFileLock({ filePath, logPrefix: "market:storage" }, async () => {
     if (await fileExists(filePath)) {
       if (opts.mode !== "fill_existing") {
         return { status: "skipped_existing" as const, path: filePath };
@@ -824,94 +586,6 @@ export async function writeNewsSnapshot(
   });
 
   return res;
-}
-
-export type RawSeriesWindowLoadResult =
-  | { status: "ok"; selectedFiles: string[]; series: RawSeries }
-  | { status: "not_found"; selectedFiles: string[] }
-  | { status: "insufficient_window"; selectedFiles: string[]; requiredMinFiles: number };
-
-export async function loadRawSeriesWindow(
-  date: string,
-  symbol: string,
-  interval: MarketInterval
-): Promise<RawSeriesWindowLoadResult> {
-  const requirement = rawDataWindowRequirementFor(interval);
-  const dir = getRawSeriesDir(symbol, interval);
-  const target = formatRawDataFileDate(date);
-
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch (error) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? (error as { code?: unknown }).code
-        : undefined;
-
-    if (code === "ENOENT") {
-      return { status: "not_found", selectedFiles: [] };
-    }
-
-    throw error;
-  }
-
-  const files = entries
-    .filter((e) => e.endsWith(".json"))
-    .map((e) => e.replace(/\.json$/, ""))
-    .filter((d) => /^\d{8}$/.test(d))
-    .filter((d) => d <= target)
-    .sort();
-
-  if (!files.includes(target)) {
-    return { status: "not_found", selectedFiles: [] };
-  }
-
-  const startIndex = Math.max(0, files.length - requirement.idealFiles);
-  const selected = files.slice(startIndex);
-  if (selected.length < requirement.minFiles) {
-    return {
-      status: selected.length === 0 ? "not_found" : "insufficient_window",
-      selectedFiles: selected,
-      requiredMinFiles: requirement.minFiles
-    };
-  }
-
-  let provider = "yahoo-finance";
-  let fetchedAt = "";
-  let bars: RawSeries["bars"] = [];
-  for (const fileDate of selected) {
-    const raw = await readJson<RawSeries>(path.join(dir, `${fileDate}.json`));
-
-    if (raw.symbol !== symbol || raw.interval !== interval) {
-      throw new Error(
-        `[market:loadRawSeriesWindow] Mismatched series metadata in ${symbol}/${interval} ${fileDate}: expected ${symbol}/${interval}, got ${raw.symbol}/${raw.interval}`
-      );
-    }
-
-    if (provider !== "yahoo-finance" && provider !== raw.provider) {
-      throw new Error(
-        `[market:loadRawSeriesWindow] Multiple providers for ${symbol} ${interval}: ${provider} and ${raw.provider}`
-      );
-    }
-
-    provider = raw.provider;
-    // ISO strings preserve chronological ordering under lexicographic compare.
-    fetchedAt = fetchedAt === "" ? raw.fetchedAt : fetchedAt.localeCompare(raw.fetchedAt) >= 0 ? fetchedAt : raw.fetchedAt;
-    bars = mergeBars(bars, raw.bars);
-  }
-
-  return {
-    status: "ok",
-    selectedFiles: selected,
-    series: {
-      symbol,
-      interval,
-      provider,
-      fetchedAt,
-      bars
-    }
-  };
 }
 
 export async function writeAnalyzedSeries(date: string, series: AnalyzedSeries): Promise<void> {
