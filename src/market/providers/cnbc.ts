@@ -164,6 +164,8 @@ export class CnbcVideoProvider {
 
   /**
   * Fetch CNBC videos for `asOfDate` (NY calendar date).
+  *
+  * Note: this returns only videos whose NY-local calendar date matches `asOfDate`.
   */
   async fetchNews(args: {
     asOfDate: string;

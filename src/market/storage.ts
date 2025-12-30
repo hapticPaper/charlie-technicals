@@ -240,7 +240,13 @@ export async function writeNewsSnapshot(
     mode?: ExistingSnapshotMode;
   } = {}
 ): Promise<WriteNewsSnapshotResult> {
-  if (snapshot.symbol === "cnbc") {
+  if (snapshot.symbol.toLowerCase() === "cnbc") {
+    if (snapshot.symbol !== "cnbc") {
+      throw new Error(
+        `[market:storage] CNBC news snapshots must use symbol="cnbc". Got: ${JSON.stringify({ symbol: snapshot.symbol })}`
+      );
+    }
+
     return writeCnbcVideoSnapshot(date, snapshot, opts);
   }
 

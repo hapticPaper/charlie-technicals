@@ -9,8 +9,6 @@ import type { CnbcVideoArticle, MarketNewsArticle, MarketNewsSnapshot, StoredCnb
 
 const CNBC_VIDEO_DIR = path.join(process.cwd(), "content", "data", "cnbc");
 
-const cnbcReadCache = new Map<string, CnbcVideoArticle[]>();
-
 function nodeErrorCode(error: unknown): string | undefined {
   if (typeof error === "object" && error !== null && "code" in error) {
     const { code } = error as { code?: unknown };
@@ -130,11 +128,6 @@ function isValidIsoDateYmd(value: string, now = new Date()): boolean {
 export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArticle[]> {
   const dirPath = getCnbcVideoDateDir(date);
 
-  const cached = cnbcReadCache.get(dirPath);
-  if (cached) {
-    return cached;
-  }
-
   let entries: Array<{ name: string; isFile: boolean }> = [];
   try {
     const raw = await readdir(dirPath, { withFileTypes: true });
@@ -191,7 +184,6 @@ export async function readCnbcVideoArticles(date: string): Promise<CnbcVideoArti
     })
   );
 
-  cnbcReadCache.set(dirPath, articles);
   return articles;
 }
 
@@ -412,10 +404,6 @@ export async function writeCnbcVideoSnapshot(
       await writeJsonFile(tmpPath, storedArticle);
       await rename(tmpPath, filePath);
       changed = true;
-    }
-
-    if (changed) {
-      cnbcReadCache.delete(dirPath);
     }
 
     return { status: changed ? ("written" as const) : ("skipped_existing" as const), path: dirPath };
