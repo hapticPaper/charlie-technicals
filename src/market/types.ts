@@ -1,12 +1,6 @@
-export type MarketInterval = "1m" | "5m" | "15m" | "1h" | "1d";
+export const MARKET_INTERVALS = ["1m", "5m", "15m", "1h", "1d"] as const;
 
-export const MARKET_INTERVALS: readonly MarketInterval[] = [
-  "1m",
-  "5m",
-  "15m",
-  "1h",
-  "1d"
-];
+export type MarketInterval = (typeof MARKET_INTERVALS)[number];
 
 /**
 * Hard cap on the number of technical trades surfaced in the report.

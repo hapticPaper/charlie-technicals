@@ -42,7 +42,7 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 /**
 * Renders the summary widget section for a report.
 */
-export function ReportSummary(props: { summaryWidgets?: MarketReportSummaryWidgets }) {
+export function ReportSummary(props: { summaryWidgets: MarketReportSummaryWidgets }) {
   const summary = props.summaryWidgets;
   if (!summary) {
     console.error("[reports] ReportSummary missing `summaryWidgets` prop");
