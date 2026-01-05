@@ -1,4 +1,4 @@
-import type { MarketInterval, MarketReport, TradePlan } from "../../market/types";
+import type { ReportIntervalSeries, ReportPick as ReportPickSetup, TradePlan } from "../../market/types";
 import { ReportChart } from "./ReportChart";
 import styles from "./report.module.css";
 
@@ -32,40 +32,27 @@ function formatTrade(trade: TradePlan): {
   };
 }
 
-function mustGetSeries(report: MarketReport, symbol: string, interval: MarketInterval) {
-  const series = report.series[symbol]?.[interval];
-  if (!series) {
-    throw new Error(`Missing series in report for ${symbol} ${interval}`);
-  }
-
-  return series;
-}
-
-export function ReportPick(props: { report: MarketReport; symbol: string }) {
-  const { report, symbol } = props;
-  if (!report) {
-    throw new Error("ReportPick must be rendered with a `report` prop.");
-  }
-
-  const pick = report.picks.find((p) => p.symbol === symbol);
-  const watch = report.watchlist?.find((p) => p.symbol === symbol);
-  const hasDuplicateSetup = pick != null && watch != null;
-  const setup = pick ?? watch;
+export function ReportPick(props: {
+  symbol: string;
+  setup?: ReportPickSetup;
+  setupType?: "pick" | "watchlist" | "both";
+  series1d?: ReportIntervalSeries;
+  series15m?: ReportIntervalSeries;
+}) {
+  const { symbol, setup, setupType, series1d, series15m } = props;
   if (!setup) {
+    console.warn("[reports] ReportPick missing setup data", { symbol });
     return <p>Missing setup data for {symbol}.</p>;
   }
 
-  const setupTypeLabel = hasDuplicateSetup ? "Trade (also on Watchlist)" : pick ? "Trade" : "Watchlist";
+  const setupTypeLabel =
+    setupType === "both" ? "Trade (also on Watchlist)" : setupType === "watchlist" ? "Watchlist" : "Trade";
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
 
-  let series1d;
-  let series15m;
-  try {
-    series1d = mustGetSeries(report, symbol, "1d");
-    series15m = mustGetSeries(report, symbol, "15m");
-  } catch {
+  if (!series1d || !series15m) {
+    console.warn("[reports] ReportPick missing series", { symbol, has1d: Boolean(series1d), has15m: Boolean(series15m) });
     return <p>Missing price series data for {symbol} (cannot render report charts).</p>;
   }
 

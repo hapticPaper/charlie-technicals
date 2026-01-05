@@ -42,12 +42,12 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 /**
 * Renders the summary widget section for a report.
 */
-export function ReportSummary(props: { summaryWidgets: MarketReportSummaryWidgets }) {
-  if (!props.summaryWidgets) {
-    throw new Error("ReportSummary must be rendered with a `summaryWidgets` prop.");
-  }
-
+export function ReportSummary(props: { summaryWidgets?: MarketReportSummaryWidgets }) {
   const summary = props.summaryWidgets;
+  if (!summary) {
+    console.error("[reports] ReportSummary missing `summaryWidgets` prop");
+    return <p>Summary unavailable.</p>;
+  }
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";
   const sentimentLines = summary.sentiment?.lines ?? [];

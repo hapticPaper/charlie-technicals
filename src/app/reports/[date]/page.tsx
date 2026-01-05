@@ -113,8 +113,31 @@ export default async function ReportPage(props: ReportPageProps) {
   try {
     const res = await renderMdx(mdxRaw, {
       ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
-      ReportCharts: (chartProps) => <ReportCharts report={report} {...chartProps} />,
-      ReportPick: (pickProps) => <ReportPick report={report} {...pickProps} />,
+      ReportCharts: ({ symbol, interval }) => (
+        <ReportCharts
+          symbol={symbol}
+          interval={interval}
+          series={report.series[symbol]?.[interval]}
+          trade={report.picks.find((p) => p.symbol === symbol)?.trade}
+          isMissingSymbol={report.missingSymbols.includes(symbol)}
+        />
+      ),
+      ReportPick: ({ symbol }) => {
+        const pick = report.picks.find((p) => p.symbol === symbol);
+        const watch = report.watchlist?.find((p) => p.symbol === symbol);
+        const setup = pick ?? watch;
+        const setupType = pick && watch ? "both" : pick ? "pick" : watch ? "watchlist" : undefined;
+
+        return (
+          <ReportPick
+            symbol={symbol}
+            setup={setup}
+            setupType={setupType}
+            series1d={report.series[symbol]?.["1d"]}
+            series15m={report.series[symbol]?.["15m"]}
+          />
+        );
+      },
       CnbcVideoWidget
     });
     content = res.content;
