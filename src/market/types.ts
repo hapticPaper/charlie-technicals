@@ -275,8 +275,8 @@ export type MarketReport = {
    * (`content/reports/<date>.summary.json`). This field is preserved for backward
    * compatibility with historical artifacts.
    *
-   * Writers must not populate this field for new reports. Renderers should prefer the
-   * sidecar cache instead.
+   * Writers must not populate this field for new reports. UI renderers must not read from
+   * this field and should prefer the sidecar cache instead.
    */
   summaryWidgets?: MarketReportSummaryWidgets;
 };

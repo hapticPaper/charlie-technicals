@@ -43,6 +43,10 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 * Renders the summary widget section for a report.
 */
 export function ReportSummary(props: { summaryWidgets: MarketReportSummaryWidgets }) {
+  if (!props.summaryWidgets) {
+    throw new Error("ReportSummary must be rendered with a `summaryWidgets` prop.");
+  }
+
   const summary = props.summaryWidgets;
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";

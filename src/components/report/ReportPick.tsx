@@ -42,13 +42,17 @@ function mustGetSeries(report: MarketReport, symbol: string, interval: MarketInt
 }
 
 export function ReportPick(props: { report: MarketReport; symbol: string }) {
-  const report = props.report;
-  const pick = report.picks.find((p) => p.symbol === props.symbol);
-  const watch = report.watchlist?.find((p) => p.symbol === props.symbol);
+  const { report, symbol } = props;
+  if (!report) {
+    throw new Error("ReportPick must be rendered with a `report` prop.");
+  }
+
+  const pick = report.picks.find((p) => p.symbol === symbol);
+  const watch = report.watchlist?.find((p) => p.symbol === symbol);
   const hasDuplicateSetup = pick != null && watch != null;
   const setup = pick ?? watch;
   if (!setup) {
-    return <p>Missing setup data for {props.symbol}.</p>;
+    return <p>Missing setup data for {symbol}.</p>;
   }
 
   const setupTypeLabel = hasDuplicateSetup ? "Trade (also on Watchlist)" : pick ? "Trade" : "Watchlist";
@@ -59,10 +63,10 @@ export function ReportPick(props: { report: MarketReport; symbol: string }) {
   let series1d;
   let series15m;
   try {
-    series1d = mustGetSeries(report, props.symbol, "1d");
-    series15m = mustGetSeries(report, props.symbol, "15m");
+    series1d = mustGetSeries(report, symbol, "1d");
+    series15m = mustGetSeries(report, symbol, "15m");
   } catch {
-    return <p>Missing price series data for {props.symbol} (cannot render report charts).</p>;
+    return <p>Missing price series data for {symbol} (cannot render report charts).</p>;
   }
 
   return (
