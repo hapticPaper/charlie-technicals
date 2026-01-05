@@ -1,12 +1,6 @@
-export type MarketInterval = "1m" | "5m" | "15m" | "1h" | "1d";
+export const MARKET_INTERVALS = ["1m", "5m", "15m", "1h", "1d"] as const;
 
-export const MARKET_INTERVALS: readonly MarketInterval[] = [
-  "1m",
-  "5m",
-  "15m",
-  "1h",
-  "1d"
-];
+export type MarketInterval = (typeof MARKET_INTERVALS)[number];
 
 /**
 * Hard cap on the number of technical trades surfaced in the report.
@@ -275,8 +269,8 @@ export type MarketReport = {
    * (`content/reports/<date>.summary.json`). This field is preserved for backward
    * compatibility with historical artifacts.
    *
-   * Writers must not populate this field for new reports. Renderers should prefer the
-   * sidecar cache (and the UI `ReportProvider` context) instead.
+   * Writers must not populate this field for new reports. UI renderers must not read from
+   * this field and should prefer the sidecar cache instead.
    */
   summaryWidgets?: MarketReportSummaryWidgets;
 };

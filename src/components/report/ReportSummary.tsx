@@ -1,10 +1,8 @@
-"use client";
-
 import {
   type MarketReportSummaryMostActiveRow,
+  type MarketReportSummaryWidgets,
   type RiskTone
 } from "../../market/types";
-import { useReportSummaryWidgets } from "./ReportProvider";
 import styles from "./report.module.css";
 
 function toneBadgeClass(tone: RiskTone): string {
@@ -44,11 +42,21 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 /**
 * Renders the summary widget section for a report.
 *
-* This component is intentionally provider-bound: it must be rendered under `ReportProvider`,
-* and it does not accept a `summary` prop (to keep large generated payloads out of MDX).
+* `summaryWidgets` is injected by the report page's MDX renderer; the prop is optional so
+* malformed MDX wiring doesn't crash the entire report. Missing data is treated as non-fatal
+* and logged as a warning.
 */
-export function ReportSummary() {
-  const summary = useReportSummaryWidgets();
+export function ReportSummary(props: { summaryWidgets?: MarketReportSummaryWidgets }) {
+  const summary = props.summaryWidgets;
+  if (!summary) {
+    const message = "[reports] ReportSummary missing `summaryWidgets` prop";
+    if (process.env.NODE_ENV !== "production") {
+      console.error(message);
+    } else {
+      console.warn(message);
+    }
+    return <p>Summary unavailable.</p>;
+  }
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";
   const sentimentLines = summary.sentiment?.lines ?? [];

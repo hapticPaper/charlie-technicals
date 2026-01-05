@@ -1,8 +1,5 @@
-"use client";
-
-import type { MarketInterval, TradePlan } from "../../market/types";
+import type { ReportIntervalSeries, ReportPick as ReportPickSetup, TradePlan } from "../../market/types";
 import { ReportChart } from "./ReportChart";
-import { useReport } from "./ReportProvider";
 import styles from "./report.module.css";
 
 function formatPrice(value: number, reference: number): string {
@@ -35,38 +32,40 @@ function formatTrade(trade: TradePlan): {
   };
 }
 
-function mustGetSeries(report: ReturnType<typeof useReport>, symbol: string, interval: MarketInterval) {
-  const series = report.series[symbol]?.[interval];
-  if (!series) {
-    throw new Error(`Missing series in report for ${symbol} ${interval}`);
+/**
+* Renders a single trade/watchlist setup from a report.
+*
+* This component is used via the report MDX renderer, which is responsible for validating and
+* slicing the report payload before rendering.
+*
+* Symbol-specific diagnostics and fallback copy live at the MDX wiring layer.
+*/
+export function ReportPick(props: {
+  setup: ReportPickSetup;
+  setupType: "pick" | "watchlist" | "both";
+  series1d: ReportIntervalSeries;
+  series15m: ReportIntervalSeries;
+}) {
+  const { setup, setupType, series1d, series15m } = props;
+  if (process.env.NODE_ENV !== "production") {
+    if (series1d == null || series15m == null) {
+      console.error("[reports] ReportPick rendered with missing series (MDX wiring bug)", {
+        symbol: setup.symbol,
+        has1d: series1d != null,
+        has15m: series15m != null
+      });
+    }
   }
 
-  return series;
-}
-
-export function ReportPick(props: { symbol: string }) {
-  const report = useReport();
-  const pick = report.picks.find((p) => p.symbol === props.symbol);
-  const watch = report.watchlist?.find((p) => p.symbol === props.symbol);
-  const hasDuplicateSetup = pick != null && watch != null;
-  const setup = pick ?? watch;
-  if (!setup) {
-    return <p>Missing setup data for {props.symbol}.</p>;
+  if (series1d == null || series15m == null) {
+    return <p>Missing price series data for {setup.symbol} (cannot render report charts).</p>;
   }
 
-  const setupTypeLabel = hasDuplicateSetup ? "Trade (also on Watchlist)" : pick ? "Trade" : "Watchlist";
+  const setupTypeLabel =
+    setupType === "both" ? "Trade (also on Watchlist)" : setupType === "watchlist" ? "Watchlist" : "Trade";
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
-
-  let series1d;
-  let series15m;
-  try {
-    series1d = mustGetSeries(report, props.symbol, "1d");
-    series15m = mustGetSeries(report, props.symbol, "15m");
-  } catch {
-    return <p>Missing price series data for {props.symbol} (cannot render report charts).</p>;
-  }
 
   return (
     <section className={styles.pick}>

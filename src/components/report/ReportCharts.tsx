@@ -1,23 +1,30 @@
-"use client";
-
-import type { MarketInterval } from "../../market/types";
-import { useReport } from "./ReportProvider";
+import type { MarketInterval, ReportIntervalSeries, TradePlan } from "../../market/types";
 import { ReportChart } from "./ReportChart";
 
-export function ReportCharts(props: { symbol: string; interval: MarketInterval }) {
-  const report = useReport();
-  const series = report.series[props.symbol]?.[props.interval];
+/**
+* Renders a report chart for a single symbol + interval.
+*
+* `isMissingSymbol` should reflect whether the upstream provider was missing this symbol for the report date
+* (derived from `MarketReport.missingSymbols`).
+*/
+export function ReportCharts(props: {
+  symbol: string;
+  interval: MarketInterval;
+  series?: ReportIntervalSeries;
+  trade?: TradePlan;
+  isMissingSymbol: boolean;
+}) {
+  const { symbol, interval, series, trade, isMissingSymbol } = props;
+
   if (!series) {
-    const isMissingSymbol = report.missingSymbols.includes(props.symbol);
     return <p>{isMissingSymbol ? "No data from provider for this symbol." : "Missing series."}</p>;
   }
 
-  const pick = report.picks.find((p) => p.symbol === props.symbol);
   return (
     <ReportChart
-      title={`${props.symbol} ${props.interval}`}
+      title={`${symbol} ${interval}`}
       series={series}
-      annotations={pick ? { trade: pick.trade } : undefined}
+      annotations={trade ? { trade } : undefined}
       showSignals
     />
   );
