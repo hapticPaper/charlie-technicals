@@ -370,7 +370,7 @@ function formatPriceCompact(value: number): string {
   return value.toFixed(5);
 }
 
-function buildPickNarrative(args: {
+type PickNarrativeArgs = {
   symbol: string;
   side: TradeSide;
   trade: TradePlan;
@@ -387,11 +387,12 @@ function buildPickNarrative(args: {
   signals1d: string[];
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
   news: MarketNewsSnapshot | undefined;
-}): string {
-  const sideLabel = args.side === "buy" ? "bullish" : "bearish";
-  const dirLabel = args.side === "buy" ? "upside" : "downside";
+};
 
+function buildPickSetupText(args: PickNarrativeArgs): string {
+  const sideLabel = args.side === "buy" ? "bullish" : "bearish";
   const setupParts: string[] = [];
+
   if (args.breakout) {
     const aboveBelow = args.breakout.direction === "up" ? "above" : "below";
     setupParts.push(
@@ -425,6 +426,10 @@ function buildPickNarrative(args: {
     setupParts.push(`Key pivot support: ${formatPriceCompact(args.support.level)}.`);
   }
 
+  return setupParts.join(" ");
+}
+
+function buildPickRiskText(args: PickNarrativeArgs): string {
   const riskParts: string[] = [];
   const entry = formatPriceCompact(args.trade.entry);
   const stop = formatPriceCompact(args.trade.stop);
@@ -462,6 +467,11 @@ function buildPickNarrative(args: {
     riskParts.push("RSI is overbought, so chase risk is elevated; keep size disciplined.");
   }
 
+  return riskParts.join(" ");
+}
+
+function buildPickContextText(args: PickNarrativeArgs): string {
+  const dirLabel = args.side === "buy" ? "upside" : "downside";
   const contextParts: string[] = [];
   const sectorProxy = findSectorProxy(args.symbol, args.analyzedBySymbol);
   if (sectorProxy) {
@@ -499,9 +509,13 @@ function buildPickNarrative(args: {
     contextParts.push(`${prefix} ${analyst.lines.join(" | ")}.`);
   }
 
-  const setup = capWords(setupParts.join(" ").trim(), 45);
-  const risk = capWords(riskParts.join(" ").trim(), 35);
-  const context = capWords(contextParts.join(" ").trim(), 45);
+  return contextParts.join(" ");
+}
+
+function buildPickNarrative(args: PickNarrativeArgs): string {
+  const setup = capWords(buildPickSetupText(args).trim(), 45);
+  const risk = capWords(buildPickRiskText(args).trim(), 35);
+  const context = capWords(buildPickContextText(args).trim(), 45);
 
   return [setup, risk, context].filter(Boolean).join(" ");
 }
