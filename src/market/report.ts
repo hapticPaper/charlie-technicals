@@ -181,6 +181,7 @@ function computeMovePct(bars: MarketBar[], lookback: number): number | null {
   }
 
   const idx = bars.length - 1;
+  // `lookback = 1` compares the latest close vs the prior bar (i.e. a 1-session change).
   const prevIdx = idx - lookback;
   if (prevIdx < 0) {
     return null;
@@ -498,12 +499,11 @@ function buildPickNarrative(args: {
     contextParts.push(`${prefix} ${analyst.lines.join(" | ")}.`);
   }
 
-  const narrative = [setupParts.join(" "), riskParts.join(" "), contextParts.join(" ")]
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .join(" ");
+  const setup = capWords(setupParts.join(" ").trim(), 45);
+  const risk = capWords(riskParts.join(" ").trim(), 35);
+  const context = capWords(contextParts.join(" ").trim(), 45);
 
-  return capWords(narrative, 90);
+  return [setup, risk, context].filter(Boolean).join(" ");
 }
 
 const REGIME_POLICY = {
