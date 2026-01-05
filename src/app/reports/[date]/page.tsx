@@ -23,10 +23,19 @@ import {
 } from "../../../market/reportStorage";
 import { MARKET_INTERVALS, type MarketInterval, type MarketReport, type MarketReportSummaryWidgets } from "../../../market/types";
 
-const MARKET_INTERVAL_SET = new Set<MarketInterval>(MARKET_INTERVALS);
+const MARKET_INTERVAL_SET: ReadonlySet<string> = new Set(MARKET_INTERVALS);
 
 function isMarketInterval(value: unknown): value is MarketInterval {
-  return typeof value === "string" && MARKET_INTERVAL_SET.has(value as MarketInterval);
+  return typeof value === "string" && MARKET_INTERVAL_SET.has(value);
+}
+
+function logReportMdxIssue(date: string, message: string, details?: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "production") {
+    console.error(`[reports] ${message}`, { date, ...details });
+    return;
+  }
+
+  console.warn(`[reports] ${message}`, { date });
 }
 
 type ReportPageParams = { date: string };
@@ -125,7 +134,7 @@ export default async function ReportPage(props: ReportPageProps) {
         const interval = isMarketInterval(rawInterval) ? rawInterval : null;
 
         if (!symbol || !interval) {
-          console.error("[reports] ReportCharts rendered with invalid props", props);
+          logReportMdxIssue(date, "ReportCharts rendered with invalid props", { props });
           return <p>Unable to render chart (invalid chart spec).</p>;
         }
 
@@ -142,7 +151,7 @@ export default async function ReportPage(props: ReportPageProps) {
       ReportPick: (props: { symbol?: unknown }) => {
         const symbol = typeof props.symbol === "string" ? props.symbol : null;
         if (!symbol) {
-          console.error("[reports] ReportPick rendered with invalid props", props);
+          logReportMdxIssue(date, "ReportPick rendered with invalid props", { props });
           return <p>Unable to render setup (invalid symbol).</p>;
         }
 
@@ -152,7 +161,11 @@ export default async function ReportPage(props: ReportPageProps) {
         const setupType = pick && watch ? "both" : pick ? "pick" : watch ? "watchlist" : undefined;
 
         if (!setup || !setupType) {
-          console.error("[reports] ReportPick missing setup data", { symbol, hasPick: Boolean(pick), hasWatch: Boolean(watch) });
+          logReportMdxIssue(date, "ReportPick missing setup data", {
+            symbol,
+            hasPick: Boolean(pick),
+            hasWatch: Boolean(watch)
+          });
           return <p>Missing setup data for {symbol}.</p>;
         }
 
