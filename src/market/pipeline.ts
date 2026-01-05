@@ -347,7 +347,7 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
   const warnSamples: string[] = [];
   const seenWarnKeys = new Set<string>();
 
-  for (const symbol of symbols) {
+  await mapWithConcurrency(symbols, { concurrency: 8 }, async (symbol) => {
     try {
       const data = await readNewsData(date, symbol);
       if (data.kind === "snapshot") {
@@ -359,7 +359,7 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
           ? (error as { code?: unknown }).code
           : undefined;
       if (code === "ENOENT") {
-        continue;
+        return;
       }
 
       const message = error instanceof Error ? error.message : String(error);
@@ -369,7 +369,7 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
         warnSamples.push(`${symbol}: ${message}`);
       }
     }
-  }
+  });
 
   if (warnSamples.length > 0) {
     console.warn(

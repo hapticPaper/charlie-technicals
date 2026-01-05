@@ -384,6 +384,7 @@ function formatPriceCompact(value: number): string {
 }
 
 type PickNarrativeArgs = {
+  kind: "pick" | "watchlist";
   symbol: string;
   side: TradeSide;
   trade: TradePlan;
@@ -481,8 +482,9 @@ function buildPickRiskText(args: PickNarrativeArgs): string {
         : "";
 
   const targetsLabel = targets.length > 0 ? ` targeting ${targets.join(" / ")}` : "";
+  const planPrefix = args.kind === "watchlist" ? "If triggered:" : "Plan:";
   riskParts.push(
-    `Plan: ${args.side === "buy" ? "long" : "short"} entry ${entry} (stop ${stop})${targetsLabel}${atrLabel}.`
+    `${planPrefix} ${args.side === "buy" ? "long" : "short"} entry ${entry} (stop ${stop})${targetsLabel}${atrLabel}.`
   );
 
   const rsiOversold = args.signals1d.some((s) => /\brsi\s+oversold\b/i.test(s));
@@ -544,10 +546,14 @@ function buildPickContextText(args: PickNarrativeArgs): string {
   return contextParts.join(" ");
 }
 
+const PICK_NARRATIVE_MAX_SETUP_WORDS = 45;
+const PICK_NARRATIVE_MAX_RISK_WORDS = 35;
+const PICK_NARRATIVE_MAX_CONTEXT_WORDS = 45;
+
 function buildPickNarrative(args: PickNarrativeArgs): string {
-  const setup = capWords(buildPickSetupText(args).trim(), 45);
-  const risk = capWords(buildPickRiskText(args).trim(), 35);
-  const context = capWords(buildPickContextText(args).trim(), 45);
+  const setup = capWords(buildPickSetupText(args).trim(), PICK_NARRATIVE_MAX_SETUP_WORDS);
+  const risk = capWords(buildPickRiskText(args).trim(), PICK_NARRATIVE_MAX_RISK_WORDS);
+  const context = capWords(buildPickContextText(args).trim(), PICK_NARRATIVE_MAX_CONTEXT_WORDS);
 
   return [setup, risk, context].filter(Boolean).join(" ");
 }
@@ -1684,6 +1690,7 @@ function buildPicks(args: {
 
 function attachPickNarratives(args: {
   picks: ReportPick[];
+  kind: "pick" | "watchlist";
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
   newsBySymbol?: Record<string, MarketNewsSnapshot>;
 }): ReportPick[] {
@@ -1691,6 +1698,10 @@ function attachPickNarratives(args: {
   const levelLookback1d = PICK_POLICY.levelLookback1d;
 
   return args.picks.map((pick) => {
+    if (typeof pick.narrative === "string" && pick.narrative.trim() !== "") {
+      return pick;
+    }
+
     const symbol = pick.symbol;
     const series15m = args.analyzedBySymbol[symbol]?.["15m"];
     const series1h = args.analyzedBySymbol[symbol]?.["1h"];
@@ -1722,6 +1733,7 @@ function attachPickNarratives(args: {
         : null;
 
     const narrative = buildPickNarrative({
+      kind: args.kind,
       symbol,
       side: pick.trade.side,
       trade: pick.trade,
@@ -2130,8 +2142,13 @@ export function buildMarketReport(args: {
   }
 
   const { picks: rawPicks, watchlist: rawWatchlist } = buildPicks({ analyzedBySymbol });
-  const picks = attachPickNarratives({ picks: rawPicks, analyzedBySymbol, newsBySymbol: args.newsBySymbol });
-  const watchlist = attachPickNarratives({ picks: rawWatchlist, analyzedBySymbol, newsBySymbol: args.newsBySymbol });
+  const picks = attachPickNarratives({ picks: rawPicks, kind: "pick", analyzedBySymbol, newsBySymbol: args.newsBySymbol });
+  const watchlist = attachPickNarratives({
+    picks: rawWatchlist,
+    kind: "watchlist",
+    analyzedBySymbol,
+    newsBySymbol: args.newsBySymbol
+  });
   const mostActive = buildMostActive({ analyzedBySymbol });
   const summaries = buildSummaries(args.date, picks, watchlist, analyzedBySymbol, args.missingSymbols);
 
