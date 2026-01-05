@@ -1,11 +1,8 @@
-"use client";
-
-import type { MarketInterval } from "../../market/types";
-import { useReport } from "./ReportProvider";
+import type { MarketInterval, MarketReport } from "../../market/types";
 import { ReportChart } from "./ReportChart";
 
-export function ReportCharts(props: { symbol: string; interval: MarketInterval }) {
-  const report = useReport();
+export function ReportCharts(props: { report: MarketReport; symbol: string; interval: MarketInterval }) {
+  const report = props.report;
   const series = report.series[props.symbol]?.[props.interval];
   if (!series) {
     const isMissingSymbol = report.missingSymbols.includes(props.symbol);

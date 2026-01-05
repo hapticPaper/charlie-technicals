@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 import { ReportCharts } from "../../../components/report/ReportCharts";
 import { CnbcVideoWidget } from "../../../components/report/CnbcVideoWidget";
 import { ReportPick } from "../../../components/report/ReportPick";
-import { ReportProvider } from "../../../components/report/ReportProvider";
 import { ReportSummary } from "../../../components/report/ReportSummary";
 import { renderMdx } from "../../../lib/mdx";
 import { parseIsoDateYmd } from "../../../market/date";
@@ -112,7 +111,12 @@ export default async function ReportPage(props: ReportPageProps) {
 
   let content: ReactNode;
   try {
-    const res = await renderMdx(mdxRaw, { ReportSummary, ReportCharts, ReportPick, CnbcVideoWidget });
+    const res = await renderMdx(mdxRaw, {
+      ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
+      ReportCharts: (chartProps) => <ReportCharts report={report} {...chartProps} />,
+      ReportPick: (pickProps) => <ReportPick report={report} {...pickProps} />,
+      CnbcVideoWidget
+    });
     content = res.content;
   } catch (error) {
     try {
@@ -129,11 +133,9 @@ export default async function ReportPage(props: ReportPageProps) {
   const title = getReportTitle(date);
 
   return (
-    <ReportProvider report={report} summaryWidgets={summaryWidgets}>
-      <>
-        <h1>{title}</h1>
-        {content}
-      </>
-    </ReportProvider>
+    <>
+      <h1>{title}</h1>
+      {content}
+    </>
   );
 }

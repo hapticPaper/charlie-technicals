@@ -1,8 +1,5 @@
-"use client";
-
-import type { MarketInterval, TradePlan } from "../../market/types";
+import type { MarketInterval, MarketReport, TradePlan } from "../../market/types";
 import { ReportChart } from "./ReportChart";
-import { useReport } from "./ReportProvider";
 import styles from "./report.module.css";
 
 function formatPrice(value: number, reference: number): string {
@@ -35,7 +32,7 @@ function formatTrade(trade: TradePlan): {
   };
 }
 
-function mustGetSeries(report: ReturnType<typeof useReport>, symbol: string, interval: MarketInterval) {
+function mustGetSeries(report: MarketReport, symbol: string, interval: MarketInterval) {
   const series = report.series[symbol]?.[interval];
   if (!series) {
     throw new Error(`Missing series in report for ${symbol} ${interval}`);
@@ -44,8 +41,8 @@ function mustGetSeries(report: ReturnType<typeof useReport>, symbol: string, int
   return series;
 }
 
-export function ReportPick(props: { symbol: string }) {
-  const report = useReport();
+export function ReportPick(props: { report: MarketReport; symbol: string }) {
+  const report = props.report;
   const pick = report.picks.find((p) => p.symbol === props.symbol);
   const watch = report.watchlist?.find((p) => p.symbol === props.symbol);
   const hasDuplicateSetup = pick != null && watch != null;

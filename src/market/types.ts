@@ -276,7 +276,7 @@ export type MarketReport = {
    * compatibility with historical artifacts.
    *
    * Writers must not populate this field for new reports. Renderers should prefer the
-   * sidecar cache (and the UI `ReportProvider` context) instead.
+   * sidecar cache instead.
    */
   summaryWidgets?: MarketReportSummaryWidgets;
 };

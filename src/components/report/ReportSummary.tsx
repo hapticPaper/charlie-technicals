@@ -1,10 +1,8 @@
-"use client";
-
 import {
   type MarketReportSummaryMostActiveRow,
+  type MarketReportSummaryWidgets,
   type RiskTone
 } from "../../market/types";
-import { useReportSummaryWidgets } from "./ReportProvider";
 import styles from "./report.module.css";
 
 function toneBadgeClass(tone: RiskTone): string {
@@ -43,12 +41,9 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 
 /**
 * Renders the summary widget section for a report.
-*
-* This component is intentionally provider-bound: it must be rendered under `ReportProvider`,
-* and it does not accept a `summary` prop (to keep large generated payloads out of MDX).
 */
-export function ReportSummary() {
-  const summary = useReportSummaryWidgets();
+export function ReportSummary(props: { summaryWidgets: MarketReportSummaryWidgets }) {
+  const summary = props.summaryWidgets;
 
   const sentimentTone = summary.sentiment?.tone ?? "mixed";
   const sentimentLines = summary.sentiment?.lines ?? [];
