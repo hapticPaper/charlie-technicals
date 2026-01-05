@@ -178,14 +178,8 @@ type SectorProxyContext = {
 const SECTOR_PROXY_WINDOW_BARS = 120;
 const SECTOR_PROXY_MIN_RETURNS = 60;
 const SECTOR_PROXY_MIN_CORRELATION = 0.35;
-const SECTOR_PROXY_RETURNS_CACHE = new WeakMap<AnalyzedSeries, number[]>();
 
 function computeReturnSeriesForCorrelation(series: AnalyzedSeries): number[] {
-  const cached = SECTOR_PROXY_RETURNS_CACHE.get(series);
-  if (cached) {
-    return cached;
-  }
-
   const closes = series.bars
     .slice(-SECTOR_PROXY_WINDOW_BARS)
     .map((b) => b.c)
@@ -204,7 +198,6 @@ function computeReturnSeriesForCorrelation(series: AnalyzedSeries): number[] {
     }
   }
 
-  SECTOR_PROXY_RETURNS_CACHE.set(series, out);
   return out;
 }
 
