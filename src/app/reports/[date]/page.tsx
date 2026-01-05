@@ -151,6 +151,16 @@ export default async function ReportPage(props: ReportPageProps) {
         const setup = pick ?? watch;
         const setupType = pick && watch ? "both" : pick ? "pick" : watch ? "watchlist" : undefined;
 
+        if (!setup || !setupType) {
+          return (
+            <ReportPick
+              symbol={symbol}
+              series1d={report.series[symbol]?.["1d"]}
+              series15m={report.series[symbol]?.["15m"]}
+            />
+          );
+        }
+
         return (
           <ReportPick
             symbol={symbol}

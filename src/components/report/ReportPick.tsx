@@ -34,28 +34,20 @@ function formatTrade(trade: TradePlan): {
 
 export function ReportPick(props: {
   symbol: string;
-  setup?: ReportPickSetup;
-  setupType?: "pick" | "watchlist" | "both";
   series1d?: ReportIntervalSeries;
   series15m?: ReportIntervalSeries;
-}) {
+} & (
+  | { setup: ReportPickSetup; setupType: "pick" | "watchlist" | "both" }
+  | { setup?: undefined; setupType?: undefined }
+)) {
   const { symbol, setup, setupType, series1d, series15m } = props;
   if (!setup) {
     console.warn("[reports] ReportPick missing setup data", { symbol });
     return <p>Missing setup data for {symbol}.</p>;
   }
 
-  let setupTypeLabel: string;
-  if (setupType === "both") {
-    setupTypeLabel = "Trade (also on Watchlist)";
-  } else if (setupType === "watchlist") {
-    setupTypeLabel = "Watchlist";
-  } else if (setupType === "pick") {
-    setupTypeLabel = "Trade";
-  } else {
-    console.warn("[reports] ReportPick missing `setupType` prop", { symbol });
-    setupTypeLabel = "Setup";
-  }
+  const setupTypeLabel =
+    setupType === "both" ? "Trade (also on Watchlist)" : setupType === "watchlist" ? "Watchlist" : "Trade";
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
