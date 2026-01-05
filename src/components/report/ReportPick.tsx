@@ -34,12 +34,11 @@ function formatTrade(trade: TradePlan): {
 
 export function ReportPick(props: {
   symbol: string;
+  setup: ReportPickSetup;
+  setupType: "pick" | "watchlist" | "both";
   series1d?: ReportIntervalSeries;
   series15m?: ReportIntervalSeries;
-} & (
-  | { setup: ReportPickSetup; setupType: "pick" | "watchlist" | "both" }
-  | { setup?: undefined; setupType?: undefined }
-)) {
+}) {
   const { symbol, setup, setupType, series1d, series15m } = props;
   if (!setup) {
     console.warn("[reports] ReportPick missing setup data", { symbol });
