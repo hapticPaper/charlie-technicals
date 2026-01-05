@@ -176,8 +176,17 @@ type SectorProxyContext = {
 };
 
 const SECTOR_PROXY_WINDOW_BARS = 120;
-const SECTOR_PROXY_MIN_RETURNS = 60;
-const SECTOR_PROXY_MIN_CORRELATION = 0.35;
+const SECTOR_PROXY_MIN_RETURNS = 30;
+
+function minSectorProxyCorrelation(nReturns: number): number {
+  if (nReturns >= 80) {
+    return 0.35;
+  }
+  if (nReturns >= 50) {
+    return 0.4;
+  }
+  return 0.45;
+}
 
 function computeReturnSeriesForCorrelation(series: AnalyzedSeries): number[] {
   const closes = series.bars
@@ -276,6 +285,8 @@ function findSectorProxy(
     return null;
   }
 
+  const minCorr = minSectorProxyCorrelation(symbolReturns.length);
+
   let best: SectorProxyContext | null = null;
 
   for (const proxySymbol of SECTOR_PROXY_SYMBOLS) {
@@ -305,7 +316,7 @@ function findSectorProxy(
     }
   }
 
-  if (!best || best.correlation < SECTOR_PROXY_MIN_CORRELATION) {
+  if (!best || best.correlation < minCorr) {
     return null;
   }
 
@@ -319,13 +330,18 @@ type AnalystSignal = {
 
 function inferAnalystSignalTone(title: string): AnalystSignal["tone"] {
   const t = title.toLowerCase();
-  const bearish =
-    /(downgrad(e|es|ed)|cut[s]?\s+price\s+target|lowers\s+price\s+target|cut[s]?\s+to\s+(sell|underperform|underweight|neutral|hold)|initiates?\s+at\s+(sell|underperform|underweight))/i;
-  const bullish =
-    /(upgrad(e|es|ed)|raises\s+price\s+target|initiates?\s+at\s+(buy|outperform|overweight)|reiterates?\s+(buy|outperform|overweight)|to\s+(buy|outperform|overweight))/i;
+  const downgrade = /(downgrad(e|es|ed)\s+[^,]*\s+to\s+(sell|underperform|underweight|neutral|hold))/i;
+  const upgrade = /(upgrad(e|es|ed)\s+[^,]*\s+to\s+(buy|outperform|overweight))/i;
+  const initiateBear = /(initiates?\s+[^,]*\s+at\s+(sell|underperform|underweight))/i;
+  const initiateBull = /(initiates?\s+[^,]*\s+at\s+(buy|outperform|overweight))/i;
+  const reiterateBull = /(reiterates?\s+[^,]*\s+(buy|outperform|overweight))/i;
 
-  const isBear = bearish.test(t);
-  const isBull = bullish.test(t);
+  const cutTargetBear =
+    /(cut[s]?\s+price\s+target|lowers\s+price\s+target)[^,]*\b(sell|underperform|underweight)\b/i;
+  const raiseTargetBull = /(raises\s+price\s+target)[^,]*\b(buy|outperform|overweight)\b/i;
+
+  const isBear = downgrade.test(t) || initiateBear.test(t) || cutTargetBear.test(t);
+  const isBull = upgrade.test(t) || initiateBull.test(t) || reiterateBull.test(t) || raiseTargetBull.test(t);
   if (isBear && isBull) {
     return "mixed";
   }

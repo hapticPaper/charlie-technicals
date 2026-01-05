@@ -346,6 +346,7 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
   const out: Record<string, MarketNewsSnapshot> = {};
   const warnSamples: string[] = [];
   const seenWarnKeys = new Set<string>();
+  let errorCount = 0;
 
   await mapWithConcurrency(symbols, { concurrency: 8 }, async (symbol) => {
     try {
@@ -362,6 +363,8 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
         return;
       }
 
+      errorCount += 1;
+
       const message = error instanceof Error ? error.message : String(error);
       const warnKey = `${String(code ?? "")}:${message}`;
       if (!seenWarnKeys.has(warnKey) && warnSamples.length < 8) {
@@ -372,6 +375,13 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
   });
 
   if (warnSamples.length > 0) {
+    const failureRate = symbols.length > 0 ? errorCount / symbols.length : 0;
+    if (failureRate > 0.5) {
+      throw new Error(
+        `[market:report] Failed to read news snapshots for more than half of symbols on ${date}; aborting report generation.`
+      );
+    }
+
     console.warn(
       `[market:report] Some news snapshots were unreadable for ${date}; analyst context may be incomplete. Samples: ${warnSamples.join(
         " | "
