@@ -344,6 +344,8 @@ export async function loadAnalyzedSeries(date: string): Promise<AnalyzedSeries[]
 
 async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Record<string, MarketNewsSnapshot>> {
   const out: Record<string, MarketNewsSnapshot> = {};
+  const warnSamples: string[] = [];
+  const seenWarnKeys = new Set<string>();
 
   for (const symbol of symbols) {
     try {
@@ -361,8 +363,20 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[market:report] Failed reading news snapshot for ${symbol} (${date}): ${message}`);
+      const warnKey = `${String(code ?? "")}:${message}`;
+      if (!seenWarnKeys.has(warnKey) && warnSamples.length < 8) {
+        seenWarnKeys.add(warnKey);
+        warnSamples.push(`${symbol}: ${message}`);
+      }
     }
+  }
+
+  if (warnSamples.length > 0) {
+    console.warn(
+      `[market:report] Some news snapshots were unreadable for ${date}; analyst context may be incomplete. Samples: ${warnSamples.join(
+        " | "
+      )}`
+    );
   }
 
   return out;

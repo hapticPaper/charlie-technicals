@@ -175,6 +175,39 @@ type SectorProxyContext = {
   move20dPct: number | null;
 };
 
+const SECTOR_PROXY_WINDOW_BARS = 120;
+const SECTOR_PROXY_MIN_RETURNS = 60;
+const SECTOR_PROXY_MIN_CORRELATION = 0.35;
+const SECTOR_PROXY_RETURNS_CACHE = new WeakMap<AnalyzedSeries, number[]>();
+
+function computeReturnSeriesForCorrelation(series: AnalyzedSeries): number[] {
+  const cached = SECTOR_PROXY_RETURNS_CACHE.get(series);
+  if (cached) {
+    return cached;
+  }
+
+  const closes = series.bars
+    .slice(-SECTOR_PROXY_WINDOW_BARS)
+    .map((b) => b.c)
+    .filter((v): v is number => Number.isFinite(v));
+
+  const out: number[] = [];
+  for (let i = 1; i < closes.length; i += 1) {
+    const prev = closes[i - 1];
+    const cur = closes[i];
+    if (!(prev !== 0)) {
+      continue;
+    }
+    const ret = (cur - prev) / prev;
+    if (Number.isFinite(ret)) {
+      out.push(ret);
+    }
+  }
+
+  SECTOR_PROXY_RETURNS_CACHE.set(series, out);
+  return out;
+}
+
 function computeMovePct(bars: MarketBar[], lookback: number): number | null {
   if (lookback <= 0) {
     return null;
@@ -240,28 +273,8 @@ function findSectorProxy(
     return null;
   }
 
-  const windowBars = 120;
-  function computeReturns(bars: MarketBar[]): number[] {
-    const closes = bars
-      .map((b) => b.c)
-      .filter((v): v is number => Number.isFinite(v));
-    const out: number[] = [];
-    for (let i = 1; i < closes.length; i += 1) {
-      const prev = closes[i - 1];
-      const cur = closes[i];
-      if (!(prev !== 0)) {
-        continue;
-      }
-      const ret = (cur - prev) / prev;
-      if (Number.isFinite(ret)) {
-        out.push(ret);
-      }
-    }
-    return out;
-  }
-
-  const symbolReturns = computeReturns(series.bars.slice(-windowBars));
-  if (symbolReturns.length < 40) {
+  const symbolReturns = computeReturnSeriesForCorrelation(series);
+  if (symbolReturns.length < SECTOR_PROXY_MIN_RETURNS) {
     return null;
   }
 
@@ -277,7 +290,7 @@ function findSectorProxy(
       continue;
     }
 
-    const proxyReturns = computeReturns(proxySeries.bars.slice(-windowBars));
+    const proxyReturns = computeReturnSeriesForCorrelation(proxySeries);
 
     const corr = computePearsonCorrelation(symbolReturns, proxyReturns);
     if (corr === null) {
@@ -294,7 +307,7 @@ function findSectorProxy(
     }
   }
 
-  if (!best || best.correlation < 0.25) {
+  if (!best || best.correlation < SECTOR_PROXY_MIN_CORRELATION) {
     return null;
   }
 
@@ -437,14 +450,20 @@ function buildPickRiskText(args: PickNarrativeArgs): string {
   const targets = [target1, target2]
     .filter((t): t is number => typeof t === "number" && Number.isFinite(t))
     .map((t) => formatPriceCompact(t));
-  const t1Atr =
-    typeof args.atr1d === "number" && args.atr1d > 0 && typeof target1 === "number"
-      ? Math.abs(target1 - args.trade.entry) / args.atr1d
-      : null;
-  const t2Atr =
-    typeof args.atr1d === "number" && args.atr1d > 0 && typeof target2 === "number"
-      ? Math.abs(target2 - args.trade.entry) / args.atr1d
-      : null;
+  const MAX_ATR_MULTIPLE = 6;
+  function safeAtrMultiple(target: number | undefined): number | null {
+    if (!(typeof args.atr1d === "number" && args.atr1d > 0 && typeof target === "number")) {
+      return null;
+    }
+    const multiple = Math.abs(target - args.trade.entry) / args.atr1d;
+    if (!(Number.isFinite(multiple) && multiple <= MAX_ATR_MULTIPLE)) {
+      return null;
+    }
+    return multiple;
+  }
+
+  const t1Atr = safeAtrMultiple(target1);
+  const t2Atr = safeAtrMultiple(target2);
   const atrLabel =
     t1Atr !== null && t2Atr !== null
       ? ` (~${t1Atr.toFixed(1)}–${t2Atr.toFixed(1)} ATR)`
@@ -506,7 +525,13 @@ function buildPickContextText(args: PickNarrativeArgs): string {
           ? `Analyst flow contrasts with the ${dirLabel} call (more contrarian):`
           : "Analyst flow:";
 
-    contextParts.push(`${prefix} ${analyst.lines.join(" | ")}.`);
+    if (reinforcement === "contrasts with") {
+      contextParts.push(
+        `${prefix} ${analyst.lines.join(" | ")}. We are leaning on the technical setup here; treat this as a contrarian idea with tighter risk.`
+      );
+    } else {
+      contextParts.push(`${prefix} ${analyst.lines.join(" | ")}.`);
+    }
   }
 
   return contextParts.join(" ");
