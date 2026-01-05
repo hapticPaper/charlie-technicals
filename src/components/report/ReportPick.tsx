@@ -32,17 +32,33 @@ function formatTrade(trade: TradePlan): {
   };
 }
 
+/**
+* Renders a single trade/watchlist setup from a report.
+*
+* This component is used via the report MDX renderer, which is responsible for validating and
+* slicing the report payload before rendering.
+*
+* Symbol-specific diagnostics and fallback copy live at the MDX wiring layer.
+*/
 export function ReportPick(props: {
-  symbol: string;
   setup: ReportPickSetup;
   setupType: "pick" | "watchlist" | "both";
-  series1d?: ReportIntervalSeries;
-  series15m?: ReportIntervalSeries;
+  series1d: ReportIntervalSeries;
+  series15m: ReportIntervalSeries;
 }) {
-  const { symbol, setup, setupType, series1d, series15m } = props;
-  if (!setup) {
-    console.warn("[reports] ReportPick missing setup data", { symbol });
-    return <p>Missing setup data for {symbol}.</p>;
+  const { setup, setupType, series1d, series15m } = props;
+  if (process.env.NODE_ENV !== "production") {
+    if (series1d == null || series15m == null) {
+      console.error("[reports] ReportPick rendered with missing series (MDX wiring bug)", {
+        symbol: setup.symbol,
+        has1d: series1d != null,
+        has15m: series15m != null
+      });
+    }
+  }
+
+  if (series1d == null || series15m == null) {
+    return <p>Missing price series data for {setup.symbol} (cannot render report charts).</p>;
   }
 
   const setupTypeLabel =
@@ -50,11 +66,6 @@ export function ReportPick(props: {
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
-
-  if (!series1d || !series15m) {
-    console.warn("[reports] ReportPick missing series", { symbol, has1d: Boolean(series1d), has15m: Boolean(series15m) });
-    return <p>Missing price series data for {symbol} (cannot render report charts).</p>;
-  }
 
   return (
     <section className={styles.pick}>

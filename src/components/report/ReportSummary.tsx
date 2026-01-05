@@ -41,11 +41,20 @@ function renderMostActiveWeekRow(row: MarketReportSummaryMostActiveRow) {
 
 /**
 * Renders the summary widget section for a report.
+*
+* `summaryWidgets` is injected by the report page's MDX renderer; the prop is optional so
+* malformed MDX wiring doesn't crash the entire report. Missing data is treated as non-fatal
+* and logged as a warning.
 */
-export function ReportSummary(props: { summaryWidgets: MarketReportSummaryWidgets }) {
+export function ReportSummary(props: { summaryWidgets?: MarketReportSummaryWidgets }) {
   const summary = props.summaryWidgets;
   if (!summary) {
-    console.error("[reports] ReportSummary missing `summaryWidgets` prop");
+    const message = "[reports] ReportSummary missing `summaryWidgets` prop";
+    if (process.env.NODE_ENV !== "production") {
+      console.error(message);
+    } else {
+      console.warn(message);
+    }
     return <p>Summary unavailable.</p>;
   }
 

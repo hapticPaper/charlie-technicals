@@ -21,7 +21,13 @@ import {
   listReportDates,
   readJson
 } from "../../../market/reportStorage";
-import { MARKET_INTERVALS, type MarketInterval, type MarketReport, type MarketReportSummaryWidgets } from "../../../market/types";
+import {
+  MARKET_INTERVALS,
+  type MarketInterval,
+  type MarketReport,
+  type MarketReportSummaryWidgets,
+  type ReportIntervalSeries
+} from "../../../market/types";
 
 const MARKET_INTERVAL_SET: ReadonlySet<string> = new Set(MARKET_INTERVALS);
 
@@ -29,13 +35,48 @@ function isMarketInterval(value: unknown): value is MarketInterval {
   return typeof value === "string" && MARKET_INTERVAL_SET.has(value);
 }
 
-function logReportMdxIssue(date: string, message: string, details?: Record<string, unknown>) {
+// Log-only details for report MDX wiring issues.
+//
+// Notes:
+// - Best-effort diagnostics: every field is optional.
+// - Development logs may include all fields; production logs use a minimal, non-sensitive subset.
+type ReportMdxIssueDetails = {
+  component?: string;
+  symbol?: string;
+  interval?: string;
+  symbolType?: string;
+  intervalType?: string;
+  invalidInterval?: string;
+  hasPick?: boolean;
+  hasWatch?: boolean;
+  missingSeries?: string;
+};
+
+function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== undefined)) as Partial<T>;
+}
+
+function logReportMdxIssue(date: string, message: string, details?: ReportMdxIssueDetails) {
+  const safeDetails = details ? omitUndefined(details) : undefined;
+  const payload = safeDetails ? { date, ...safeDetails } : { date };
+
   if (process.env.NODE_ENV !== "production") {
-    console.error(`[reports] ${message}`, { date, ...details });
+    console.error(`[reports] ${message}`, payload);
     return;
   }
 
-  console.warn(`[reports] ${message}`, { date });
+  const prodDetails = safeDetails
+    ? {
+        component: safeDetails.component,
+        symbol: safeDetails.symbol,
+        interval: safeDetails.interval,
+        invalidInterval: safeDetails.invalidInterval,
+        missingSeries: safeDetails.missingSeries
+      }
+    : undefined;
+  const prodPayload = prodDetails ? omitUndefined({ date, ...prodDetails }) : { date };
+
+  console.warn(`[reports] ${message}`, prodPayload);
 }
 
 type ReportPageParams = { date: string };
@@ -72,6 +113,26 @@ function nodeErrorCode(error: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+// Resolves the price series required for rendering a pick.
+// Picks currently require both 1d and 15m series; if either is missing we treat the symbol as
+// not renderable in the MDX layer.
+function resolvePickSeries(report: MarketReport, symbol: string):
+  | { ok: true; series1d: ReportIntervalSeries; series15m: ReportIntervalSeries }
+  | { ok: false; missingSeries: string } {
+  const series1d = report.series[symbol]?.["1d"];
+  const series15m = report.series[symbol]?.["15m"];
+
+  const missing1d = series1d == null;
+  const missing15m = series15m == null;
+
+  if (missing1d || missing15m) {
+    const missingSeries = missing1d && missing15m ? "1d+15m" : missing1d ? "1d" : "15m";
+    return { ok: false, missingSeries };
+  }
+
+  return { ok: true, series1d, series15m };
 }
 
 
@@ -129,12 +190,20 @@ export default async function ReportPage(props: ReportPageProps) {
     const res = await renderMdx(mdxRaw, {
       ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
       ReportCharts: (props: { symbol?: unknown; interval?: unknown }) => {
-        const symbol = typeof props.symbol === "string" ? props.symbol : null;
+        const rawSymbol = props.symbol;
         const rawInterval = props.interval;
+        const symbol = typeof rawSymbol === "string" ? rawSymbol : null;
         const interval = isMarketInterval(rawInterval) ? rawInterval : null;
 
         if (!symbol || !interval) {
-          logReportMdxIssue(date, "ReportCharts rendered with invalid props", { props });
+          logReportMdxIssue(date, "ReportCharts rendered with invalid symbol or interval", {
+            component: "ReportCharts",
+            symbol: typeof rawSymbol === "string" ? rawSymbol : undefined,
+            interval: interval ?? undefined,
+            symbolType: typeof rawSymbol,
+            intervalType: typeof rawInterval,
+            invalidInterval: typeof rawInterval === "string" && !isMarketInterval(rawInterval) ? rawInterval : undefined
+          });
           return <p>Unable to render chart (invalid chart spec).</p>;
         }
 
@@ -149,9 +218,14 @@ export default async function ReportPage(props: ReportPageProps) {
         );
       },
       ReportPick: (props: { symbol?: unknown }) => {
-        const symbol = typeof props.symbol === "string" ? props.symbol : null;
+        const rawSymbol = props.symbol;
+        const symbol = typeof rawSymbol === "string" ? rawSymbol : null;
         if (!symbol) {
-          logReportMdxIssue(date, "ReportPick rendered with invalid props", { props });
+          logReportMdxIssue(date, "ReportPick rendered with invalid props", {
+            component: "ReportPick",
+            symbol: typeof rawSymbol === "string" ? rawSymbol : undefined,
+            symbolType: typeof rawSymbol
+          });
           return <p>Unable to render setup (invalid symbol).</p>;
         }
 
@@ -162,20 +236,32 @@ export default async function ReportPage(props: ReportPageProps) {
 
         if (!setup || !setupType) {
           logReportMdxIssue(date, "ReportPick missing setup data", {
+            component: "ReportPick",
             symbol,
             hasPick: Boolean(pick),
             hasWatch: Boolean(watch)
           });
-          return <p>Missing setup data for {symbol}.</p>;
+          return <p>Missing setup data for {symbol} (cannot render setup charts).</p>;
+        }
+
+        const series = resolvePickSeries(report, symbol);
+        if (!series.ok) {
+          logReportMdxIssue(date, "ReportPick missing series", {
+            component: "ReportPick",
+            symbol,
+            hasPick: Boolean(pick),
+            hasWatch: Boolean(watch),
+            missingSeries: series.missingSeries
+          });
+          return <p>Missing price series data for {symbol} (cannot render report charts).</p>;
         }
 
         return (
           <ReportPick
-            symbol={symbol}
             setup={setup}
             setupType={setupType}
-            series1d={report.series[symbol]?.["1d"]}
-            series15m={report.series[symbol]?.["15m"]}
+            series1d={series.series1d}
+            series15m={series.series15m}
           />
         );
       },
