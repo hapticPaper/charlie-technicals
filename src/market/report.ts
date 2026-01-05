@@ -408,7 +408,7 @@ function buildPickNarrative(args: {
     momentumParts.push(`1h ${formatPct(args.momentum.roc1h)}`);
   }
   if (typeof args.momentum.roc1d === "number") {
-    momentumParts.push(`20d ${formatPct(args.momentum.roc1d)}`);
+    momentumParts.push(`1d ${formatPct(args.momentum.roc1d)}`);
   }
   if (momentumParts.length > 0) {
     setupParts.push(`Momentum: ${momentumParts.join(", ")}${args.momentum.aligned ? " (aligned)" : ""}.`);
@@ -427,19 +427,30 @@ function buildPickNarrative(args: {
   const riskParts: string[] = [];
   const entry = formatPriceCompact(args.trade.entry);
   const stop = formatPriceCompact(args.trade.stop);
-  const targets = args.trade.targets.slice(0, 2).map((t) => formatPriceCompact(t));
+  const [target1, target2] = args.trade.targets;
+  const targets = [target1, target2]
+    .filter((t): t is number => typeof t === "number" && Number.isFinite(t))
+    .map((t) => formatPriceCompact(t));
   const t1Atr =
-    typeof args.atr1d === "number" && args.atr1d > 0 ? Math.abs(args.trade.targets[0] - args.trade.entry) / args.atr1d : null;
+    typeof args.atr1d === "number" && args.atr1d > 0 && typeof target1 === "number"
+      ? Math.abs(target1 - args.trade.entry) / args.atr1d
+      : null;
   const t2Atr =
-    typeof args.atr1d === "number" && args.atr1d > 0 ? Math.abs(args.trade.targets[1] - args.trade.entry) / args.atr1d : null;
+    typeof args.atr1d === "number" && args.atr1d > 0 && typeof target2 === "number"
+      ? Math.abs(target2 - args.trade.entry) / args.atr1d
+      : null;
   const atrLabel =
     t1Atr !== null && t2Atr !== null
       ? ` (~${t1Atr.toFixed(1)}–${t2Atr.toFixed(1)} ATR)`
+      : t1Atr !== null
+        ? ` (~${t1Atr.toFixed(1)} ATR)`
       : typeof args.atr1d === "number" && args.atr1d > 0
         ? ` (ATR14 ${formatPriceCompact(args.atr1d)})`
         : "";
+
+  const targetsLabel = targets.length > 0 ? ` targeting ${targets.join(" / ")}` : "";
   riskParts.push(
-    `Plan: ${args.side === "buy" ? "long" : "short"} entry ${entry} (stop ${stop}) targeting ${targets.join(" / ")}${atrLabel}.`
+    `Plan: ${args.side === "buy" ? "long" : "short"} entry ${entry} (stop ${stop})${targetsLabel}${atrLabel}.`
   );
 
   const rsiOversold = args.signals1d.some((s) => /\brsi\s+oversold\b/i.test(s));

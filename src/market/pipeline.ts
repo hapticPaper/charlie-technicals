@@ -359,6 +359,9 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
       if (code === "ENOENT") {
         continue;
       }
+
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[market:report] Failed reading news snapshot for ${symbol} (${date}): ${message}`);
     }
   }
 

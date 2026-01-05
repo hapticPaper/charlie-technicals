@@ -66,6 +66,7 @@ export function ReportPick(props: {
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
+  const hasNarrative = typeof setup.narrative === "string" && setup.narrative.trim() !== "";
 
   return (
     <section className={styles.pick}>
@@ -113,19 +114,27 @@ export function ReportPick(props: {
         ) : null}
       </div>
 
-      {typeof setup.narrative === "string" && setup.narrative.trim() !== "" ? (
+      {hasNarrative ? (
         <p className={styles.pickNarrative}>{setup.narrative}</p>
       ) : null}
 
       {setup.rationale.length > 0 ? (
-        <details className={styles.pickDetails}>
-          <summary>Details</summary>
+        hasNarrative ? (
+          <details className={styles.pickDetails}>
+            <summary>Details</summary>
+            <ul className={styles.rationale}>
+              {setup.rationale.map((r, idx) => (
+                <li key={idx}>{r}</li>
+              ))}
+            </ul>
+          </details>
+        ) : (
           <ul className={styles.rationale}>
             {setup.rationale.map((r, idx) => (
               <li key={idx}>{r}</li>
             ))}
           </ul>
-        </details>
+        )
       ) : null}
 
       <div className={styles.charts}>
