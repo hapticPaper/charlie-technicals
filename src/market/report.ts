@@ -404,7 +404,7 @@ type PickNarrativeArgs = {
   symbol: string;
   side: TradeSide;
   trade: TradePlan;
-  breakout: BreakoutHit;
+  breakout: BreakoutHit | null;
   momentum: {
     roc15: number | null;
     roc1h: number | null;

@@ -383,9 +383,9 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
 
   if (warnSamples.length > 0) {
     const failureRate = symbols.length > 0 ? errorCount / symbols.length : 0;
-    if (failureRate > 0.5) {
+    if (failureRate > 0.9) {
       throw new Error(
-        `[market:report] Failed to read news snapshots for more than half of symbols on ${date}; aborting report generation.`
+        `[market:report] Failed to read news snapshots for more than 90% of symbols on ${date}; aborting report generation.`
       );
     }
 
