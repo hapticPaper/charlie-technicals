@@ -57,7 +57,13 @@ function getYahooQueryHost(): string {
 
 function withUserAgent(baseFetch: typeof fetch, userAgent: string): typeof fetch {
   return async (input, init) => {
-    const headers = new Headers(init?.headers);
+    const headers = new Headers();
+    if (init?.headers) {
+      const existing = new Headers(init.headers as HeadersInit);
+      existing.forEach((value, key) => {
+        headers.append(key, value);
+      });
+    }
     headers.set("user-agent", userAgent);
 
     return baseFetch(input, { ...init, headers });
