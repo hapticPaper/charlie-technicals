@@ -11,10 +11,64 @@ import {
 import type { MarketBar, MarketInterval, MarketNewsArticle, MarketNewsSnapshot, RawSeries } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CHART_MIN_INTERVAL_MS = 750;
+const CHART_MAX_RETRIES = 8;
+const CHART_BASE_BACKOFF_MS = 1_000;
+const CHART_MAX_BACKOFF_MS = 30_000;
 const NEWS_SEARCH_MIN_INTERVAL_MS = 350;
 const NEWS_SEARCH_MAX_RETRIES = 5;
 const NEWS_SEARCH_BASE_BACKOFF_MS = 750;
 const NEWS_SEARCH_MAX_BACKOFF_MS = 5_000;
+
+const DEFAULT_YAHOO_USER_AGENT =
+  "charlie-technicals/1.0 (+https://github.com/hapticPaper/charlie-technicals)";
+
+function getYahooUserAgent(): string {
+  const ua =
+    typeof process !== "undefined" &&
+    typeof process.env === "object" &&
+    process.env !== null &&
+    typeof process.env.YAHOO_USER_AGENT === "string"
+      ? process.env.YAHOO_USER_AGENT
+      : undefined;
+
+  if (typeof ua === "string" && ua.trim() !== "") {
+    return ua;
+  }
+
+  return DEFAULT_YAHOO_USER_AGENT;
+}
+
+function getYahooQueryHost(): string {
+  const host =
+    typeof process !== "undefined" &&
+    typeof process.env === "object" &&
+    process.env !== null &&
+    typeof process.env.YF_QUERY_HOST === "string"
+      ? process.env.YF_QUERY_HOST
+      : undefined;
+
+  if (typeof host === "string" && host.trim() !== "") {
+    return host;
+  }
+
+  return "query1.finance.yahoo.com";
+}
+
+function withUserAgent(baseFetch: typeof fetch, userAgent: string): typeof fetch {
+  return async (input, init) => {
+    const headers = new Headers();
+    if (init?.headers) {
+      const existing = new Headers(init.headers as HeadersInit);
+      existing.forEach((value, key) => {
+        headers.append(key, value);
+      });
+    }
+    headers.set("user-agent", userAgent);
+
+    return baseFetch(input, { ...init, headers });
+  };
+}
 
 function sleepMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -134,11 +188,42 @@ function maxBarsFor(interval: MarketInterval): number {
 
 export class YahooMarketDataProvider {
   readonly #yf: InstanceType<typeof YahooFinance>;
+  #chartQueue: Promise<void> = Promise.resolve();
+  #lastChartAtMs = 0;
   #newsSearchQueue: Promise<void> = Promise.resolve();
   #lastNewsSearchAtMs = 0;
 
   constructor() {
-    this.#yf = new YahooFinance();
+    if (typeof globalThis.fetch !== "function") {
+      throw new Error("[yahoo] global fetch() is not available");
+    }
+
+    this.#yf = new YahooFinance({
+      YF_QUERY_HOST: getYahooQueryHost(),
+      fetch: withUserAgent(globalThis.fetch, getYahooUserAgent())
+    });
+  }
+
+  async #withChartRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this.#chartQueue;
+    let release: (() => void) | undefined;
+    this.#chartQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await prev;
+
+    const waitMs = this.#lastChartAtMs + CHART_MIN_INTERVAL_MS - Date.now();
+    if (waitMs > 0) {
+      await sleepMs(waitMs);
+    }
+    this.#lastChartAtMs = Date.now();
+
+    try {
+      return await fn();
+    } finally {
+      release?.();
+    }
   }
 
   async #withNewsSearchRateLimit<T>(fn: () => Promise<T>): Promise<T> {
@@ -230,7 +315,22 @@ export class YahooMarketDataProvider {
       }
     }
 
-    const res = await this.#yf.chart(symbol, { interval: yahooInterval, period1, period2 });
+    const res = await this.#withChartRateLimit(async () => {
+      for (let attempt = 0; attempt < CHART_MAX_RETRIES; attempt += 1) {
+        try {
+          return await this.#yf.chart(symbol, { interval: yahooInterval, period1, period2 });
+        } catch (error) {
+          if (!isYahooRateLimitError(error) || attempt === CHART_MAX_RETRIES - 1) {
+            throw error;
+          }
+
+          const backoffMs = Math.min(CHART_BASE_BACKOFF_MS * 2 ** attempt, CHART_MAX_BACKOFF_MS);
+          await sleepMs(backoffMs);
+        }
+      }
+
+      throw new Error("Unreachable: retry loop exhausted without returning or throwing");
+    });
     if (!Array.isArray(res.quotes) || res.quotes.length === 0) {
       return {
         symbol,
