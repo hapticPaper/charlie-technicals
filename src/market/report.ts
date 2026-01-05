@@ -451,26 +451,33 @@ function buildPickRiskText(args: PickNarrativeArgs): string {
     .filter((t): t is number => typeof t === "number" && Number.isFinite(t))
     .map((t) => formatPriceCompact(t));
   const MAX_ATR_MULTIPLE = 6;
-  function safeAtrMultiple(target: number | undefined): number | null {
+  function computeAtrMultiple(target: number | undefined): { multiple: number | null; tooFar: boolean } {
     if (!(typeof args.atr1d === "number" && args.atr1d > 0 && typeof target === "number")) {
-      return null;
+      return { multiple: null, tooFar: false };
     }
     const multiple = Math.abs(target - args.trade.entry) / args.atr1d;
-    if (!(Number.isFinite(multiple) && multiple <= MAX_ATR_MULTIPLE)) {
-      return null;
+    if (!Number.isFinite(multiple)) {
+      return { multiple: null, tooFar: false };
     }
-    return multiple;
+    if (multiple > MAX_ATR_MULTIPLE) {
+      return { multiple: null, tooFar: true };
+    }
+    return { multiple, tooFar: false };
   }
 
-  const t1Atr = safeAtrMultiple(target1);
-  const t2Atr = safeAtrMultiple(target2);
+  const t1 = computeAtrMultiple(target1);
+  const t2 = computeAtrMultiple(target2);
+  const t1Atr = t1.multiple;
+  const t2Atr = t2.multiple;
+  const hasFarTarget = t1.tooFar || t2.tooFar;
+  const farLabel = hasFarTarget ? `, >${MAX_ATR_MULTIPLE} ATR` : "";
   const atrLabel =
     t1Atr !== null && t2Atr !== null
       ? ` (~${t1Atr.toFixed(1)}–${t2Atr.toFixed(1)} ATR)`
       : t1Atr !== null
-        ? ` (~${t1Atr.toFixed(1)} ATR)`
+        ? ` (~${t1Atr.toFixed(1)} ATR${farLabel})`
       : typeof args.atr1d === "number" && args.atr1d > 0
-        ? ` (ATR14 ${formatPriceCompact(args.atr1d)})`
+        ? ` (ATR14 ${formatPriceCompact(args.atr1d)}${farLabel})`
         : "";
 
   const targetsLabel = targets.length > 0 ? ` targeting ${targets.join(" / ")}` : "";
@@ -1326,7 +1333,6 @@ function toReportSeries(analyzed: AnalyzedSeries, maxPoints: number): ReportInte
 
 function buildPicks(args: {
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
-  newsBySymbol?: Record<string, MarketNewsSnapshot>;
 }): { picks: ReportPick[]; watchlist: ReportPick[] } {
   // Policy:
   // - Technical trades: should be driven by an explicit setup (momentum alignment, breakouts, or levels) and
@@ -1586,39 +1592,6 @@ function buildPicks(args: {
     }
 
     const trade = buildTradePlan(series15m, side, atr1d);
-    const news = args.newsBySymbol?.[symbol];
-    const narrative = buildPickNarrative({
-      symbol,
-      side,
-      trade,
-      breakout,
-      momentum: {
-        roc15,
-        roc1h,
-        roc1d,
-        aligned: momentumAligned
-      },
-      atr1d,
-      support:
-        typeof supportLevel === "number"
-          ? {
-              level: supportLevel,
-              distAtr: supportDistAtr,
-              hits: supportHits
-            }
-          : null,
-      resistance:
-        typeof resistanceLevel === "number"
-          ? {
-              level: resistanceLevel,
-              distAtr: resistanceDistAtr,
-              hits: resistanceHits
-            }
-          : null,
-      signals1d,
-      analyzedBySymbol: args.analyzedBySymbol,
-      news
-    });
 
     candidates.push({
       symbol,
@@ -1629,7 +1602,6 @@ function buildPicks(args: {
       move1d,
       move1dAtr14,
       absMove1dAtr14,
-      narrative,
       rationale,
       signals: {
         "15m": signals15,
@@ -1708,6 +1680,82 @@ function buildPicks(args: {
   const watchlist = signalCandidates.concat(byDollarVolume).map(stripCandidate);
 
   return { picks, watchlist };
+}
+
+function attachPickNarratives(args: {
+  picks: ReportPick[];
+  analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
+  newsBySymbol?: Record<string, MarketNewsSnapshot>;
+}): ReportPick[] {
+  const momentumLookback = PICK_POLICY.momentumLookback;
+  const levelLookback1d = PICK_POLICY.levelLookback1d;
+
+  return args.picks.map((pick) => {
+    const symbol = pick.symbol;
+    const series15m = args.analyzedBySymbol[symbol]?.["15m"];
+    const series1h = args.analyzedBySymbol[symbol]?.["1h"];
+    const series1d = args.analyzedBySymbol[symbol]?.["1d"];
+    if (!series15m || !series1d) {
+      return pick;
+    }
+
+    const breakout = detectDailyBreakout(series1d);
+    const roc15 = computeRocPct(series15m.bars, momentumLookback["15m"]);
+    const roc1h = series1h ? computeRocPct(series1h.bars, momentumLookback["1h"]) : null;
+    const roc1d = computeRocPct(series1d.bars, momentumLookback["1d"]);
+    const rocValues = [roc15, roc1h, roc1d].filter((v): v is number => typeof v === "number");
+    const rocSigns = rocValues.map(sign).filter((s): s is -1 | 1 => s !== 0);
+    const momentumAligned = rocSigns.length >= 2 && rocSigns.every((s) => s === rocSigns[0]);
+
+    const atr1d = pick.atr14_1d ?? computeMoveAtr1d(series1d).atr14;
+    const levels = computePivotLevels(series1d.bars, levelLookback1d, atr1d);
+    const supportLevel = levels.support?.level;
+    const resistanceLevel = levels.resistance?.level;
+    const close1d = series1d.bars.at(-1)?.c;
+    const supportDistAtr =
+      typeof close1d === "number" && typeof supportLevel === "number" && typeof atr1d === "number" && atr1d > 0
+        ? (close1d - supportLevel) / atr1d
+        : null;
+    const resistanceDistAtr =
+      typeof close1d === "number" && typeof resistanceLevel === "number" && typeof atr1d === "number" && atr1d > 0
+        ? (resistanceLevel - close1d) / atr1d
+        : null;
+
+    const narrative = buildPickNarrative({
+      symbol,
+      side: pick.trade.side,
+      trade: pick.trade,
+      breakout,
+      momentum: {
+        roc15,
+        roc1h,
+        roc1d,
+        aligned: momentumAligned
+      },
+      atr1d,
+      support:
+        typeof supportLevel === "number"
+          ? {
+              level: supportLevel,
+              distAtr: supportDistAtr,
+              hits: levels.support?.hits ?? 0
+            }
+          : null,
+      resistance:
+        typeof resistanceLevel === "number"
+          ? {
+              level: resistanceLevel,
+              distAtr: resistanceDistAtr,
+              hits: levels.resistance?.hits ?? 0
+            }
+          : null,
+      signals1d: pick.signals["1d"] ?? activeSignalLabels(series1d),
+      analyzedBySymbol: args.analyzedBySymbol,
+      news: args.newsBySymbol?.[symbol]
+    });
+
+    return { ...pick, narrative };
+  });
 }
 
 function computeRegimeReadout(analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>): {
@@ -2081,7 +2129,9 @@ export function buildMarketReport(args: {
     analyzedBySymbol[s.symbol][s.interval] = s;
   }
 
-  const { picks, watchlist } = buildPicks({ analyzedBySymbol, newsBySymbol: args.newsBySymbol });
+  const { picks: rawPicks, watchlist: rawWatchlist } = buildPicks({ analyzedBySymbol });
+  const picks = attachPickNarratives({ picks: rawPicks, analyzedBySymbol, newsBySymbol: args.newsBySymbol });
+  const watchlist = attachPickNarratives({ picks: rawWatchlist, analyzedBySymbol, newsBySymbol: args.newsBySymbol });
   const mostActive = buildMostActive({ analyzedBySymbol });
   const summaries = buildSummaries(args.date, picks, watchlist, analyzedBySymbol, args.missingSymbols);
 

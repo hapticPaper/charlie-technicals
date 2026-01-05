@@ -213,6 +213,7 @@ export type ReportPick = {
   * Human-readable trade narrative.
   *
   * Optional to preserve compatibility with older persisted report JSON artifacts.
+  * All newly generated reports should populate this for user-facing UIs.
   */
   narrative?: string;
   rationale: string[];
