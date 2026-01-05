@@ -343,36 +343,43 @@ export async function loadAnalyzedSeries(date: string): Promise<AnalyzedSeries[]
 }
 
 async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Record<string, MarketNewsSnapshot>> {
-  const out: Record<string, MarketNewsSnapshot> = {};
-  const warnSamples: string[] = [];
-  const seenWarnKeys = new Set<string>();
-  let errorCount = 0;
-
-  await mapWithConcurrency(symbols, { concurrency: 8 }, async (symbol) => {
+  const results = await mapWithConcurrency(symbols, { concurrency: 8 }, async (symbol) => {
     try {
       const data = await readNewsData(date, symbol);
-      if (data.kind === "snapshot") {
-        out[symbol] = data.snapshot;
-      }
+      return { symbol, snapshot: data.kind === "snapshot" ? data.snapshot : null, error: null };
     } catch (error) {
       const code =
         typeof error === "object" && error !== null && "code" in error
           ? (error as { code?: unknown }).code
           : undefined;
       if (code === "ENOENT") {
-        return;
+        return { symbol, snapshot: null, error: null };
       }
-
-      errorCount += 1;
 
       const message = error instanceof Error ? error.message : String(error);
-      const warnKey = `${String(code ?? "")}:${message}`;
-      if (!seenWarnKeys.has(warnKey) && warnSamples.length < 8) {
-        seenWarnKeys.add(warnKey);
-        warnSamples.push(`${symbol}: ${message}`);
-      }
+      return { symbol, snapshot: null, error: { code, message } };
     }
   });
+
+  const out: Record<string, MarketNewsSnapshot> = {};
+  const warnSamples: string[] = [];
+  const seenWarnKeys = new Set<string>();
+  let errorCount = 0;
+
+  for (const r of results) {
+    if (r.snapshot) {
+      out[r.symbol] = r.snapshot;
+    }
+
+    if (r.error) {
+      errorCount += 1;
+      const warnKey = `${String(r.error.code ?? "")}:${r.error.message}`;
+      if (!seenWarnKeys.has(warnKey) && warnSamples.length < 8) {
+        seenWarnKeys.add(warnKey);
+        warnSamples.push(`${r.symbol}: ${r.error.message}`);
+      }
+    }
+  }
 
   if (warnSamples.length > 0) {
     const failureRate = symbols.length > 0 ? errorCount / symbols.length : 0;
