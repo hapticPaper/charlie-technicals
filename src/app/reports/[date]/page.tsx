@@ -152,13 +152,8 @@ export default async function ReportPage(props: ReportPageProps) {
         const setupType = pick && watch ? "both" : pick ? "pick" : watch ? "watchlist" : undefined;
 
         if (!setup || !setupType) {
-          return (
-            <ReportPick
-              symbol={symbol}
-              series1d={report.series[symbol]?.["1d"]}
-              series15m={report.series[symbol]?.["15m"]}
-            />
-          );
+          console.error("[reports] ReportPick missing setup data", { symbol, hasPick: Boolean(pick), hasWatch: Boolean(watch) });
+          return <p>Missing setup data for {symbol}.</p>;
         }
 
         return (
