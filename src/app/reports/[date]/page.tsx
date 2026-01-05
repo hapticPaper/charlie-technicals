@@ -21,7 +21,7 @@ import {
   listReportDates,
   readJson
 } from "../../../market/reportStorage";
-import type { MarketReport, MarketReportSummaryWidgets } from "../../../market/types";
+import { MARKET_INTERVALS, type MarketInterval, type MarketReport, type MarketReportSummaryWidgets } from "../../../market/types";
 
 type ReportPageParams = { date: string };
 type ReportPageProps = { params: ReportPageParams | PromiseLike<ReportPageParams> };
@@ -113,16 +113,32 @@ export default async function ReportPage(props: ReportPageProps) {
   try {
     const res = await renderMdx(mdxRaw, {
       ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
-      ReportCharts: ({ symbol, interval }) => (
-        <ReportCharts
-          symbol={symbol}
-          interval={interval}
-          series={report.series[symbol]?.[interval]}
-          trade={report.picks.find((p) => p.symbol === symbol)?.trade}
-          isMissingSymbol={report.missingSymbols.includes(symbol)}
-        />
-      ),
-      ReportPick: ({ symbol }) => {
+      ReportCharts: (props: { symbol?: unknown; interval?: unknown }) => {
+        const symbol = typeof props.symbol === "string" ? props.symbol : null;
+        const interval = typeof props.interval === "string" ? props.interval : null;
+
+        if (!symbol || !interval || !(MARKET_INTERVALS as readonly string[]).includes(interval)) {
+          console.error("[reports] ReportCharts rendered with invalid props", props);
+          return <p>Unable to render chart (invalid chart spec).</p>;
+        }
+
+        return (
+          <ReportCharts
+            symbol={symbol}
+            interval={interval as MarketInterval}
+            series={report.series[symbol]?.[interval as MarketInterval]}
+            trade={report.picks.find((p) => p.symbol === symbol)?.trade}
+            isMissingSymbol={report.missingSymbols.includes(symbol)}
+          />
+        );
+      },
+      ReportPick: (props: { symbol?: unknown }) => {
+        const symbol = typeof props.symbol === "string" ? props.symbol : null;
+        if (!symbol) {
+          console.error("[reports] ReportPick rendered with invalid props", props);
+          return <p>Unable to render setup (invalid symbol).</p>;
+        }
+
         const pick = report.picks.find((p) => p.symbol === symbol);
         const watch = report.watchlist?.find((p) => p.symbol === symbol);
         const setup = pick ?? watch;
