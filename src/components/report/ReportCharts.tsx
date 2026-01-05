@@ -8,7 +8,7 @@ export function ReportCharts(props: {
   trade?: TradePlan;
   isMissingSymbol: boolean;
 }) {
-  const { symbol, interval, series, trade, isMissingSymbol = false } = props;
+  const { symbol, interval, series, trade, isMissingSymbol } = props;
 
   if (!series) {
     return <p>{isMissingSymbol ? "No data from provider for this symbol." : "Missing series."}</p>;
