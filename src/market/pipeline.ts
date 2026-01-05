@@ -21,11 +21,12 @@ import {
   getAnalysisDir,
   newsSnapshotExists,
   readJson,
+  readNewsData,
   writeReport,
   writeAnalyzedSeries,
   writeNewsSnapshot
 } from "./storage";
-import type { AnalyzedSeries, MarketInterval } from "./types";
+import type { AnalyzedSeries, MarketInterval, MarketNewsSnapshot } from "./types";
 
 type ConcurrencyOptions = {
   concurrency?: number;
@@ -341,6 +342,29 @@ export async function loadAnalyzedSeries(date: string): Promise<AnalyzedSeries[]
   return out;
 }
 
+async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Record<string, MarketNewsSnapshot>> {
+  const out: Record<string, MarketNewsSnapshot> = {};
+
+  for (const symbol of symbols) {
+    try {
+      const data = await readNewsData(date, symbol);
+      if (data.kind === "snapshot") {
+        out[symbol] = data.snapshot;
+      }
+    } catch (error) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+      if (code === "ENOENT") {
+        continue;
+      }
+    }
+  }
+
+  return out;
+}
+
 export async function runMarketReport(args: {
   date: string;
   symbols: string[];
@@ -349,6 +373,7 @@ export async function runMarketReport(args: {
 }): Promise<{ wrote: boolean }> {
   await ensureReportsDir();
   const analyzed = await loadAnalyzedSeries(args.date);
+  const newsBySymbol = await loadNewsSnapshots(args.date, args.symbols);
 
   const missingSymbols =
     args.missingSymbols ??
@@ -359,7 +384,8 @@ export async function runMarketReport(args: {
     symbols: args.symbols,
     intervals: args.intervals,
     analyzed,
-    missingSymbols
+    missingSymbols,
+    newsBySymbol
   });
   const mdx = buildReportMdx(report);
   await writeReport(args.date, report, mdx);

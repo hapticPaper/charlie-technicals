@@ -113,12 +113,19 @@ export function ReportPick(props: {
         ) : null}
       </div>
 
+      {typeof setup.narrative === "string" && setup.narrative.trim() !== "" ? (
+        <p className={styles.pickNarrative}>{setup.narrative}</p>
+      ) : null}
+
       {setup.rationale.length > 0 ? (
-        <ul className={styles.rationale}>
-          {setup.rationale.map((r, idx) => (
-            <li key={idx}>{r}</li>
-          ))}
-        </ul>
+        <details className={styles.pickDetails}>
+          <summary>Details</summary>
+          <ul className={styles.rationale}>
+            {setup.rationale.map((r, idx) => (
+              <li key={idx}>{r}</li>
+            ))}
+          </ul>
+        </details>
       ) : null}
 
       <div className={styles.charts}>

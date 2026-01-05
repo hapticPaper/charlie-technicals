@@ -23,6 +23,11 @@ The rendered report is split into:
   - *Watchlist commentary* (our stance/bias on the watchlist names; what to watch for next).
 - Keep it clean and concise (human-readable).
 - Do not dump per-symbol indicator hits (e.g., "AIG: RSI overbought | …") into the narrative; keep that detail on the technical analysis charts/sections.
+- For each pick/watchlist name, prefer a short trade narrative (2–4 sentences) over raw rule dumps. The narrative should typically include:
+  - Setup trigger + momentum/levels (what changed, and why it matters).
+  - The plan (entry, stop, targets) and the expected move in ATR terms when ATR is available.
+  - Context: sector/industry tape (use a sector proxy within the configured universe when possible) and any relevant analyst-driven headlines (upgrades/downgrades/price-target changes).
+    - If the setup is contrarian vs analyst flow, say so explicitly and tighten risk language.
 
 ### Summarize step (required)
 
