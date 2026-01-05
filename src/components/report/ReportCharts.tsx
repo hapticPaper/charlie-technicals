@@ -8,10 +8,9 @@ export function ReportCharts(props: {
   trade?: TradePlan;
   isMissingSymbol?: boolean;
 }) {
-  const { symbol, interval, series, trade, isMissingSymbol } = props;
-  if (typeof isMissingSymbol !== "boolean") {
-    console.error("[reports] ReportCharts missing injected props", { symbol, interval });
-    return <p>Unable to render chart (missing report data).</p>;
+  const { symbol, interval, series, trade, isMissingSymbol = false } = props;
+  if (props.isMissingSymbol === undefined) {
+    console.error("[reports] ReportCharts missing `isMissingSymbol` prop", { symbol, interval });
   }
 
   if (!series) {

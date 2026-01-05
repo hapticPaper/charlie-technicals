@@ -45,8 +45,17 @@ export function ReportPick(props: {
     return <p>Missing setup data for {symbol}.</p>;
   }
 
-  const setupTypeLabel =
-    setupType === "both" ? "Trade (also on Watchlist)" : setupType === "watchlist" ? "Watchlist" : "Trade";
+  let setupTypeLabel: string;
+  if (setupType === "both") {
+    setupTypeLabel = "Trade (also on Watchlist)";
+  } else if (setupType === "watchlist") {
+    setupTypeLabel = "Watchlist";
+  } else if (setupType === "pick") {
+    setupTypeLabel = "Trade";
+  } else {
+    console.warn("[reports] ReportPick missing `setupType` prop", { symbol });
+    setupTypeLabel = "Setup";
+  }
 
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";

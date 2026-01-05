@@ -23,6 +23,12 @@ import {
 } from "../../../market/reportStorage";
 import { MARKET_INTERVALS, type MarketInterval, type MarketReport, type MarketReportSummaryWidgets } from "../../../market/types";
 
+const MARKET_INTERVAL_SET = new Set<MarketInterval>(MARKET_INTERVALS);
+
+function isMarketInterval(value: unknown): value is MarketInterval {
+  return typeof value === "string" && MARKET_INTERVAL_SET.has(value as MarketInterval);
+}
+
 type ReportPageParams = { date: string };
 type ReportPageProps = { params: ReportPageParams | PromiseLike<ReportPageParams> };
 
@@ -115,9 +121,10 @@ export default async function ReportPage(props: ReportPageProps) {
       ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
       ReportCharts: (props: { symbol?: unknown; interval?: unknown }) => {
         const symbol = typeof props.symbol === "string" ? props.symbol : null;
-        const interval = typeof props.interval === "string" ? props.interval : null;
+        const rawInterval = props.interval;
+        const interval = isMarketInterval(rawInterval) ? rawInterval : null;
 
-        if (!symbol || !interval || !(MARKET_INTERVALS as readonly string[]).includes(interval)) {
+        if (!symbol || !interval) {
           console.error("[reports] ReportCharts rendered with invalid props", props);
           return <p>Unable to render chart (invalid chart spec).</p>;
         }
@@ -125,8 +132,8 @@ export default async function ReportPage(props: ReportPageProps) {
         return (
           <ReportCharts
             symbol={symbol}
-            interval={interval as MarketInterval}
-            series={report.series[symbol]?.[interval as MarketInterval]}
+            interval={interval}
+            series={report.series[symbol]?.[interval]}
             trade={report.picks.find((p) => p.symbol === symbol)?.trade}
             isMissingSymbol={report.missingSymbols.includes(symbol)}
           />
