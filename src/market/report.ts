@@ -208,11 +208,16 @@ function computeReturnSeriesForCorrelation(series: AnalyzedSeries): number[] {
   return out;
 }
 
-function computeMovePct(bars: MarketBar[], lookback: number): number | null {
+function computeMovePct1d(series1d: AnalyzedSeries, lookback: number): number | null {
+  if (series1d.interval !== "1d") {
+    return null;
+  }
+
   if (lookback <= 0) {
     return null;
   }
 
+  const bars = series1d.bars;
   const idx = bars.length - 1;
   // `lookback = 1` compares the latest close vs the prior bar (i.e. a 1-session change).
   const prevIdx = idx - lookback;
@@ -301,8 +306,8 @@ function findSectorProxy(
       best = {
         symbol: proxySymbol,
         correlation: corr,
-        move1dPct: computeMovePct(proxySeries.bars, 1),
-        move20dPct: computeMovePct(proxySeries.bars, 20)
+        move1dPct: computeMovePct1d(proxySeries, 1),
+        move20dPct: computeMovePct1d(proxySeries, 20)
       };
     }
   }
@@ -321,8 +326,10 @@ type AnalystSignal = {
 
 function inferAnalystSignalTone(title: string): AnalystSignal["tone"] {
   const t = title.toLowerCase();
-  const bearish = /(downgrade|downgrades|cut[s]?\s+price\s+target|lowers\s+price\s+target|to\s+sell|to\s+underperform)/i;
-  const bullish = /(upgrade|upgrades|raises\s+price\s+target|to\s+buy|to\s+outperform)/i;
+  const bearish =
+    /(downgrad(e|es|ed)|cut[s]?\s+price\s+target|lowers\s+price\s+target|cut[s]?\s+to\s+(sell|underperform|underweight|neutral|hold)|initiates?\s+at\s+(sell|underperform|underweight))/i;
+  const bullish =
+    /(upgrad(e|es|ed)|raises\s+price\s+target|initiates?\s+at\s+(buy|outperform|overweight)|reiterates?\s+(buy|outperform|overweight)|to\s+(buy|outperform|overweight))/i;
 
   const isBear = bearish.test(t);
   const isBull = bullish.test(t);
