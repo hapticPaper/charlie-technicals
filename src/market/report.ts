@@ -17,6 +17,8 @@ import { coerceRiskTone, REPORT_MAX_PICKS, REPORT_MAX_WATCHLIST, REPORT_VERY_SHO
 
 import type { TradePlan, TradeSide } from "./types";
 
+import { isNonSelectableSymbol } from "./symbolPolicy";
+
 function activeSignalLabels(series: AnalyzedSeries): string[] {
   return series.signals.filter((s) => s.active).map((s) => s.label);
 }
@@ -141,13 +143,7 @@ const PICK_SCORE = {
   rsiDeviationScaleDiv: 6
 } as const;
 
-const PICK_NON_SELECTABLE_SYMBOL_PREFIXES = ["^"] as const;
-
-// Single source of truth for pick/watchlist symbol eligibility.
-function isNonSelectableSymbol(symbol: string): boolean {
-  // Market context symbols (e.g. indices like ^VIX) are still allowed elsewhere (regime readout, most active).
-  return PICK_NON_SELECTABLE_SYMBOL_PREFIXES.some((prefix) => symbol.startsWith(prefix));
-}
+// Pick/watchlist symbol eligibility is defined centrally in symbolPolicy.ts.
 
 const SECTOR_PROXY_SYMBOLS = [
   "SPY",
@@ -271,16 +267,47 @@ function computePearsonCorrelation(a: number[], b: number[]): number | null {
   return Number.isFinite(corr) ? corr : null;
 }
 
-function findSectorProxy(
-  symbol: string,
+type SectorProxyCacheEntry = {
+  returns: number[];
+  move1dPct: number | null;
+  move20dPct: number | null;
+};
+
+type SectorProxyCache = Partial<Record<(typeof SECTOR_PROXY_SYMBOLS)[number], SectorProxyCacheEntry>>;
+
+type DailyAnalyzedSeries = AnalyzedSeries & { interval: "1d" };
+
+function isDailyAnalyzedSeries(series: AnalyzedSeries): series is DailyAnalyzedSeries {
+  return series.interval === "1d";
+}
+
+function buildSectorProxyCache(
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>
-): SectorProxyContext | null {
-  const series = analyzedBySymbol[symbol]?.["1d"];
-  if (!series) {
-    return null;
+): SectorProxyCache {
+  const out: SectorProxyCache = {};
+
+  for (const proxySymbol of SECTOR_PROXY_SYMBOLS) {
+    const proxySeries = analyzedBySymbol[proxySymbol]?.["1d"];
+    if (!proxySeries) {
+      continue;
+    }
+
+    out[proxySymbol] = {
+      returns: computeReturnSeriesForCorrelation(proxySeries),
+      move1dPct: computeMovePct1d(proxySeries, 1),
+      move20dPct: computeMovePct1d(proxySeries, 20)
+    };
   }
 
-  const symbolReturns = computeReturnSeriesForCorrelation(series);
+  return out;
+}
+
+function findSectorProxy(
+  series1d: DailyAnalyzedSeries,
+  proxyCache: SectorProxyCache
+): SectorProxyContext | null {
+  const symbol = series1d.symbol;
+  const symbolReturns = computeReturnSeriesForCorrelation(series1d);
   if (symbolReturns.length < SECTOR_PROXY_MIN_RETURNS) {
     return null;
   }
@@ -294,14 +321,12 @@ function findSectorProxy(
       continue;
     }
 
-    const proxySeries = analyzedBySymbol[proxySymbol]?.["1d"];
-    if (!proxySeries) {
+    const proxy = proxyCache[proxySymbol];
+    if (!proxy) {
       continue;
     }
 
-    const proxyReturns = computeReturnSeriesForCorrelation(proxySeries);
-
-    const corr = computePearsonCorrelation(symbolReturns, proxyReturns);
+    const corr = computePearsonCorrelation(symbolReturns, proxy.returns);
     if (corr === null) {
       continue;
     }
@@ -310,8 +335,8 @@ function findSectorProxy(
       best = {
         symbol: proxySymbol,
         correlation: corr,
-        move1dPct: computeMovePct1d(proxySeries, 1),
-        move20dPct: computeMovePct1d(proxySeries, 20)
+        move1dPct: proxy.move1dPct,
+        move20dPct: proxy.move20dPct
       };
     }
   }
@@ -328,27 +353,30 @@ type AnalystSignal = {
   tone: "bullish" | "bearish" | "mixed" | null;
 };
 
+function isPriceTargetHeadline(title: string): boolean {
+  const t = title.toLowerCase();
+  return /(cuts?|lowers|slashes|raises|boosts|lifts|hikes)\s+(price\s+target|pt)\b/.test(t);
+}
+
 function inferAnalystSignalTone(title: string): AnalystSignal["tone"] {
   const t = title.toLowerCase();
-  const downgrade = /(downgrad(e|es|ed)\s+[^,]*\s+to\s+(sell|underperform|underweight|neutral|hold))/i;
-  const upgrade = /(upgrad(e|es|ed)\s+[^,]*\s+to\s+(buy|outperform|overweight))/i;
-  const initiateBear = /(initiates?\s+[^,]*\s+at\s+(sell|underperform|underweight))/i;
-  const initiateBull = /(initiates?\s+[^,]*\s+at\s+(buy|outperform|overweight))/i;
-  const reiterateBull = /(reiterates?\s+[^,]*\s+(buy|outperform|overweight))/i;
 
-  const cutTargetBear =
-    /(cut[s]?\s+price\s+target|lowers\s+price\s+target)[^,]*\b(sell|underperform|underweight)\b/i;
-  const raiseTargetBull = /(raises\s+price\s+target)[^,]*\b(buy|outperform|overweight)\b/i;
+  const downgrade = /downgrad(?:e|es|ed)\b.*?\bto\s+(sell|underperform|underweight|neutral|hold)\b/;
+  const upgrade = /upgrad(?:e|es|ed)\b.*?\bto\s+(buy|outperform|overweight)\b/;
+  const initiateBear = /initiates?\b.*?\bat\s+(sell|underperform|underweight)\b/;
+  const initiateBull = /initiates?\b.*?\bat\s+(buy|outperform|overweight)\b/;
+  const reiterateBull = /reiterates?\b.*?\b(buy|outperform|overweight)\b/;
 
-  const isBear = downgrade.test(t) || initiateBear.test(t) || cutTargetBear.test(t);
-  const isBull = upgrade.test(t) || initiateBull.test(t) || reiterateBull.test(t) || raiseTargetBull.test(t);
-  if (isBear && isBull) {
+  const isBearFromRating = downgrade.test(t) || initiateBear.test(t);
+  const isBullFromRating = upgrade.test(t) || initiateBull.test(t) || reiterateBull.test(t);
+
+  if (isBearFromRating && isBullFromRating) {
     return "mixed";
   }
-  if (isBear) {
+  if (isBearFromRating) {
     return "bearish";
   }
-  if (isBull) {
+  if (isBullFromRating) {
     return "bullish";
   }
   return null;
@@ -362,9 +390,10 @@ function extractAnalystSignals(snapshot: MarketNewsSnapshot | undefined): Analys
   const tagged = snapshot.articles
     .map((a) => {
       const tone = inferAnalystSignalTone(a.title);
-      return { title: a.title, publisher: a.publisher, tone };
+      return { title: a.title, publisher: a.publisher, tone, isPriceTarget: isPriceTargetHeadline(a.title) };
     })
-    .filter((a) => a.tone !== null);
+    .filter((a) => a.tone !== null || a.isPriceTarget)
+    .sort((a, b) => Number(a.tone === null) - Number(b.tone === null));
 
   const lines = tagged.slice(0, 2).map((a) => `${a.title}${a.publisher ? ` (${a.publisher})` : ""}`);
 
@@ -402,6 +431,7 @@ function formatPriceCompact(value: number): string {
 type PickNarrativeArgs = {
   kind: "pick" | "watchlist";
   symbol: string;
+  basis?: ReportPick["basis"];
   side: TradeSide;
   trade: TradePlan;
   breakout: BreakoutHit | null;
@@ -416,6 +446,7 @@ type PickNarrativeArgs = {
   resistance: { level: number; distAtr: number | null; hits: number } | null;
   signals1d: string[];
   analyzedBySymbol: Record<string, Partial<Record<MarketInterval, AnalyzedSeries>>>;
+  sectorProxyCache: SectorProxyCache;
   news: MarketNewsSnapshot | undefined;
 };
 
@@ -423,11 +454,23 @@ function buildPickSetupText(args: PickNarrativeArgs): string {
   const sideLabel = args.side === "buy" ? "bullish" : "bearish";
   const setupParts: string[] = [];
 
-  if (args.breakout) {
-    const aboveBelow = args.breakout.direction === "up" ? "above" : "below";
-    setupParts.push(
-      `With a recent close ${aboveBelow} the prior ${args.breakout.window}d level (${formatPriceCompact(args.breakout.level)}), ${args.symbol} has a ${sideLabel} setup.`
-    );
+  const breakout = args.breakout;
+
+  if (breakout) {
+    const aboveBelow = breakout.direction === "up" ? "above" : "below";
+    if (args.kind === "watchlist") {
+      const basisLabel = args.basis === "trend" ? "trend" : args.basis === "signal" ? "signal" : "watch";
+      setupParts.push(
+        `${args.symbol} is on watch (${basisLabel} basis) after a close ${aboveBelow} the prior ${breakout.window}d level (${formatPriceCompact(breakout.level)}).`
+      );
+    } else {
+      setupParts.push(
+        `With a recent close ${aboveBelow} the prior ${breakout.window}d level (${formatPriceCompact(breakout.level)}), ${args.symbol} has a ${sideLabel} setup.`
+      );
+    }
+  } else if (args.kind === "watchlist") {
+    const basisLabel = args.basis === "trend" ? "trend" : args.basis === "signal" ? "signal" : "watch";
+    setupParts.push(`${args.symbol} is on watch for a ${sideLabel} trigger (${basisLabel} basis).`);
   } else {
     setupParts.push(`${args.symbol} is setting up ${sideLabel} with multi-timeframe momentum as the primary driver.`);
   }
@@ -463,13 +506,10 @@ function buildPickRiskText(args: PickNarrativeArgs): string {
   const riskParts: string[] = [];
   const entry = formatPriceCompact(args.trade.entry);
   const stop = formatPriceCompact(args.trade.stop);
-  const [target1, target2] = args.trade.targets;
-  const targets = [target1, target2]
-    .filter((t): t is number => typeof t === "number" && Number.isFinite(t))
-    .map((t) => formatPriceCompact(t));
+  const targets = args.trade.targets.filter((t): t is number => typeof t === "number" && Number.isFinite(t));
   const MAX_ATR_MULTIPLE = 6;
-  function computeAtrMultiple(target: number | undefined): { multiple: number | null; tooFar: boolean } {
-    if (!(typeof args.atr1d === "number" && args.atr1d > 0 && typeof target === "number")) {
+  function computeAtrMultiple(target: number): { multiple: number | null; tooFar: boolean } {
+    if (!(typeof args.atr1d === "number" && args.atr1d > 0)) {
       return { multiple: null, tooFar: false };
     }
     const multiple = Math.abs(target - args.trade.entry) / args.atr1d;
@@ -482,22 +522,45 @@ function buildPickRiskText(args: PickNarrativeArgs): string {
     return { multiple, tooFar: false };
   }
 
-  const t1 = computeAtrMultiple(target1);
-  const t2 = computeAtrMultiple(target2);
-  const t1Atr = t1.multiple;
-  const t2Atr = t2.multiple;
-  const hasFarTarget = t1.tooFar || t2.tooFar;
-  const farLabel = hasFarTarget ? `, >${MAX_ATR_MULTIPLE} ATR` : "";
-  const atrLabel =
-    t1Atr !== null && t2Atr !== null
-      ? ` (~${t1Atr.toFixed(1)}–${t2Atr.toFixed(1)} ATR)`
-      : t1Atr !== null
-        ? ` (~${t1Atr.toFixed(1)} ATR${farLabel})`
-      : typeof args.atr1d === "number" && args.atr1d > 0
-        ? ` (ATR14 ${formatPriceCompact(args.atr1d)}${farLabel})`
-        : "";
+  const targetsWithAtr = targets.map((target) => ({ target, ...computeAtrMultiple(target) }));
+  const nearTargets = targetsWithAtr.filter((t) => !t.tooFar).map((t) => t.target);
+  const targetsForDisplay = nearTargets.length > 0 ? nearTargets : targets;
 
-  const targetsLabel = targets.length > 0 ? ` targeting ${targets.join(" / ")}` : "";
+  const displayedTargets = targetsForDisplay.slice(0, 2);
+  const moreTargetCount = Math.max(0, targets.length - displayedTargets.length);
+
+  const targetsLabel =
+    displayedTargets.length > 0
+      ? ` targeting ${displayedTargets.map((t) => formatPriceCompact(t)).join(" / ")}${
+          moreTargetCount > 0 ? ` (+${moreTargetCount} more)` : ""
+        }`
+      : "";
+
+  const atrLabel = (() => {
+    if (!(typeof args.atr1d === "number" && args.atr1d > 0)) {
+      return "";
+    }
+
+    if (targets.length === 0) {
+      return ` (ATR14 ${formatPriceCompact(args.atr1d)})`;
+    }
+
+    const hasFarTarget = targetsWithAtr.some((m) => m.tooFar);
+    const farLabel = hasFarTarget ? `, >${MAX_ATR_MULTIPLE} ATR` : "";
+
+    const finiteMultiples = targetsWithAtr.map((m) => m.multiple).filter((m): m is number => m !== null);
+    if (finiteMultiples.length >= 2) {
+      const min = Math.min(...finiteMultiples);
+      const max = Math.max(...finiteMultiples);
+      return ` (~${min.toFixed(1)}–${max.toFixed(1)} ATR)`;
+    }
+    if (finiteMultiples.length === 1) {
+      return ` (~${finiteMultiples[0].toFixed(1)} ATR${farLabel})`;
+    }
+
+    return ` (ATR14 ${formatPriceCompact(args.atr1d)}${farLabel})`;
+  })();
+
   const planPrefix = args.kind === "watchlist" ? "If triggered:" : "Plan:";
   riskParts.push(
     `${planPrefix} ${args.side === "buy" ? "long" : "short"} entry ${entry} (stop ${stop})${targetsLabel}${atrLabel}.`
@@ -517,7 +580,8 @@ function buildPickRiskText(args: PickNarrativeArgs): string {
 function buildPickContextText(args: PickNarrativeArgs): string {
   const dirLabel = args.side === "buy" ? "upside" : "downside";
   const contextParts: string[] = [];
-  const sectorProxy = findSectorProxy(args.symbol, args.analyzedBySymbol);
+  const series1d = args.analyzedBySymbol[args.symbol]?.["1d"];
+  const sectorProxy = series1d && isDailyAnalyzedSeries(series1d) ? findSectorProxy(series1d, args.sectorProxyCache) : null;
   if (sectorProxy) {
     const proxyMoveLabel =
       typeof sectorProxy.move1dPct === "number" ? `${sectorProxy.symbol} ${formatPct(sectorProxy.move1dPct)} today` : null;
@@ -1712,6 +1776,7 @@ function attachPickNarratives(args: {
 }): ReportPick[] {
   const momentumLookback = PICK_POLICY.momentumLookback;
   const levelLookback1d = PICK_POLICY.levelLookback1d;
+  const sectorProxyCache = buildSectorProxyCache(args.analyzedBySymbol);
 
   return args.picks.map((pick) => {
     if (typeof pick.narrative === "string" && pick.narrative.trim() !== "") {
@@ -1751,6 +1816,7 @@ function attachPickNarratives(args: {
     const narrative = buildPickNarrative({
       kind: args.kind,
       symbol,
+      basis: pick.basis,
       side: pick.trade.side,
       trade: pick.trade,
       breakout,
@@ -1779,6 +1845,7 @@ function attachPickNarratives(args: {
           : null,
       signals1d: pick.signals["1d"] ?? activeSignalLabels(series1d),
       analyzedBySymbol: args.analyzedBySymbol,
+      sectorProxyCache,
       news: args.newsBySymbol?.[symbol]
     });
 

@@ -9,6 +9,7 @@ import { loadAnalysisConfig, loadSymbols } from "./config";
 import { CnbcVideoProvider } from "./providers/cnbc";
 import { YahooMarketDataProvider } from "./providers/yahoo";
 import { buildMarketReport, buildReportMdx } from "./report";
+import { isNewsEligibleSymbol } from "./symbolPolicy";
 import {
   loadRawSeriesWindow,
   rawSeriesSnapshotExists,
@@ -342,22 +343,29 @@ export async function loadAnalyzedSeries(date: string): Promise<AnalyzedSeries[]
   return out;
 }
 
-async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Record<string, MarketNewsSnapshot>> {
-  const results = await mapWithConcurrency(symbols, { concurrency: 8 }, async (symbol) => {
+// `newsSymbols` must already be filtered (e.g. via `isNewsEligibleSymbol`).
+async function loadNewsSnapshots(date: string, newsSymbols: string[]): Promise<Record<string, MarketNewsSnapshot>> {
+  const results = await mapWithConcurrency(newsSymbols, { concurrency: 8 }, async (symbol) => {
+    if (!isNewsEligibleSymbol(symbol)) {
+      console.warn(
+        `[market:report] Invariant violation: loadNewsSnapshots called with news-ineligible symbol ${symbol} on ${date}.`
+      );
+      return { symbol, snapshot: null, error: null, missing: false };
+    }
     try {
       const data = await readNewsData(date, symbol);
-      return { symbol, snapshot: data.kind === "snapshot" ? data.snapshot : null, error: null };
+      return { symbol, snapshot: data.kind === "snapshot" ? data.snapshot : null, error: null, missing: false };
     } catch (error) {
       const code =
         typeof error === "object" && error !== null && "code" in error
           ? (error as { code?: unknown }).code
           : undefined;
       if (code === "ENOENT") {
-        return { symbol, snapshot: null, error: null };
+        return { symbol, snapshot: null, error: null, missing: true };
       }
 
       const message = error instanceof Error ? error.message : String(error);
-      return { symbol, snapshot: null, error: { code, message } };
+      return { symbol, snapshot: null, error: { code, message }, missing: false };
     }
   });
 
@@ -365,10 +373,17 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
   const warnSamples: string[] = [];
   const seenWarnKeys = new Set<string>();
   let errorCount = 0;
+  let missingCount = 0;
+  let snapshotCount = 0;
 
   for (const r of results) {
     if (r.snapshot) {
       out[r.symbol] = r.snapshot;
+      snapshotCount += 1;
+    }
+
+    if (r.missing) {
+      missingCount += 1;
     }
 
     if (r.error) {
@@ -381,18 +396,19 @@ async function loadNewsSnapshots(date: string, symbols: string[]): Promise<Recor
     }
   }
 
-  if (warnSamples.length > 0) {
-    const failureRate = symbols.length > 0 ? errorCount / symbols.length : 0;
+  if (newsSymbols.length > 0 && errorCount > 0) {
+    const failureRate = errorCount / newsSymbols.length;
     if (failureRate > 0.9) {
       throw new Error(
-        `[market:report] Failed to read news snapshots for more than 90% of symbols on ${date}; aborting report generation.`
+        `[market:report] Failed to read news snapshots for more than 90% of news-eligible symbols on ${date}; aborting report generation.`
       );
     }
 
+    const samplesText = warnSamples.length > 0 ? ` Samples: ${warnSamples.join(" | ")}` : "";
+    console.warn(`[market:report] Some news snapshots were unreadable for ${date}; analyst context may be incomplete.${samplesText}`);
+  } else if (newsSymbols.length > 0 && snapshotCount === 0 && missingCount === newsSymbols.length) {
     console.warn(
-      `[market:report] Some news snapshots were unreadable for ${date}; analyst context may be incomplete. Samples: ${warnSamples.join(
-        " | "
-      )}`
+      `[market:report] No news snapshots were found for any of ${newsSymbols.length} news-eligible symbols on ${date}; upstream feed may be empty.`
     );
   }
 
@@ -407,7 +423,13 @@ export async function runMarketReport(args: {
 }): Promise<{ wrote: boolean }> {
   await ensureReportsDir();
   const analyzed = await loadAnalyzedSeries(args.date);
-  const newsBySymbol = await loadNewsSnapshots(args.date, args.symbols);
+  const newsSymbols = args.symbols.filter(isNewsEligibleSymbol);
+  if (args.symbols.length > 0 && newsSymbols.length === 0) {
+    console.warn(
+      `[market:report] All ${args.symbols.length} symbols were filtered out as news-ineligible; no news snapshots will be loaded for ${args.date}.`
+    );
+  }
+  const newsBySymbol = await loadNewsSnapshots(args.date, newsSymbols);
 
   const missingSymbols =
     args.missingSymbols ??
