@@ -209,6 +209,13 @@ export type ReportPick = {
   atr14_1d?: number | null;
   move1d?: number | null;
   move1dAtr14?: number | null;
+  /**
+  * Human-readable trade narrative.
+  *
+  * Optional to preserve compatibility with older persisted report JSON artifacts.
+  * All newly generated reports should populate this for user-facing UIs.
+  */
+  narrative?: string;
   rationale: string[];
   signals: Partial<Record<MarketInterval, string[]>>;
 };
