@@ -319,6 +319,12 @@ function shortenCnbcVideoFileStem(stem: string): string {
     return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
   }
 
+  const cnbcLooseDatePrefixMatch = /^(cnbc-\d{8}-?)(.*)$/.exec(stem);
+  if (cnbcLooseDatePrefixMatch) {
+    const [, prefix, tail] = cnbcLooseDatePrefixMatch;
+    return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
+  }
+
   return stem.length <= CNBC_VIDEO_FILENAME_TAIL_LIMIT ? stem : stem.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT);
 }
 
@@ -412,14 +418,14 @@ export async function writeCnbcVideoSnapshot(
             );
           }
 
-          const mergedRes = mergeNewsArticles(storedB, storedA);
+          const mergedRes = mergeNewsArticles(storedA, storedB);
           const mergedRelatedTickers = Array.from(new Set(mergedRes.merged.relatedTickers));
           const mergedStored: StoredCnbcVideoArticle = {
-            ...storedB,
+            ...storedA,
             ...mergedRes.merged,
             relatedTickers: mergedRelatedTickers,
             symbol: mergedRelatedTickers.length === 1 ? mergedRelatedTickers[0] ?? null : null,
-            fetchedAt: maxTimestamp(storedB.fetchedAt, storedA.fetchedAt)
+            fetchedAt: maxTimestamp(storedA.fetchedAt, storedB.fetchedAt)
           };
 
           await writeJsonFile(tmpPath, mergedStored);
