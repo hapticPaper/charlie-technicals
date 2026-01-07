@@ -433,6 +433,18 @@ export async function writeCnbcVideoSnapshot(
           await rm(legacyFilePath, { force: true });
           changed = true;
         } else {
+          const legacyStored = await readJson<StoredCnbcVideoArticle>(legacyFilePath);
+          if (legacyStored.provider !== "cnbc" || legacyStored.asOfDate !== date) {
+            throw new Error(
+              `[market:cnbc-storage] Unexpected CNBC article metadata in legacy file ${legacyFilePath} during migration: ${JSON.stringify({
+                id: legacyStored.id,
+                provider: legacyStored.provider,
+                asOfDate: legacyStored.asOfDate,
+                expectedAsOfDate: date
+              })}`
+            );
+          }
+
           await rename(legacyFilePath, filePath);
           changed = true;
         }
