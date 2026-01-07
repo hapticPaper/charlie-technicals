@@ -307,7 +307,7 @@ function maxTimestamp(a: string, b: string): string {
 const CNBC_VIDEO_FILENAME_TAIL_LIMIT = 64;
 
 function shortenCnbcVideoFileStem(stem: string): string {
-  const cnbcUrlPrefixMatch = /^(cnbc-\d{8}-https[a-z0-9]*\d{8})(.+)$/.exec(stem);
+  const cnbcUrlPrefixMatch = /^(cnbc-\d{8}-https[^-]*\d{8})(.+)$/.exec(stem);
   if (cnbcUrlPrefixMatch) {
     const [, prefix, tail] = cnbcUrlPrefixMatch;
     return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
@@ -424,7 +424,7 @@ export async function writeCnbcVideoSnapshot(
 
           await writeJsonFile(tmpPath, mergedStored);
           await rename(tmpPath, filePath);
-          await rm(legacyFilePath);
+          await rm(legacyFilePath, { force: true });
           changed = true;
         } else {
           await rename(legacyFilePath, filePath);
