@@ -307,10 +307,9 @@ function maxTimestamp(a: string, b: string): string {
 const CNBC_VIDEO_FILENAME_TAIL_LIMIT = 64;
 
 function shortenCnbcVideoFileStem(stem: string): string {
-  const cnbcUrlPrefixMatch = /^(cnbc-(\d{8})-https[a-z0-9]*\2)(.+)$/.exec(stem);
+  const cnbcUrlPrefixMatch = /^(cnbc-\d{8}-https[a-z0-9]*\d{8})(.+)$/.exec(stem);
   if (cnbcUrlPrefixMatch) {
-    const [, prefix, _date, tail] = cnbcUrlPrefixMatch;
-    void _date;
+    const [, prefix, tail] = cnbcUrlPrefixMatch;
     return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
   }
 
