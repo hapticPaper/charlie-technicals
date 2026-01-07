@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { withFileLock } from "./fileLock";
@@ -304,10 +304,38 @@ function maxTimestamp(a: string, b: string): string {
   return a.localeCompare(b) >= 0 ? a : b;
 }
 
-function getCnbcVideoFilePath(date: string, stored: StoredCnbcVideoArticle): string {
+const CNBC_VIDEO_FILENAME_TAIL_LIMIT = 64;
+
+function shortenCnbcVideoFileStem(stem: string): string {
+  const cnbcUrlPrefixMatch = /^(cnbc-\d{8}-httpswwwcnbccom\d{8})(.+)$/.exec(stem);
+  if (cnbcUrlPrefixMatch) {
+    const [, prefix, tail] = cnbcUrlPrefixMatch;
+    return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
+  }
+
+  const cnbcDatePrefixMatch = /^(cnbc-\d{8}-)(.+)$/.exec(stem);
+  if (cnbcDatePrefixMatch) {
+    const [, prefix, tail] = cnbcDatePrefixMatch;
+    return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
+  }
+
+  return stem.length <= CNBC_VIDEO_FILENAME_TAIL_LIMIT ? stem : stem.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT);
+}
+
+function getCnbcVideoFilePaths(
+  date: string,
+  stored: StoredCnbcVideoArticle
+): {
+  filePath: string;
+  legacyFilePath: string;
+} {
   const dirPath = getCnbcVideoDateDir(date);
-  const stem = safeBasename(stored.id);
-  return path.join(dirPath, `${stem}.json`);
+  const legacyStem = safeBasename(stored.id);
+  const stem = shortenCnbcVideoFileStem(legacyStem);
+  return {
+    filePath: path.join(dirPath, `${stem}.json`),
+    legacyFilePath: path.join(dirPath, `${legacyStem}.json`)
+  };
 }
 
 async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
@@ -345,8 +373,42 @@ export async function writeCnbcVideoSnapshot(
 
     for (const article of snapshot.articles) {
       const storedArticle = toStoredCnbcArticle(snapshot, article);
-      const filePath = getCnbcVideoFilePath(date, storedArticle);
+      const { filePath, legacyFilePath } = getCnbcVideoFilePaths(date, storedArticle);
       const tmpPath = `${filePath}.tmp`;
+
+      if (legacyFilePath !== filePath && (await fileExists(legacyFilePath))) {
+        if (await fileExists(filePath)) {
+          const storedA = await readJson<StoredCnbcVideoArticle>(legacyFilePath);
+          const storedB = await readJson<StoredCnbcVideoArticle>(filePath);
+
+          if (storedA.id !== storedB.id) {
+            throw new Error(
+              `[market:cnbc-storage] Conflicting CNBC video IDs while migrating ${legacyFilePath} -> ${filePath}: ${JSON.stringify({
+                legacyId: storedA.id,
+                fileId: storedB.id
+              })}`
+            );
+          }
+
+          const mergedRes = mergeNewsArticles(storedB, storedA);
+          const mergedRelatedTickers = Array.from(new Set(mergedRes.merged.relatedTickers));
+          const mergedStored: StoredCnbcVideoArticle = {
+            ...storedB,
+            ...mergedRes.merged,
+            relatedTickers: mergedRelatedTickers,
+            symbol: mergedRelatedTickers.length === 1 ? mergedRelatedTickers[0] ?? null : null,
+            fetchedAt: maxTimestamp(storedB.fetchedAt, storedA.fetchedAt)
+          };
+
+          await writeJsonFile(tmpPath, mergedStored);
+          await rename(tmpPath, filePath);
+          await rm(legacyFilePath);
+          changed = true;
+        } else {
+          await rename(legacyFilePath, filePath);
+          changed = true;
+        }
+      }
 
       if (await fileExists(filePath)) {
         if (opts.mode !== "fill_existing") {
