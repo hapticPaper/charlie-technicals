@@ -307,9 +307,10 @@ function maxTimestamp(a: string, b: string): string {
 const CNBC_VIDEO_FILENAME_TAIL_LIMIT = 64;
 
 function shortenCnbcVideoFileStem(stem: string): string {
-  const cnbcUrlPrefixMatch = /^(cnbc-\d{8}-httpswwwcnbccom\d{8})(.+)$/.exec(stem);
+  const cnbcUrlPrefixMatch = /^(cnbc-(\d{8})-https[a-z0-9]*\2)(.+)$/.exec(stem);
   if (cnbcUrlPrefixMatch) {
-    const [, prefix, tail] = cnbcUrlPrefixMatch;
+    const [, prefix, _date, tail] = cnbcUrlPrefixMatch;
+    void _date;
     return `${prefix}${tail.slice(0, CNBC_VIDEO_FILENAME_TAIL_LIMIT)}`;
   }
 
@@ -380,6 +381,28 @@ export async function writeCnbcVideoSnapshot(
         if (await fileExists(filePath)) {
           const storedA = await readJson<StoredCnbcVideoArticle>(legacyFilePath);
           const storedB = await readJson<StoredCnbcVideoArticle>(filePath);
+
+          if (storedA.provider !== "cnbc" || storedA.asOfDate !== date) {
+            throw new Error(
+              `[market:cnbc-storage] Unexpected CNBC article metadata in legacy file ${legacyFilePath} during migration: ${JSON.stringify({
+                id: storedA.id,
+                provider: storedA.provider,
+                asOfDate: storedA.asOfDate,
+                expectedAsOfDate: date
+              })}`
+            );
+          }
+
+          if (storedB.provider !== "cnbc" || storedB.asOfDate !== date) {
+            throw new Error(
+              `[market:cnbc-storage] Unexpected CNBC article metadata in new file ${filePath} during migration: ${JSON.stringify({
+                id: storedB.id,
+                provider: storedB.provider,
+                asOfDate: storedB.asOfDate,
+                expectedAsOfDate: date
+              })}`
+            );
+          }
 
           if (storedA.id !== storedB.id) {
             throw new Error(
