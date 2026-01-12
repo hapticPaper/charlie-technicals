@@ -1,0 +1,51 @@
+{
+  "version": "v2-highlights",
+  "date": "2026-01-12",
+  "generatedAt": "2026-01-12T09:05:30.808Z",
+  "picks": [
+    {
+      "symbol": "INTC",
+      "trade": {
+        "side": "buy",
+        "entry": 45.54,
+        "stop": 45.20446
+      }
+    },
+    {
+      "symbol": "LOW",
+      "trade": {
+        "side": "buy",
+        "entry": 268.7,
+        "stop": 265.89130366210935
+      }
+    },
+    {
+      "symbol": "DDOG",
+      "trade": {
+        "side": "sell",
+        "entry": 125.5337,
+        "stop": 127.1055370569336
+      }
+    },
+    {
+      "symbol": "TM",
+      "trade": {
+        "side": "buy",
+        "entry": 219.1,
+        "stop": 215.8135
+      }
+    },
+    {
+      "symbol": "LMT",
+      "trade": {
+        "side": "buy",
+        "entry": 543.59,
+        "stop": 541.46641
+      }
+    }
+  ],
+  "summaries": {
+    "veryShort": "Watchlist stance: bullish bias, watching ARKQ, XLY, GDX, HON, SPY, QQQ, TSLA, NVDA for follow-through.",
+    "mainIdea": "Risk tone was mixed: breadth 47% up / 53% down, VIX 16.6 (+14.8%), top10 concentration 58% of $vol, breakouts 19 up / 8 down (20/55/252d). Volatility was muted (median 1d move 0.5 ATR; ≥1 ATR: 19; ≥2 ATR: 1). Top setups: INTC buy, LOW buy, DDOG sell, TM buy, LMT buy. Macro: headlines around DOJ subpoenas/probe into Fed Chair Jerome Powell (tied to Fed HQ renovations testimony) renewed focus on Fed independence amid White House pressure for rate cuts; early reaction leaned defensive (dollar softer, some 'sell America' chatter)."
+  }
+}
