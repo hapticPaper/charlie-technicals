@@ -1,0 +1,27 @@
+{
+  "version": "v1-setup-performance",
+  "setupDate": "2026-01-14",
+  "symbol": "INTC",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 48.27,
+    "stop": 47.351729999999996,
+    "targets": [
+      52.79687193650124,
+      55.06030790475186
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-15T13:43:50.457Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

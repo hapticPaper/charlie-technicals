@@ -1,0 +1,27 @@
+{
+  "version": "v1-setup-performance",
+  "setupDate": "2026-01-15",
+  "symbol": "HON",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 213.33,
+    "stop": 210.78667,
+    "targets": [
+      221.0982318234006,
+      224.9823477351009
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-15T13:43:51.003Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

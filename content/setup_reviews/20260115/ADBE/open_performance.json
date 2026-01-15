@@ -1,0 +1,27 @@
+{
+  "version": "v1-setup-performance",
+  "setupDate": "2026-01-15",
+  "symbol": "ADBE",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 303.78,
+    "stop": 307.20378,
+    "targets": [
+      284.9888376481038,
+      275.59325647215576
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-15T13:43:50.979Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

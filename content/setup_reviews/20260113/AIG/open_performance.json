@@ -1,0 +1,27 @@
+{
+  "version": "v1-setup-performance",
+  "setupDate": "2026-01-13",
+  "symbol": "AIG",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 74,
+    "stop": 75.074,
+    "targets": [
+      69.9154130677035,
+      67.87311960155525
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-15T13:43:49.678Z",
+  "openedAt": "2026-01-14T14:55:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 73.04,
+  "realizedPct": 0,
+  "unrealizedPct": 1.297297297297289,
+  "totalPct": 1.297297297297289,
+  "status": "open",
+  "outcome": "open"
+}

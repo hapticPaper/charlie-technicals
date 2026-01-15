@@ -1,0 +1,27 @@
+{
+  "version": "v1-setup-performance",
+  "setupDate": "2026-01-14",
+  "symbol": "LOW",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 273.97,
+    "stop": 272.92602999999997,
+    "targets": [
+      286.33497475909667,
+      292.517462138645
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-15T13:43:50.465Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

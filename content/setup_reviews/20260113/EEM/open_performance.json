@@ -1,0 +1,27 @@
+{
+  "version": "v1-setup-performance",
+  "setupDate": "2026-01-13",
+  "symbol": "EEM",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 57.61,
+    "stop": 57.30239,
+    "targets": [
+      58.76661717544564,
+      59.34492576316846
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-15T13:43:49.713Z",
+  "openedAt": "2026-01-14T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 57.75,
+  "realizedPct": 0,
+  "unrealizedPct": 0.2430133657351164,
+  "totalPct": 0.2430133657351164,
+  "status": "open",
+  "outcome": "open"
+}
