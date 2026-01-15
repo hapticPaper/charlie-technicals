@@ -196,6 +196,37 @@ export type TradePlan = {
   targets: number[];
 };
 
+export type SetupReviewSetupType = "pick" | "watchlist" | "both";
+
+export type SetupReviewOutcome =
+  | "pending"
+  | "not_opened"
+  | "open"
+  | "tp1_open"
+  | "stopped_out"
+  | "tp1_stop"
+  | "tp1_tp2";
+
+export type SetupReviewPerformance = {
+  version: "v1-setup-performance";
+  setupDate: string;
+  symbol: string;
+  setupType: SetupReviewSetupType;
+  trade: TradePlan;
+  asOfDate: string;
+  computedAt: string;
+  openedAt: string | null;
+  tp1At: string | null;
+  tp2At: string | null;
+  stopAt: string | null;
+  currentPrice: number | null;
+  realizedPct: number;
+  unrealizedPct: number | null;
+  totalPct: number | null;
+  status: "open" | "closed";
+  outcome: SetupReviewOutcome;
+};
+
 export type ReportPick = {
   symbol: string;
   /**

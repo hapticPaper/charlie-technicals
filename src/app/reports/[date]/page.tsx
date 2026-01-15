@@ -26,8 +26,10 @@ import {
   type MarketInterval,
   type MarketReport,
   type MarketReportSummaryWidgets,
-  type ReportIntervalSeries
+  type ReportIntervalSeries,
+  type SetupReviewPerformance
 } from "../../../market/types";
+import { readSetupReviewPerformance } from "../../../market/setupReviewStorage";
 
 const MARKET_INTERVAL_SET: ReadonlySet<string> = new Set(MARKET_INTERVALS);
 
@@ -186,6 +188,24 @@ export default async function ReportPage(props: ReportPageProps) {
   }
 
   let content: ReactNode;
+
+  const setupSymbols = new Set<string>([
+    ...report.picks.map((p) => p.symbol),
+    ...(report.watchlist?.map((p) => p.symbol) ?? [])
+  ]);
+  const performanceEntries = await Promise.all(
+    Array.from(setupSymbols).map(async (symbol) => ({
+      symbol,
+      performance: await readSetupReviewPerformance(date, symbol)
+    }))
+  );
+  const performanceBySymbol = new Map<string, SetupReviewPerformance>();
+  for (const entry of performanceEntries) {
+    if (entry.performance) {
+      performanceBySymbol.set(entry.symbol, entry.performance);
+    }
+  }
+
   try {
     const res = await renderMdx(mdxRaw, {
       ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
@@ -262,6 +282,7 @@ export default async function ReportPage(props: ReportPageProps) {
             setupType={setupType}
             series1d={series.series1d}
             series15m={series.series15m}
+            performance={performanceBySymbol.get(symbol) ?? null}
           />
         );
       },
