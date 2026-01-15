@@ -280,13 +280,15 @@ function simulateTrade(args: {
 
   const currentPrice = filtered.length > 0 ? filtered[filtered.length - 1]?.c ?? null : null;
   const realizedPct = state.realized * 100;
-  const unrealizedPct =
-    state.entryAt !== null && state.remaining > 0 && typeof currentPrice === "number" && Number.isFinite(currentPrice)
-      ? state.remaining * tradeReturnFraction(trade.side, trade.entry, currentPrice) * 100
-      : null;
-  const totalPct = unrealizedPct === null ? null : realizedPct + unrealizedPct;
-
   const hasEntry = state.entryAt !== null;
+  const unrealizedPct =
+    hasEntry && state.remaining > 0 && typeof currentPrice === "number" && Number.isFinite(currentPrice)
+      ? state.remaining * tradeReturnFraction(trade.side, trade.entry, currentPrice) * 100
+      : hasEntry
+        ? 0
+        : null;
+  const totalPct = hasEntry ? realizedPct + (unrealizedPct ?? 0) : null;
+
   const hasTp1 = state.tp1At !== null;
   const hasTp2 = state.tp2At !== null;
   const hasStop = state.stopAt !== null;
