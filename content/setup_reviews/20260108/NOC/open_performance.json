@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-08",
+  "symbol": "NOC",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 625.66,
+    "stop": 606.2743399999999,
+    "targets": [
+      664.43132,
+      683.8169800000001
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.171Z",
+  "openedAt": "2026-01-13T14:40:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 654.6199951171875,
+  "realizedPct": 0,
+  "unrealizedPct": 4.628711299617609,
+  "totalPct": 4.628711299617609,
+  "status": "open",
+  "outcome": "open"
+}

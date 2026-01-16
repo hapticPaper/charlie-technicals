@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-16",
+  "symbol": "XLI",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 166.45,
+    "stop": 165.54755,
+    "targets": [
+      170.29730767172242,
+      172.22096150758364
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.487Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

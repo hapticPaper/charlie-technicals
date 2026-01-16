@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-12",
+  "symbol": "LMT",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 543.59,
+    "stop": 541.46641,
+    "targets": [
+      576.0780277919179,
+      592.3220416878768
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.343Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 577.97998046875,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

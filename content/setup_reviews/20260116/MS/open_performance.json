@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-16",
+  "symbol": "MS",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 190.03,
+    "stop": 187.17955,
+    "targets": [
+      198.0848084287657,
+      202.11221264314858
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.468Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

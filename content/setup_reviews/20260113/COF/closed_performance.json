@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-13",
+  "symbol": "COF",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 234.72,
+    "stop": 235.63472000000002,
+    "targets": [
+      222.15538483581193,
+      215.8730772537179
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.373Z",
+  "openedAt": "2026-01-13T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-01-15T14:30:00.000Z",
+  "currentPrice": 237,
+  "realizedPct": -0.3897068847989165,
+  "unrealizedPct": null,
+  "totalPct": -0.3897068847989165,
+  "status": "closed",
+  "outcome": "stopped_out"
+}
