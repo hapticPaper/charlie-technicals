@@ -21,7 +21,7 @@ function hasOpenedAt(perf: SetupReviewPerformance): perf is OpenedSetupReviewPer
     return false;
   }
 
-  return !Number.isNaN(Date.parse(openedAt));
+  return true;
 }
 
 function formatSignedPct(value: number): string {
@@ -58,10 +58,6 @@ function pnlPctFor(perf: SetupReviewPerformance): number | null {
   return perf.totalPct;
 }
 
-function pnlUsdFor(perf: SetupReviewPerformance): number | null {
-  return pnlUsdComponents(perf).pnlUsd;
-}
-
 function assumedNotionalUsd(perf: SetupReviewPerformance): number {
   if (!perf.openedAt) {
     return 0;
@@ -74,18 +70,27 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
   return ASSUMED_SETUP_NOTIONAL_USD;
 }
 
-function pnlUsdComponents(perf: SetupReviewPerformance): { notional: number; pnlUsd: number | null } {
-  const notional = assumedNotionalUsd(perf);
-  if (notional === 0) {
-    return { notional, pnlUsd: null };
+function computePnl(perf: SetupReviewPerformance): { notionalUsd: number; pct: number | null; usd: number | null } {
+  const notionalUsd = assumedNotionalUsd(perf);
+  if (notionalUsd === 0) {
+    return { notionalUsd, pct: null, usd: null };
   }
 
   const pct = pnlPctFor(perf);
   if (pct == null || !Number.isFinite(pct)) {
-    return { notional, pnlUsd: null };
+    return { notionalUsd, pct: null, usd: null };
   }
 
-  return { notional, pnlUsd: (pct / 100) * notional };
+  return { notionalUsd, pct, usd: (pct / 100) * notionalUsd };
+}
+
+function toEpochMs(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
 }
 
 function laterDate(a: string | null, b: string | null): string | null {
@@ -97,7 +102,22 @@ function laterDate(a: string | null, b: string | null): string | null {
     return a;
   }
 
-  return a > b ? a : b;
+  const aTime = toEpochMs(a);
+  const bTime = toEpochMs(b);
+
+  if (aTime == null && bTime == null) {
+    return null;
+  }
+
+  if (aTime == null) {
+    return b;
+  }
+
+  if (bTime == null) {
+    return a;
+  }
+
+  return aTime >= bTime ? a : b;
 }
 
 function finalizedAt(perf: SetupReviewPerformance): string | null {
@@ -140,20 +160,26 @@ function splitPositions(items: SetupReviewPerformance[]): {
 function compareClosedPositions(a: OpenedSetupReviewPerformance, b: OpenedSetupReviewPerformance): number {
   const aFinal = finalizedAt(a);
   const bFinal = finalizedAt(b);
+  const aTime = toEpochMs(aFinal);
+  const bTime = toEpochMs(bFinal);
 
-  if (!aFinal && !bFinal) {
+  if (aTime == null && bTime == null) {
     return b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
   }
 
-  if (!aFinal) {
+  if (aTime == null) {
     return 1;
   }
 
-  if (!bFinal) {
+  if (bTime == null) {
     return -1;
   }
 
-  return bFinal.localeCompare(aFinal) || b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
+  if (bTime !== aTime) {
+    return bTime - aTime;
+  }
+
+  return b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
 }
 
 function aggregate(items: SetupReviewPerformance[]): {
@@ -165,13 +191,13 @@ function aggregate(items: SetupReviewPerformance[]): {
   let pnlUsd = 0;
 
   for (const perf of items) {
-    const { notional, pnlUsd: rowPnlUsd } = pnlUsdComponents(perf);
-    if (notional === 0 || rowPnlUsd == null) {
+    const pnl = computePnl(perf);
+    if (pnl.notionalUsd === 0 || pnl.usd == null) {
       continue;
     }
 
-    investedUsd += notional;
-    pnlUsd += rowPnlUsd;
+    investedUsd += pnl.notionalUsd;
+    pnlUsd += pnl.usd;
   }
 
   const pnlPct = investedUsd > 0 ? (pnlUsd / investedUsd) * 100 : null;
@@ -205,8 +231,9 @@ function joinWithAnd(parts: string[]): string {
 }
 
 function getPnlDisplay(perf: SetupReviewPerformance): { className: string; pctLabel: string; usdLabel: string } {
-  const pnlPct = pnlPctFor(perf);
-  const pnlUsd = pnlUsdFor(perf);
+  const pnl = computePnl(perf);
+  const pnlPct = pnl.pct;
+  const pnlUsd = pnl.usd;
 
   const className =
     pnlPct == null
@@ -242,7 +269,7 @@ function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
             const pnl = getPnlDisplay(p);
 
             return (
-              <tr key={`${p.setupDate}-${p.symbol}`}>
+              <tr key={`${p.setupDate}-${p.symbol}-${p.openedAt}`}>
                 <td>
                   <Link href={`/reports/${p.setupDate}`}>
                     <strong>{p.symbol}</strong>
@@ -280,7 +307,7 @@ function renderClosedTable(rows: OpenedSetupReviewPerformance[]) {
             const pnl = getPnlDisplay(p);
 
             return (
-              <tr key={`${p.setupDate}-${p.symbol}`}>
+              <tr key={`${p.setupDate}-${p.symbol}-${p.openedAt}-${finalizedAt(p) ?? "unknown"}`}>
                 <td>
                   <Link href={`/reports/${p.setupDate}`}>
                     <strong>{p.symbol}</strong>
