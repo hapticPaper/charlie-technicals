@@ -10,7 +10,9 @@ import { CnbcTopicTrendWidgetClient, type CnbcTopicTrendDatum } from "./CnbcTopi
 const MAX_NON_EMPTY_DAYS = 30;
 // Cap how far back we scan, to keep the chart "recent" and avoid unbounded reads.
 const MAX_SCAN_DAYS = MAX_NON_EMPTY_DAYS * 3;
-const MAX_TOPICS = 8;
+// We intentionally ship a larger pool than we render so the client can hide "markets"
+// and still have enough topics to fill the chart (client `MAX_VISIBLE_TOPICS` is 8).
+const MAX_TOPIC_POOL = 12;
 // Cap the number of most-recent videos we keep per (day, topic) for the overlay.
 // Older videos beyond this cap are intentionally omitted to keep the page payload small.
 const MAX_VIDEOS_PER_TOPIC_PER_DAY = 8;
@@ -101,7 +103,7 @@ export async function CnbcTopicTrendWidget() {
   const topTopics = Array.from(totals.entries())
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([topic]) => topic)
-    .slice(0, MAX_TOPICS);
+    .slice(0, MAX_TOPIC_POOL);
   const includedTopics = new Set(topTopics);
 
   const data: CnbcTopicTrendDatum[] = [];
