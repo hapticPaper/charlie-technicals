@@ -11,7 +11,7 @@ const MAX_NON_EMPTY_DAYS = 30;
 // Cap how far back we scan, to keep the chart "recent" and avoid unbounded reads.
 const MAX_SCAN_DAYS = MAX_NON_EMPTY_DAYS * 3;
 // We intentionally ship a larger pool than we render so the client can hide "markets"
-// and still have enough topics to fill the chart.
+// and still have enough topics to fill the chart (client shows up to 8 topics).
 const MAX_TOPIC_POOL = 12;
 // Cap the number of most-recent videos we keep per (day, topic) for the overlay.
 // Older videos beyond this cap are intentionally omitted to keep the page payload small.

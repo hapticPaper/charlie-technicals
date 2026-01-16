@@ -53,6 +53,8 @@ const SERIES_COLORS = [
   "rgba(255, 255, 255, 0.35)"
 ];
 
+const warnedTooltipRawKeys = new Set<string>();
+
 function formatDateTick(value: unknown): string {
   if (typeof value !== "string") {
     return "";
@@ -132,6 +134,14 @@ function TopicTooltip(props: {
         const raw = chartKey && row ? row[toRawChartKey(chartKey)] : undefined;
         const hasRaw = typeof raw === "number" && Number.isFinite(raw);
         if (props.yAxisMode === "log2" && !hasRaw) {
+          if (process.env.NODE_ENV !== "production") {
+            const key = `${topic}::${chartKey ?? "unknown"}`;
+            if (!warnedTooltipRawKeys.has(key)) {
+              warnedTooltipRawKeys.add(key);
+              console.warn(`[home:cnbc] Missing raw tooltip value for ${key}`);
+            }
+          }
+
           return null;
         }
 
@@ -284,7 +294,8 @@ export function CnbcTopicTrendWidgetClient(props: {
         chartRow[rawKey] = raw;
       }
 
-      // In log2 mode, scale each day's stacked values so the total height is log2(total + 1).
+      // In log2 mode, the Y axis represents log2(total + 1) for the visible topics on that day.
+      // Each topic's area is a proportional slice of the day's total.
       const logScale = total > 0 ? Math.log2(total + 1) / total : 0;
 
       for (const { rawKey, chartKey } of chartTopics) {
