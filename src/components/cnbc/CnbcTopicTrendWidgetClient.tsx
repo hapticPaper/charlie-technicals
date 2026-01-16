@@ -26,8 +26,16 @@ export type CnbcTopicTrendDatum = {
 
 type CnbcTopicTrendChartRow = Record<string, number | string>;
 
+type YAxisMode = "log2" | "linear";
+
+const MAX_VISIBLE_TOPICS = 8;
+
 function toChartTopicKey(topic: string): string {
   return topic === "date" ? "topic_date" : topic;
+}
+
+function toRawChartKey(chartKey: string): string {
+  return `${chartKey}__raw`;
 }
 
 const SERIES_COLORS = [
@@ -57,6 +65,8 @@ function formatDateTick(value: unknown): string {
 type TooltipEntry = {
   name?: unknown;
   value?: unknown;
+  dataKey?: unknown;
+  payload?: unknown;
   color?: unknown;
 };
 
@@ -81,6 +91,20 @@ function parseTooltipTopic(value: unknown): string | null {
   return null;
 }
 
+function formatLog2Tick(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "";
+  }
+
+  const raw = Math.pow(2, value) - 1;
+  if (!Number.isFinite(raw)) {
+    return "";
+  }
+
+  const rounded = Math.round(raw);
+  return String(rounded);
+}
+
 function TopicTooltip(props: {
   active?: boolean;
   label?: unknown;
@@ -99,7 +123,11 @@ function TopicTooltip(props: {
           return null;
         }
 
-        const count = parseTooltipCount(entry.value);
+        const chartKey = typeof entry.dataKey === "string" ? entry.dataKey : null;
+        const row = typeof entry.payload === "object" && entry.payload !== null ? (entry.payload as Record<string, unknown>) : null;
+        const raw = chartKey && row ? row[toRawChartKey(chartKey)] : undefined;
+
+        const count = parseTooltipCount(raw ?? entry.value);
         return {
           topic,
           count,
@@ -207,6 +235,9 @@ export function CnbcTopicTrendWidgetClient(props: {
     setMounted(true);
   }, []);
 
+  const [yAxisMode, setYAxisMode] = useState<YAxisMode>("log2");
+  const [includeMarkets, setIncludeMarkets] = useState(true);
+
   const [preview, setPreview] = useState<{ date: string | null; topic: string | null }>({
     date: null,
     topic: null
@@ -216,19 +247,66 @@ export function CnbcTopicTrendWidgetClient(props: {
     topic: null
   });
 
+  const visibleTopics = useMemo(() => {
+    const candidates = includeMarkets ? props.topics : props.topics.filter((topic) => topic !== "markets");
+    return candidates.slice(0, MAX_VISIBLE_TOPICS);
+  }, [includeMarkets, props.topics]);
+
+  useEffect(() => {
+    const allowed = new Set(visibleTopics);
+    setPreview((prev) => (prev.topic && !allowed.has(prev.topic) ? { ...prev, topic: null } : prev));
+    setPinned((prev) => (prev.topic && !allowed.has(prev.topic) ? { ...prev, topic: null } : prev));
+  }, [visibleTopics]);
+
   const chartTopics = useMemo(() => {
-    return props.topics.map((topic) => ({ topic, chartKey: toChartTopicKey(topic) }));
-  }, [props.topics]);
+    return visibleTopics.map((topic) => {
+      const chartKey = toChartTopicKey(topic);
+      return { topic, chartKey, rawKey: toRawChartKey(chartKey) };
+    });
+  }, [visibleTopics]);
 
   const chartData = useMemo<CnbcTopicTrendChartRow[]>(() => {
     return props.data.map((row) => {
       const chartRow: CnbcTopicTrendChartRow = { date: row.date };
-      for (const { topic, chartKey } of chartTopics) {
-        chartRow[chartKey] = row.values[topic] ?? 0;
+
+      let total = 0;
+      for (const { topic, rawKey } of chartTopics) {
+        const raw = row.values[topic] ?? 0;
+        total += raw;
+        chartRow[rawKey] = raw;
       }
+
+      const logScale = total > 0 ? Math.log2(total + 1) / total : 0;
+
+      for (const { rawKey, chartKey } of chartTopics) {
+        const raw = chartRow[rawKey];
+        const value = typeof raw === "number" ? raw : 0;
+        chartRow[chartKey] = yAxisMode === "linear" ? value : value * logScale;
+      }
+
       return chartRow;
     });
-  }, [chartTopics, props.data]);
+  }, [chartTopics, props.data, yAxisMode]);
+
+  const log2Ticks = useMemo(() => {
+    if (yAxisMode !== "log2") {
+      return null;
+    }
+
+    let maxTotal = 0;
+    for (const row of props.data) {
+      let total = 0;
+      for (const { topic } of chartTopics) {
+        total += row.values[topic] ?? 0;
+      }
+      maxTotal = Math.max(maxTotal, total);
+    }
+
+    const maxTick = Math.ceil(Math.log2(maxTotal + 1));
+    return Array.from({ length: maxTick + 1 }, (_, idx) => idx);
+  }, [chartTopics, props.data, yAxisMode]);
+
+  const log2DomainMax = log2Ticks ? log2Ticks[log2Ticks.length - 1] ?? 0 : 0;
 
   const selectedDate = pinned.date ?? preview.date;
   const selectedTopic = pinned.topic ?? preview.topic;
@@ -300,6 +378,28 @@ export function CnbcTopicTrendWidgetClient(props: {
     <div className="rpSplitLayout">
       <div className="rpSplitMain">
         <div className="rpPanelSurface">
+          <div className="rpToolbar">
+            <button
+              type="button"
+              onClick={() => {
+                setYAxisMode((prev) => (prev === "log2" ? "linear" : "log2"));
+              }}
+              className="rpToolbarButton"
+            >
+              Y axis: {yAxisMode}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIncludeMarkets((prev) => !prev);
+              }}
+              className="rpToolbarButton"
+            >
+              Categories: {includeMarkets ? "all" : 'all except "markets"'}
+            </button>
+          </div>
+
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer minWidth={0} initialDimension={getRechartsInitialDimension()}>
               <AreaChart
@@ -316,7 +416,13 @@ export function CnbcTopicTrendWidgetClient(props: {
               >
                 <CartesianGrid stroke="var(--rp-grid)" strokeDasharray="3 3" />
                 <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fill: "var(--rp-muted)" }} />
-                <YAxis tick={{ fill: "var(--rp-muted)" }} allowDecimals={false} />
+                <YAxis
+                  tick={{ fill: "var(--rp-muted)" }}
+                  allowDecimals={false}
+                  domain={yAxisMode === "log2" ? [0, log2DomainMax] : undefined}
+                  ticks={log2Ticks ?? undefined}
+                  tickFormatter={yAxisMode === "log2" ? formatLog2Tick : undefined}
+                />
                 <Tooltip
                   content={(tooltipProps: TooltipContentProps<number, string>) => (
                     <TopicTooltip
