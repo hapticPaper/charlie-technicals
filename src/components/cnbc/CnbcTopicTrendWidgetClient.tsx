@@ -105,13 +105,14 @@ function TopicTooltip(props: {
   active?: boolean;
   label?: unknown;
   payload?: readonly TooltipEntry[];
-  rawValuesByDate: Map<string, Record<string, number>>;
+  // Raw, untransformed counts keyed by date for stable tooltip values.
+  rawCountsByDate: Map<string, Record<string, number>>;
   selectedTopic: string | null;
   pinnedTopic: string | null;
   onSelect: (args: { date: string; topic: string }) => void;
 }) {
   const date = typeof props.label === "string" ? props.label : null;
-  const rawValues = date ? props.rawValuesByDate.get(date) ?? null : null;
+  const rawValues = date ? props.rawCountsByDate.get(date) ?? null : null;
 
   const entries = useMemo(() => {
     if (!rawValues) {
@@ -125,7 +126,12 @@ function TopicTooltip(props: {
           return null;
         }
 
-        const count = parseTooltipCount(rawValues[topic]);
+        const raw = rawValues[topic];
+        if (typeof raw !== "number" || !Number.isFinite(raw)) {
+          return null;
+        }
+
+        const count = parseTooltipCount(raw);
         return {
           topic,
           count,
@@ -263,10 +269,10 @@ export function CnbcTopicTrendWidgetClient(props: {
     });
   }, [visibleTopics]);
 
-  const rawValuesByDate = useMemo(() => {
+  const rawCountsByDate = useMemo(() => {
     const map = new Map<string, Record<string, number>>();
     for (const row of props.data) {
-      map.set(row.date, row.values);
+      map.set(row.date, { ...row.values });
     }
     return map;
   }, [props.data]);
@@ -313,14 +319,14 @@ export function CnbcTopicTrendWidgetClient(props: {
     }
 
     if (maxTotal <= 0) {
-      return [0, 1];
+      return [0];
     }
 
     const maxTick = Math.ceil(Math.log2(maxTotal + 1));
     return Array.from({ length: Math.max(2, maxTick + 1) }, (_, idx) => idx);
   }, [chartTopics, props.data, yAxisMode]);
 
-  const log2DomainMax = log2Ticks ? log2Ticks[log2Ticks.length - 1] ?? 1 : 1;
+  const log2DomainMax = Math.max(log2Ticks ? (log2Ticks[log2Ticks.length - 1] ?? 0) : 0, 1);
 
   const selectedDate = pinned.date ?? preview.date;
   const selectedTopic = pinned.topic ?? preview.topic;
@@ -443,7 +449,7 @@ export function CnbcTopicTrendWidgetClient(props: {
                       active={tooltipProps.active}
                       label={tooltipProps.label}
                       payload={tooltipProps.payload as unknown as readonly TooltipEntry[] | undefined}
-                      rawValuesByDate={rawValuesByDate}
+                      rawCountsByDate={rawCountsByDate}
                       selectedTopic={selectedTopic}
                       pinnedTopic={pinned.topic}
                       onSelect={({ date, topic }) => {
