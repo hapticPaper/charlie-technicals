@@ -72,12 +72,9 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
 
 function assumedQuantity(perf: SetupReviewPerformance): number {
   const notionalUsd = assumedNotionalUsd(perf);
-  if (notionalUsd === 0) {
-    return 0;
-  }
-
   const entry = perf.trade.entry;
-  if (!Number.isFinite(entry) || entry <= 0) {
+  const minEntry = 0.01;
+  if (notionalUsd === 0 || !Number.isFinite(entry) || entry < minEntry) {
     return 0;
   }
 
@@ -90,8 +87,16 @@ function formatQuantity(quantity: number): string {
     return "--";
   }
 
-  const sign = quantity < 0 ? "-" : "";
-  return `${sign}${Math.abs(quantity).toFixed(2)}`;
+  const eps = 0.005;
+  const normalized = Math.abs(quantity) < eps ? 0 : quantity;
+
+  const absLabel = Math.abs(normalized).toFixed(2);
+  if (absLabel === "0.00") {
+    return absLabel;
+  }
+
+  const sign = normalized < 0 ? "-" : "";
+  return `${sign}${absLabel}`;
 }
 
 function computePnl(perf: SetupReviewPerformance): { notionalUsd: number; pct: number | null; usd: number | null } {
@@ -117,7 +122,7 @@ function toEpochMs(value: string | null): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-function laterDate(a: string | null, b: string | null): string | null {
+function pickDate(a: string | null, b: string | null, pick: "earlier" | "later"): string | null {
   if (!a) {
     return b;
   }
@@ -141,34 +146,19 @@ function laterDate(a: string | null, b: string | null): string | null {
     return a;
   }
 
-  return aTime >= bTime ? a : b;
-}
-
-function earlierDate(a: string | null, b: string | null): string | null {
-  if (!a) {
-    return b;
-  }
-
-  if (!b) {
-    return a;
-  }
-
-  const aTime = toEpochMs(a);
-  const bTime = toEpochMs(b);
-
-  if (aTime == null && bTime == null) {
-    return null;
-  }
-
-  if (aTime == null) {
-    return b;
-  }
-
-  if (bTime == null) {
-    return a;
+  if (pick === "later") {
+    return aTime >= bTime ? a : b;
   }
 
   return aTime <= bTime ? a : b;
+}
+
+function laterDate(a: string | null, b: string | null): string | null {
+  return pickDate(a, b, "later");
+}
+
+function earlierDate(a: string | null, b: string | null): string | null {
+  return pickDate(a, b, "earlier");
 }
 
 function finalizedAt(perf: SetupReviewPerformance): string | null {
@@ -177,7 +167,7 @@ function finalizedAt(perf: SetupReviewPerformance): string | null {
 
 type AggregatedPosition = {
   symbol: string;
-  reportDate: string;
+  latestSetupDate: string;
   quantity: number;
   firstTradeAt: string | null;
   lastTradeAt: string | null;
@@ -205,14 +195,21 @@ function aggregatePositionsBySymbol(
 
   const aggregated: AggregatedPosition[] = [];
   for (const [symbol, items] of bySymbol) {
-    let reportDate = items[0].setupDate;
+    if (items.length === 0) {
+      continue;
+    }
+
+    let latestSetupDate = items[0].setupDate;
+    let latestSetupTime = toEpochMs(latestSetupDate);
     let quantity = 0;
     let firstTradeAt: string | null = null;
     let lastTradeAt: string | null = null;
 
     for (const item of items) {
-      if (item.setupDate > reportDate) {
-        reportDate = item.setupDate;
+      const setupTime = toEpochMs(item.setupDate);
+      if (setupTime != null && (latestSetupTime == null || setupTime > latestSetupTime)) {
+        latestSetupDate = item.setupDate;
+        latestSetupTime = setupTime;
       }
 
       quantity += assumedQuantity(item);
@@ -220,7 +217,7 @@ function aggregatePositionsBySymbol(
       lastTradeAt = laterDate(lastTradeAt, getLastTradeAt(item));
     }
 
-    aggregated.push({ symbol, reportDate, quantity, firstTradeAt, lastTradeAt, pnl: aggregate(items) });
+    aggregated.push({ symbol, latestSetupDate, quantity, firstTradeAt, lastTradeAt, pnl: aggregate(items) });
   }
 
   aggregated.sort((a, b) => {
@@ -239,7 +236,11 @@ function aggregatePositionsBySymbol(
       return -1;
     }
 
-    return bTime - aTime || a.symbol.localeCompare(b.symbol);
+    if (aTime === bTime) {
+      return a.symbol.localeCompare(b.symbol);
+    }
+
+    return bTime - aTime;
   });
 
   return aggregated;
@@ -363,6 +364,23 @@ function aggregate(items: SetupReviewPerformance[]): {
   return { investedUsd, pnlUsd, pnlPct };
 }
 
+function aggregatePositions(positions: AggregatedPosition[]): {
+  investedUsd: number;
+  pnlUsd: number;
+  pnlPct: number | null;
+} {
+  let investedUsd = 0;
+  let pnlUsd = 0;
+
+  for (const position of positions) {
+    investedUsd += position.pnl.investedUsd;
+    pnlUsd += position.pnl.pnlUsd;
+  }
+
+  const pnlPct = investedUsd > 0 ? (pnlUsd / investedUsd) * 100 : null;
+  return { investedUsd, pnlUsd, pnlPct };
+}
+
 function formatSummaryPnl(agg: { investedUsd: number; pnlUsd: number; pnlPct: number | null }): string {
   if (agg.investedUsd === 0 || agg.pnlPct == null) {
     return `-- (--) on $${agg.investedUsd.toFixed(0)}`;
@@ -394,7 +412,7 @@ function getAggregatePnlDisplay(agg: {
   pnlUsd: number;
   pnlPct: number | null;
 }): { className: string; pctLabel: string; usdLabel: string } {
-  if (agg.investedUsd === 0 || agg.pnlPct == null) {
+  if (agg.investedUsd === 0 || agg.pnlPct == null || !Number.isFinite(agg.pnlPct) || !Number.isFinite(agg.pnlUsd)) {
     return { className: styles.pnlNeutral, pctLabel: "--", usdLabel: "--" };
   }
 
@@ -417,7 +435,7 @@ function AggregatedPositionRow({ position }: { position: AggregatedPosition }) {
   return (
     <tr>
       <td>
-        <Link href={`/reports/${position.reportDate}`}>
+        <Link href={`/reports/${position.latestSetupDate}`}>
           <strong>{position.symbol}</strong>
         </Link>
       </td>
@@ -437,7 +455,7 @@ function renderOpenTable(rows: AggregatedPosition[]) {
         <thead>
           <tr>
             <th>Symbol</th>
-            <th>Quantity</th>
+            <th>Net quantity (assumed)</th>
             <th>First trade</th>
             <th>Last trade</th>
             <th>P&amp;L %</th>
@@ -446,7 +464,7 @@ function renderOpenTable(rows: AggregatedPosition[]) {
         </thead>
         <tbody>
           {rows.map((p) => (
-            <AggregatedPositionRow key={`open-${p.symbol}-${p.reportDate}`} position={p} />
+            <AggregatedPositionRow key={`open-${p.symbol}-${p.latestSetupDate}`} position={p} />
           ))}
         </tbody>
       </table>
@@ -461,7 +479,7 @@ function renderClosedTable(rows: AggregatedPosition[]) {
         <thead>
           <tr>
             <th>Symbol</th>
-            <th>Quantity</th>
+            <th>Net quantity (assumed)</th>
             <th>First trade</th>
             <th>Last trade</th>
             <th>P&amp;L %</th>
@@ -470,7 +488,7 @@ function renderClosedTable(rows: AggregatedPosition[]) {
         </thead>
         <tbody>
           {rows.map((p) => (
-            <AggregatedPositionRow key={`closed-${p.symbol}-${p.reportDate}`} position={p} />
+            <AggregatedPositionRow key={`closed-${p.symbol}-${p.latestSetupDate}`} position={p} />
           ))}
         </tbody>
       </table>
@@ -487,9 +505,15 @@ export default async function PortfolioPage() {
   const closedPositions = aggregateClosedPositionsBySymbol(closed);
   const totalTickers = new Set([...openPositions.map((p) => p.symbol), ...closedPositions.map((p) => p.symbol)]).size;
 
-  const openAgg = aggregate(open);
-  const closedAgg = aggregate(closed);
-  const totalAgg = aggregate([...open, ...closed]);
+  const openAgg = aggregatePositions(openPositions);
+  const closedAgg = aggregatePositions(closedPositions);
+  const totalInvestedUsd = openAgg.investedUsd + closedAgg.investedUsd;
+  const totalPnlUsd = openAgg.pnlUsd + closedAgg.pnlUsd;
+  const totalAgg = {
+    investedUsd: totalInvestedUsd,
+    pnlUsd: totalPnlUsd,
+    pnlPct: totalInvestedUsd > 0 ? (totalPnlUsd / totalInvestedUsd) * 100 : null
+  };
 
   const ignoredParts: string[] = [];
   if (ignored.pending > 0) {
@@ -505,8 +529,9 @@ export default async function PortfolioPage() {
         <div>
           <h1>Portfolio</h1>
           <p className="report-muted">
-            Aggregated positions by symbol (assumes a normalized ${"$" + ASSUMED_SETUP_NOTIONAL_USD.toFixed(0)} notional per opened setup; quantity
-            is derived from the entry price).
+            Aggregated positions by symbol (assumes a normalized ${"$" + ASSUMED_SETUP_NOTIONAL_USD.toFixed(0)} notional per opened setup). Net
+            quantity is an assumed unit count derived from the entry price and is negative for shorts, not an actual share count. P&amp;L assumes equal
+            notional per setup. Links go to the latest report date that includes the symbol.
           </p>
         </div>
         <Link className={styles.homeLink} href="/">
