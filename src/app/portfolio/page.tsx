@@ -70,6 +70,30 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
   return ASSUMED_SETUP_NOTIONAL_USD;
 }
 
+function assumedQuantity(perf: SetupReviewPerformance): number {
+  const notionalUsd = assumedNotionalUsd(perf);
+  if (notionalUsd === 0) {
+    return 0;
+  }
+
+  const entry = perf.trade.entry;
+  if (!Number.isFinite(entry) || entry <= 0) {
+    return 0;
+  }
+
+  const quantity = notionalUsd / entry;
+  return perf.trade.side === "sell" ? -quantity : quantity;
+}
+
+function formatQuantity(quantity: number): string {
+  if (!Number.isFinite(quantity)) {
+    return "--";
+  }
+
+  const sign = quantity < 0 ? "-" : "";
+  return `${sign}${Math.abs(quantity).toFixed(2)}`;
+}
+
 function computePnl(perf: SetupReviewPerformance): { notionalUsd: number; pct: number | null; usd: number | null } {
   const notionalUsd = assumedNotionalUsd(perf);
   if (notionalUsd === 0) {
@@ -120,8 +144,156 @@ function laterDate(a: string | null, b: string | null): string | null {
   return aTime >= bTime ? a : b;
 }
 
+function earlierDate(a: string | null, b: string | null): string | null {
+  if (!a) {
+    return b;
+  }
+
+  if (!b) {
+    return a;
+  }
+
+  const aTime = toEpochMs(a);
+  const bTime = toEpochMs(b);
+
+  if (aTime == null && bTime == null) {
+    return null;
+  }
+
+  if (aTime == null) {
+    return b;
+  }
+
+  if (bTime == null) {
+    return a;
+  }
+
+  return aTime <= bTime ? a : b;
+}
+
 function finalizedAt(perf: SetupReviewPerformance): string | null {
   return laterDate(perf.tp2At, perf.stopAt);
+}
+
+type AggregatedPosition = {
+  symbol: string;
+  reportDate: string;
+  quantity: number;
+  firstTradeAt: string | null;
+  lastTradeAt: string | null;
+  pnl: {
+    investedUsd: number;
+    pnlUsd: number;
+    pnlPct: number | null;
+  };
+};
+
+function aggregateOpenPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): AggregatedPosition[] {
+  const bySymbol = new Map<string, OpenedSetupReviewPerformance[]>();
+
+  for (const perf of rows) {
+    const existing = bySymbol.get(perf.symbol);
+    if (existing) {
+      existing.push(perf);
+    } else {
+      bySymbol.set(perf.symbol, [perf]);
+    }
+  }
+
+  const aggregated: AggregatedPosition[] = [];
+  for (const [symbol, items] of bySymbol) {
+    let reportDate = items[0].setupDate;
+    let quantity = 0;
+    let firstTradeAt: string | null = null;
+    let lastTradeAt: string | null = null;
+
+    for (const item of items) {
+      if (item.setupDate > reportDate) {
+        reportDate = item.setupDate;
+      }
+
+      quantity += assumedQuantity(item);
+      firstTradeAt = earlierDate(firstTradeAt, item.openedAt);
+      lastTradeAt = laterDate(lastTradeAt, item.openedAt);
+    }
+
+    aggregated.push({ symbol, reportDate, quantity, firstTradeAt, lastTradeAt, pnl: aggregate(items) });
+  }
+
+  aggregated.sort((a, b) => {
+    const aTime = toEpochMs(a.lastTradeAt);
+    const bTime = toEpochMs(b.lastTradeAt);
+
+    if (aTime == null && bTime == null) {
+      return a.symbol.localeCompare(b.symbol);
+    }
+
+    if (aTime == null) {
+      return 1;
+    }
+
+    if (bTime == null) {
+      return -1;
+    }
+
+    return bTime - aTime || a.symbol.localeCompare(b.symbol);
+  });
+
+  return aggregated;
+}
+
+function aggregateClosedPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): AggregatedPosition[] {
+  const bySymbol = new Map<string, OpenedSetupReviewPerformance[]>();
+
+  for (const perf of rows) {
+    const existing = bySymbol.get(perf.symbol);
+    if (existing) {
+      existing.push(perf);
+    } else {
+      bySymbol.set(perf.symbol, [perf]);
+    }
+  }
+
+  const aggregated: AggregatedPosition[] = [];
+  for (const [symbol, items] of bySymbol) {
+    let reportDate = items[0].setupDate;
+    let quantity = 0;
+    let firstTradeAt: string | null = null;
+    let lastTradeAt: string | null = null;
+
+    for (const item of items) {
+      if (item.setupDate > reportDate) {
+        reportDate = item.setupDate;
+      }
+
+      quantity += assumedQuantity(item);
+      firstTradeAt = earlierDate(firstTradeAt, item.openedAt);
+      lastTradeAt = laterDate(lastTradeAt, finalizedAt(item));
+    }
+
+    aggregated.push({ symbol, reportDate, quantity, firstTradeAt, lastTradeAt, pnl: aggregate(items) });
+  }
+
+  aggregated.sort((a, b) => {
+    const aTime = toEpochMs(a.lastTradeAt);
+    const bTime = toEpochMs(b.lastTradeAt);
+
+    if (aTime == null && bTime == null) {
+      return a.symbol.localeCompare(b.symbol);
+    }
+
+    if (aTime == null) {
+      return 1;
+    }
+
+    if (bTime == null) {
+      return -1;
+    }
+
+    return bTime - aTime || a.symbol.localeCompare(b.symbol);
+  });
+
+  return aggregated;
 }
 
 function splitPositions(items: SetupReviewPerformance[]): {
@@ -260,63 +432,64 @@ function joinWithAnd(parts: string[]): string {
   return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
 }
 
-function getPnlDisplay(perf: SetupReviewPerformance): { className: string; pctLabel: string; usdLabel: string } {
-  const pnl = computePnl(perf);
-  const pnlPct = pnl.pct;
-  const pnlUsd = pnl.usd;
+function getAggregatePnlDisplay(agg: {
+  investedUsd: number;
+  pnlUsd: number;
+  pnlPct: number | null;
+}): { className: string; pctLabel: string; usdLabel: string } {
+  if (agg.investedUsd === 0 || agg.pnlPct == null) {
+    return { className: styles.pnlNeutral, pctLabel: "--", usdLabel: "--" };
+  }
+
+  const pnlPct = agg.pnlPct;
+  const pnlUsd = agg.pnlUsd;
 
   const className =
-    pnlPct == null
-      ? styles.pnlNeutral
-      : pnlPct > 0
-        ? styles.pnlPositive
-        : pnlPct < 0
-          ? styles.pnlNegative
-          : styles.pnlNeutral;
+    pnlPct > 0 ? styles.pnlPositive : pnlPct < 0 ? styles.pnlNegative : styles.pnlNeutral;
 
   return {
     className,
-    pctLabel: pnlPct == null ? "--" : formatSignedPct(pnlPct),
-    usdLabel: pnlUsd == null ? "--" : formatSignedUsd(pnlUsd)
+    pctLabel: formatSignedPct(pnlPct),
+    usdLabel: formatSignedUsd(pnlUsd)
   };
 }
 
-function PositionRow({ perf, includeClosedDate }: { perf: OpenedSetupReviewPerformance; includeClosedDate: boolean }) {
-  const pnl = getPnlDisplay(perf);
-  const closedAt = includeClosedDate ? finalizedAt(perf) : null;
+function AggregatedPositionRow({ position }: { position: AggregatedPosition }) {
+  const pnl = getAggregatePnlDisplay(position.pnl);
 
   return (
     <tr>
       <td>
-        <Link href={`/reports/${perf.setupDate}`}>
-          <strong>{perf.symbol}</strong>
+        <Link href={`/reports/${position.reportDate}`}>
+          <strong>{position.symbol}</strong>
         </Link>
       </td>
-      <td>{perf.trade.side.toUpperCase()}</td>
-      <td>{formatIsoDate(perf.openedAt)}</td>
-      {includeClosedDate ? <td>{formatIsoDate(closedAt)}</td> : null}
+      <td>{formatQuantity(position.quantity)}</td>
+      <td>{formatIsoDate(position.firstTradeAt)}</td>
+      <td>{formatIsoDate(position.lastTradeAt)}</td>
       <td className={pnl.className}>{pnl.pctLabel}</td>
       <td className={pnl.className}>{pnl.usdLabel}</td>
     </tr>
   );
 }
 
-function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
+function renderOpenTable(rows: AggregatedPosition[]) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
             <th>Symbol</th>
-            <th>Side</th>
-            <th>Opened on</th>
+            <th>Quantity</th>
+            <th>First trade</th>
+            <th>Last trade</th>
             <th>P&amp;L %</th>
             <th>P&amp;L $</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((p) => (
-            <PositionRow key={`${p.setupDate}-${p.symbol}-${p.openedAt}`} perf={p} includeClosedDate={false} />
+            <AggregatedPositionRow key={p.symbol} position={p} />
           ))}
         </tbody>
       </table>
@@ -324,27 +497,23 @@ function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
   );
 }
 
-function renderClosedTable(rows: OpenedSetupReviewPerformance[]) {
+function renderClosedTable(rows: AggregatedPosition[]) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
             <th>Symbol</th>
-            <th>Side</th>
-            <th>Opened on</th>
-            <th>Closed on</th>
+            <th>Quantity</th>
+            <th>First trade</th>
+            <th>Last trade</th>
             <th>P&amp;L %</th>
             <th>P&amp;L $</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((p) => (
-            <PositionRow
-              key={`${p.setupDate}-${p.symbol}-${p.openedAt}-${finalizedAt(p) ?? "unknown"}`}
-              perf={p}
-              includeClosedDate={true}
-            />
+            <AggregatedPositionRow key={p.symbol} position={p} />
           ))}
         </tbody>
       </table>
@@ -357,6 +526,10 @@ export default async function PortfolioPage() {
   const all = listed.map((l) => l.performance);
 
   const { open, closed, ignored } = splitPositions(all);
+  const openPositions = aggregateOpenPositionsBySymbol(open);
+  const closedPositions = aggregateClosedPositionsBySymbol(closed);
+  const totalTickers = new Set([...openPositions.map((p) => p.symbol), ...closedPositions.map((p) => p.symbol)]).size;
+
   const openAgg = aggregate(open);
   const closedAgg = aggregate(closed);
   const totalAgg = aggregate([...open, ...closed]);
@@ -375,8 +548,8 @@ export default async function PortfolioPage() {
         <div>
           <h1>Portfolio</h1>
           <p className="report-muted">
-            Running + final performance for tracked setups (assumes a normalized ${"$" + ASSUMED_SETUP_NOTIONAL_USD.toFixed(0)} notional per
-            opened setup).
+            Aggregated positions by symbol (assumes a normalized ${"$" + ASSUMED_SETUP_NOTIONAL_USD.toFixed(0)} notional per opened setup; quantity
+            is derived from the entry price).
           </p>
         </div>
         <Link className={styles.homeLink} href="/">
@@ -387,17 +560,17 @@ export default async function PortfolioPage() {
       <div className={styles.summaryGrid}>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Open</div>
-          <div className={styles.summaryValue}>{open.length}</div>
+          <div className={styles.summaryValue}>{openPositions.length}</div>
           <div className="report-muted">{formatSummaryPnl(openAgg)}</div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Closed</div>
-          <div className={styles.summaryValue}>{closed.length}</div>
+          <div className={styles.summaryValue}>{closedPositions.length}</div>
           <div className="report-muted">{formatSummaryPnl(closedAgg)}</div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Total</div>
-          <div className={styles.summaryValue}>{open.length + closed.length}</div>
+          <div className={styles.summaryValue}>{totalTickers}</div>
           <div className="report-muted">{formatSummaryPnl(totalAgg)}</div>
         </div>
       </div>
@@ -406,19 +579,19 @@ export default async function PortfolioPage() {
         <p className="report-muted">Ignoring {joinWithAnd(ignoredParts)} from portfolio stats because they have no open date.</p>
       ) : null}
 
-      {open.length > 0 ? (
+      {openPositions.length > 0 ? (
         <>
           <h2>Open</h2>
-          {renderOpenTable(open)}
+          {renderOpenTable(openPositions)}
         </>
       ) : (
         <p className="report-muted">No open positions.</p>
       )}
 
-      {closed.length > 0 ? (
+      {closedPositions.length > 0 ? (
         <>
           <h2>Closed</h2>
-          {renderClosedTable(closed)}
+          {renderClosedTable(closedPositions)}
         </>
       ) : null}
     </>
