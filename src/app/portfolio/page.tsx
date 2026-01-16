@@ -9,6 +9,8 @@ import styles from "./portfolio.module.css";
 // Normalized notional used for aggregating setup performance. This is not the actual traded size.
 const ASSUMED_SETUP_NOTIONAL_USD = 1000;
 
+type OpenedSetupReviewPerformance = SetupReviewPerformance & { openedAt: string };
+
 function formatSignedPct(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
@@ -57,28 +59,36 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
 function pnlUsdComponents(perf: SetupReviewPerformance): { notional: number; pnlUsd: number | null } {
   const notional = assumedNotionalUsd(perf);
   if (notional === 0) {
-    return { notional: 0, pnlUsd: null };
+    return { notional, pnlUsd: null };
   }
 
   const pct = pnlPctFor(perf);
   if (pct == null || !Number.isFinite(pct)) {
-    return { notional: 0, pnlUsd: null };
+    return { notional, pnlUsd: null };
   }
 
   return { notional, pnlUsd: (pct / 100) * notional };
 }
 
 function finalizedAt(perf: SetupReviewPerformance): string | null {
-  return perf.tp2At ?? perf.stopAt;
+  if (!perf.tp2At) {
+    return perf.stopAt;
+  }
+
+  if (!perf.stopAt) {
+    return perf.tp2At;
+  }
+
+  return perf.tp2At > perf.stopAt ? perf.tp2At : perf.stopAt;
 }
 
 function splitPositions(items: SetupReviewPerformance[]): {
-  open: SetupReviewPerformance[];
-  closed: SetupReviewPerformance[];
+  open: OpenedSetupReviewPerformance[];
+  closed: OpenedSetupReviewPerformance[];
   ignored: { pending: number; notOpened: number };
 } {
-  const open: SetupReviewPerformance[] = [];
-  const closed: SetupReviewPerformance[] = [];
+  const open: OpenedSetupReviewPerformance[] = [];
+  const closed: OpenedSetupReviewPerformance[] = [];
   let pending = 0;
   let notOpened = 0;
 
@@ -92,34 +102,37 @@ function splitPositions(items: SetupReviewPerformance[]): {
       continue;
     }
 
-    if (p.status === "closed") {
-      closed.push(p);
+    const openedPerf = p as OpenedSetupReviewPerformance;
+    if (openedPerf.status === "closed") {
+      closed.push(openedPerf);
     } else {
-      open.push(p);
+      open.push(openedPerf);
     }
   }
 
-  open.sort((a, b) => b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol));
-  closed.sort((a, b) => {
-    const aFinal = finalizedAt(a);
-    const bFinal = finalizedAt(b);
-
-    if (!aFinal && !bFinal) {
-      return b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol);
-    }
-
-    if (!aFinal) {
-      return 1;
-    }
-
-    if (!bFinal) {
-      return -1;
-    }
-
-    return bFinal.localeCompare(aFinal) || b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol);
-  });
+  open.sort((a, b) => b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol));
+  closed.sort(compareClosedPositions);
 
   return { open, closed, ignored: { pending, notOpened } };
+}
+
+function compareClosedPositions(a: OpenedSetupReviewPerformance, b: OpenedSetupReviewPerformance): number {
+  const aFinal = finalizedAt(a);
+  const bFinal = finalizedAt(b);
+
+  if (!aFinal && !bFinal) {
+    return b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
+  }
+
+  if (!aFinal) {
+    return 1;
+  }
+
+  if (!bFinal) {
+    return -1;
+  }
+
+  return bFinal.localeCompare(aFinal) || b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
 }
 
 function aggregate(items: SetupReviewPerformance[]): {
@@ -154,7 +167,19 @@ function formatSummaryPnl(agg: { investedUsd: number; pnlUsd: number; pnlPct: nu
   return `${pctLabel} (${usdLabel}) on $${agg.investedUsd.toFixed(0)}`;
 }
 
-function renderOpenTable(rows: SetupReviewPerformance[]) {
+function joinWithAnd(parts: string[]): string {
+  if (parts.length <= 1) {
+    return parts[0] ?? "";
+  }
+
+  if (parts.length === 2) {
+    return parts.join(" and ");
+  }
+
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -203,7 +228,7 @@ function renderOpenTable(rows: SetupReviewPerformance[]) {
   );
 }
 
-function renderClosedTable(rows: SetupReviewPerformance[]) {
+function renderClosedTable(rows: OpenedSetupReviewPerformance[]) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
@@ -304,7 +329,7 @@ export default async function PortfolioPage() {
         </div>
       </div>
 
-      {ignoredParts.length > 0 ? <p className="report-muted">Ignoring {ignoredParts.join(" and ")}.</p> : null}
+      {ignoredParts.length > 0 ? <p className="report-muted">Ignoring {joinWithAnd(ignoredParts)}.</p> : null}
 
       {open.length > 0 ? (
         <>
