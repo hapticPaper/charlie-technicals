@@ -36,11 +36,6 @@ function toChartTopicKey(topic: string): string {
   return topic === "date" ? "topic_date" : topic;
 }
 
-function toRawChartKey(chartKey: string): string {
-  // Reserved prefix used for tooltip counts.
-  return `raw_${chartKey}`;
-}
-
 const SERIES_COLORS = [
   "#38bdf8",
   "#a78bfa",
@@ -52,8 +47,6 @@ const SERIES_COLORS = [
   "#fb7185",
   "rgba(255, 255, 255, 0.35)"
 ];
-
-const warnedTooltipRawKeys = new Set<string>();
 
 function formatDateTick(value: unknown): string {
   if (typeof value !== "string") {
@@ -70,8 +63,6 @@ function formatDateTick(value: unknown): string {
 type TooltipEntry = {
   name?: unknown;
   value?: unknown;
-  dataKey?: string | number;
-  payload?: Record<string, unknown>;
   color?: unknown;
 };
 
@@ -114,14 +105,19 @@ function TopicTooltip(props: {
   active?: boolean;
   label?: unknown;
   payload?: readonly TooltipEntry[];
-  yAxisMode: YAxisMode;
+  rawValuesByDate: Map<string, Record<string, number>>;
   selectedTopic: string | null;
   pinnedTopic: string | null;
   onSelect: (args: { date: string; topic: string }) => void;
 }) {
   const date = typeof props.label === "string" ? props.label : null;
+  const rawValues = date ? props.rawValuesByDate.get(date) ?? null : null;
 
   const entries = useMemo(() => {
+    if (!rawValues) {
+      return [];
+    }
+
     return (props.payload ?? [])
       .map((entry) => {
         const topic = parseTooltipTopic(entry.name);
@@ -129,23 +125,7 @@ function TopicTooltip(props: {
           return null;
         }
 
-        const chartKey = typeof entry.dataKey === "string" ? entry.dataKey : null;
-        const row = entry.payload ?? null;
-        const raw = chartKey && row ? row[toRawChartKey(chartKey)] : undefined;
-        const hasRaw = typeof raw === "number" && Number.isFinite(raw);
-        if (props.yAxisMode === "log2" && !hasRaw) {
-          if (process.env.NODE_ENV !== "production") {
-            const key = `${topic}::${chartKey ?? "unknown"}`;
-            if (!warnedTooltipRawKeys.has(key)) {
-              warnedTooltipRawKeys.add(key);
-              console.warn(`[home:cnbc] Missing raw tooltip value for ${key}`);
-            }
-          }
-
-          return null;
-        }
-
-        const count = parseTooltipCount(hasRaw ? raw : entry.value);
+        const count = parseTooltipCount(rawValues[topic]);
         return {
           topic,
           count,
@@ -156,7 +136,7 @@ function TopicTooltip(props: {
         (entry): entry is { topic: string; count: number; color: string | undefined } =>
           entry !== null && entry.count > 0
       );
-  }, [props.payload]);
+  }, [props.payload, rawValues]);
 
   const bestTopic = useMemo(() => {
     const best = entries.reduce<{ topic: string; count: number } | null>((acc, entry) => {
@@ -279,19 +259,28 @@ export function CnbcTopicTrendWidgetClient(props: {
   const chartTopics = useMemo(() => {
     return visibleTopics.map((topic) => {
       const chartKey = toChartTopicKey(topic);
-      return { topic, chartKey, rawKey: toRawChartKey(chartKey) };
+      return { topic, chartKey };
     });
   }, [visibleTopics]);
+
+  const rawValuesByDate = useMemo(() => {
+    const map = new Map<string, Record<string, number>>();
+    for (const row of props.data) {
+      map.set(row.date, row.values);
+    }
+    return map;
+  }, [props.data]);
 
   const chartData = useMemo<CnbcTopicTrendChartRow[]>(() => {
     return props.data.map((row) => {
       const chartRow: CnbcTopicTrendChartRow = { date: row.date };
 
+      const rawByChartKey: Array<{ chartKey: string; raw: number }> = [];
       let total = 0;
-      for (const { topic, rawKey } of chartTopics) {
+      for (const { topic, chartKey } of chartTopics) {
         const raw = row.values[topic] ?? 0;
+        rawByChartKey.push({ chartKey, raw });
         total += raw;
-        chartRow[rawKey] = raw;
       }
 
       // In log2 mode, we want the stacked total height for a day to be log2(total + 1) while
@@ -299,10 +288,8 @@ export function CnbcTopicTrendWidgetClient(props: {
       // factor instead of taking log2() per series.
       const logScale = total > 0 ? Math.log2(total + 1) / total : 0;
 
-      for (const { rawKey, chartKey } of chartTopics) {
-        const raw = chartRow[rawKey];
-        const value = typeof raw === "number" ? raw : 0;
-        chartRow[chartKey] = yAxisMode === "linear" ? value : value * logScale;
+      for (const { chartKey, raw } of rawByChartKey) {
+        chartRow[chartKey] = yAxisMode === "linear" ? raw : raw * logScale;
       }
 
       return chartRow;
@@ -450,7 +437,7 @@ export function CnbcTopicTrendWidgetClient(props: {
                       active={tooltipProps.active}
                       label={tooltipProps.label}
                       payload={tooltipProps.payload as unknown as readonly TooltipEntry[] | undefined}
-                      yAxisMode={yAxisMode}
+                      rawValuesByDate={rawValuesByDate}
                       selectedTopic={selectedTopic}
                       pinnedTopic={pinned.topic}
                       onSelect={({ date, topic }) => {
