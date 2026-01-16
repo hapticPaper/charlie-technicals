@@ -1,4 +1,9 @@
-import type { ReportIntervalSeries, ReportPick as ReportPickSetup, TradePlan } from "../../market/types";
+import type {
+  ReportIntervalSeries,
+  ReportPick as ReportPickSetup,
+  SetupReviewPerformance,
+  TradePlan
+} from "../../market/types";
 import { ReportChart } from "./ReportChart";
 import styles from "./report.module.css";
 
@@ -16,6 +21,11 @@ function formatPrice(value: number, reference: number): string {
 function formatSignedPrice(value: number, reference: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${formatPrice(value, reference)}`;
+}
+
+function formatSignedPct(value: number): string {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
 }
 
 function formatTrade(trade: TradePlan): {
@@ -45,8 +55,9 @@ export function ReportPick(props: {
   setupType: "pick" | "watchlist" | "both";
   series1d: ReportIntervalSeries;
   series15m: ReportIntervalSeries;
+  performance?: SetupReviewPerformance | null;
 }) {
-  const { setup, setupType, series1d, series15m } = props;
+  const { setup, setupType, series1d, series15m, performance } = props;
   if (process.env.NODE_ENV !== "production") {
     if (series1d == null || series15m == null) {
       console.error("[reports] ReportPick rendered with missing series (MDX wiring bug)", {
@@ -67,6 +78,31 @@ export function ReportPick(props: {
   const formatted = formatTrade(setup.trade);
   const isBuy = setup.trade.side === "buy";
   const hasNarrative = typeof setup.narrative === "string" && setup.narrative.trim() !== "";
+
+  const isClosed = performance?.status === "closed";
+  const pnlPct = performance ? (isClosed ? performance.realizedPct : performance.totalPct) : null;
+  const pnlClass =
+    pnlPct == null
+      ? styles.kValueMuted
+      : pnlPct > 0
+        ? styles.pnlPositive
+        : pnlPct < 0
+          ? styles.pnlNegative
+          : styles.kValueMuted;
+  const pnlLabel =
+    pnlPct == null
+      ? "--"
+      : typeof pnlPct === "number" && Number.isFinite(pnlPct)
+        ? formatSignedPct(pnlPct)
+        : "--";
+  const statusLabel =
+    performance == null
+      ? "Not tracked"
+      : performance.outcome === "pending"
+        ? "Pending"
+        : isClosed
+          ? "Closed"
+          : "Open";
 
   return (
     <section className={styles.pick}>
@@ -109,6 +145,28 @@ export function ReportPick(props: {
               {typeof setup.move1dAtr14 === "number" && Number.isFinite(setup.move1dAtr14)
                 ? ` (${Math.abs(setup.move1dAtr14).toFixed(1)} ATR)`
                 : ""}
+            </div>
+          </div>
+        ) : null}
+
+        <div className={styles.kv}>
+          <div className={styles.kLabel}>Status</div>
+          <div className={styles.kValue}>{statusLabel}</div>
+        </div>
+
+        <div className={styles.kv}>
+          <div className={styles.kLabel}>{isClosed ? "Final P&L" : "Running P&L"}</div>
+          <div className={`${styles.kValue} ${pnlClass}`}>{pnlLabel}</div>
+        </div>
+
+        {performance ? (
+          <div className={styles.kv}>
+            <div className={styles.kLabel}>Events</div>
+            <div className={styles.kValue}>
+              {performance.openedAt ? "Opened" : "Not opened"}
+              {performance.tp1At ? " • TP1" : ""}
+              {performance.tp2At ? " • TP2" : ""}
+              {performance.stopAt ? " • SL" : ""}
             </div>
           </div>
         ) : null}

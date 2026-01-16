@@ -196,6 +196,43 @@ export type TradePlan = {
   targets: number[];
 };
 
+export type SetupReviewSetupType = "pick" | "watchlist" | "both";
+
+export type SetupReviewOutcome =
+  | "pending"
+  | "not_opened"
+  | "open"
+  | "tp1_open"
+  | "stopped_out"
+  | "tp1_stop"
+  | "tp1_tp2";
+
+// v2 semantics:
+// - setup day session is eligible (setups can open on setupDate)
+// - regular session is treated as [09:30, 16:00) in NY time
+export const SETUP_REVIEW_PERFORMANCE_VERSION = "v2-setup-performance" as const;
+export type SetupReviewPerformanceVersion = typeof SETUP_REVIEW_PERFORMANCE_VERSION;
+
+export type SetupReviewPerformance = {
+  version: SetupReviewPerformanceVersion;
+  setupDate: string;
+  symbol: string;
+  setupType: SetupReviewSetupType;
+  trade: TradePlan;
+  asOfDate: string;
+  computedAt: string;
+  openedAt: string | null;
+  tp1At: string | null;
+  tp2At: string | null;
+  stopAt: string | null;
+  currentPrice: number | null;
+  realizedPct: number;
+  unrealizedPct: number | null;
+  totalPct: number | null;
+  status: "open" | "closed";
+  outcome: SetupReviewOutcome;
+};
+
 export type ReportPick = {
   symbol: string;
   /**

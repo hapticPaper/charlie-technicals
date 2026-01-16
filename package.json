@@ -13,7 +13,8 @@
     "market:news": "bun scripts/market-news.ts",
     "market:analyze": "bun scripts/market-analyze.ts",
     "market:report": "bun scripts/market-report.ts",
-    "market:run": "bun scripts/market-run.ts"
+    "market:run": "bun scripts/market-run.ts",
+    "market:setup-review": "bun scripts/market-setup-review.ts"
   },
   "dependencies": {
     "lightweight-charts": "^5.1.0",

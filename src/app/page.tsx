@@ -163,6 +163,11 @@ export default async function HomePage() {
   return (
     <>
       <h1>Charlie technicals</h1>
+      <div className="rpToolbar">
+        <Link className="rpToolbarButton" href="/portfolio">
+          Portfolio
+        </Link>
+      </div>
       <p className="report-muted">Daily highlights. Click a day for the full rundown.</p>
 
       {latestCard ? (

@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-13",
+  "symbol": "SYF",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 79.7,
+    "stop": 81.3897,
+    "targets": [
+      75.33234155521748,
+      73.14851233282621
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-16T08:20:33.130Z",
+  "openedAt": "2026-01-13T14:30:00.000Z",
+  "tp1At": "2026-01-14T16:55:00.000Z",
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 77.83000183105469,
+  "realizedPct": 2.7400617595875287,
+  "unrealizedPct": 1.1731481611953043,
+  "totalPct": 3.9132099207828333,
+  "status": "open",
+  "outcome": "tp1_open"
+}

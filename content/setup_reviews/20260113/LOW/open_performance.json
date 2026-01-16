@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-13",
+  "symbol": "LOW",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 274.1,
+    "stop": 269.6659,
+    "targets": [
+      286.74074448966417,
+      293.0611167344963
+    ]
+  },
+  "asOfDate": "2026-01-15",
+  "computedAt": "2026-01-16T08:20:33.108Z",
+  "openedAt": "2026-01-13T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 274.95001220703125,
+  "realizedPct": 0,
+  "unrealizedPct": 0.31011025429814926,
+  "totalPct": 0.31011025429814926,
+  "status": "open",
+  "outcome": "open"
+}

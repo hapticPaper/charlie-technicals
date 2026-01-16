@@ -26,8 +26,10 @@ import {
   type MarketInterval,
   type MarketReport,
   type MarketReportSummaryWidgets,
-  type ReportIntervalSeries
+  type ReportIntervalSeries,
+  type SetupReviewPerformance
 } from "../../../market/types";
+import { listSetupReviewPerformancesForDate } from "../../../market/setupReviewStorage";
 
 const MARKET_INTERVAL_SET: ReadonlySet<string> = new Set(MARKET_INTERVALS);
 
@@ -186,6 +188,29 @@ export default async function ReportPage(props: ReportPageProps) {
   }
 
   let content: ReactNode;
+
+  const setupSymbols = new Set<string>([
+    ...report.picks.map((p) => p.symbol),
+    ...(report.watchlist?.map((p) => p.symbol) ?? [])
+  ]);
+  const performanceBySymbol = new Map<string, SetupReviewPerformance>();
+  for (const entry of await listSetupReviewPerformancesForDate(date)) {
+    if (setupSymbols.has(entry.performance.symbol)) {
+      performanceBySymbol.set(entry.performance.symbol, entry.performance);
+    }
+  }
+
+  const missingPerformance: string[] = [];
+  for (const symbol of setupSymbols) {
+    if (!performanceBySymbol.has(symbol)) {
+      missingPerformance.push(symbol);
+    }
+  }
+
+  if (missingPerformance.length > 0 && process.env.NODE_ENV !== "production") {
+    console.warn("[reports] Setup review performance missing for some symbols", { date, symbols: missingPerformance });
+  }
+
   try {
     const res = await renderMdx(mdxRaw, {
       ReportSummary: () => <ReportSummary summaryWidgets={summaryWidgets} />,
@@ -262,6 +287,7 @@ export default async function ReportPage(props: ReportPageProps) {
             setupType={setupType}
             series1d={series.series1d}
             series15m={series.series15m}
+            performance={performanceBySymbol.get(symbol) ?? null}
           />
         );
       },
