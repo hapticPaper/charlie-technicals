@@ -66,19 +66,6 @@ type TooltipEntry = {
   color?: unknown;
 };
 
-function parseTooltipCount(value: unknown): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  return 0;
-}
-
 function parseTooltipTopic(value: unknown): string | null {
   if (typeof value === "string" && value.trim() !== "") {
     return value;
@@ -131,7 +118,7 @@ function TopicTooltip(props: {
           return null;
         }
 
-        const count = parseTooltipCount(raw);
+        const count = raw;
         return {
           topic,
           count,
@@ -293,6 +280,8 @@ export function CnbcTopicTrendWidgetClient(props: {
       // In log2 mode, we want the stacked total height for a day to be log2(total + 1) while
       // preserving each topic's share of that total. This is why we apply a per-row scale
       // factor instead of taking log2() per series.
+      //
+      // Note: a topic's absolute height depends on what else is active that day.
       const logScale = total > 0 ? Math.log2(total + 1) / total : 0;
 
       for (const { chartKey, raw } of rawByChartKey) {
@@ -406,7 +395,7 @@ export function CnbcTopicTrendWidgetClient(props: {
               }}
               className="rpToolbarButton"
             >
-              Y axis: {yAxisMode}
+              Y axis (toggle): {yAxisMode}
             </button>
 
             <button
@@ -416,7 +405,7 @@ export function CnbcTopicTrendWidgetClient(props: {
               }}
               className="rpToolbarButton"
             >
-              Categories: {includeMarkets ? "all" : 'all except "markets"'}
+              Categories (toggle): {includeMarkets ? "all" : 'all except "markets"'}
             </button>
           </div>
 
