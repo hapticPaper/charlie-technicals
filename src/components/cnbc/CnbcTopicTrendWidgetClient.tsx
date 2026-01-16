@@ -70,8 +70,8 @@ function formatDateTick(value: unknown): string {
 type TooltipEntry = {
   name?: unknown;
   value?: unknown;
-  dataKey?: unknown;
-  payload?: unknown;
+  dataKey?: string | number;
+  payload?: Record<string, unknown>;
   color?: unknown;
 };
 
@@ -130,7 +130,7 @@ function TopicTooltip(props: {
         }
 
         const chartKey = typeof entry.dataKey === "string" ? entry.dataKey : null;
-        const row = typeof entry.payload === "object" && entry.payload !== null ? (entry.payload as Record<string, unknown>) : null;
+        const row = entry.payload ?? null;
         const raw = chartKey && row ? row[toRawChartKey(chartKey)] : undefined;
         const hasRaw = typeof raw === "number" && Number.isFinite(raw);
         if (props.yAxisMode === "log2" && !hasRaw) {
@@ -294,8 +294,9 @@ export function CnbcTopicTrendWidgetClient(props: {
         chartRow[rawKey] = raw;
       }
 
-      // In log2 mode, the Y axis represents log2(total + 1) for the visible topics on that day.
-      // Each topic's area is a proportional slice of the day's total.
+      // In log2 mode, we want the stacked total height for a day to be log2(total + 1) while
+      // preserving each topic's share of that total. This is why we apply a per-row scale
+      // factor instead of taking log2() per series.
       const logScale = total > 0 ? Math.log2(total + 1) / total : 0;
 
       for (const { rawKey, chartKey } of chartTopics) {
