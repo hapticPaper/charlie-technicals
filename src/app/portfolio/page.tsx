@@ -39,17 +39,7 @@ function pnlPctFor(perf: SetupReviewPerformance): number | null {
 }
 
 function pnlUsdFor(perf: SetupReviewPerformance): number | null {
-  const notional = assumedNotionalUsd(perf);
-  if (notional === 0) {
-    return null;
-  }
-
-  const pct = pnlPctFor(perf);
-  if (pct == null || !Number.isFinite(pct)) {
-    return null;
-  }
-
-  return (pct / 100) * notional;
+  return pnlUsdComponents(perf).pnlUsd;
 }
 
 function assumedNotionalUsd(perf: SetupReviewPerformance): number {
@@ -62,6 +52,20 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
   }
 
   return ASSUMED_SETUP_NOTIONAL_USD;
+}
+
+function pnlUsdComponents(perf: SetupReviewPerformance): { notional: number; pnlUsd: number | null } {
+  const notional = assumedNotionalUsd(perf);
+  if (notional === 0) {
+    return { notional: 0, pnlUsd: null };
+  }
+
+  const pct = pnlPctFor(perf);
+  if (pct == null || !Number.isFinite(pct)) {
+    return { notional: 0, pnlUsd: null };
+  }
+
+  return { notional, pnlUsd: (pct / 100) * notional };
 }
 
 function finalizedAt(perf: SetupReviewPerformance): string | null {
@@ -97,8 +101,21 @@ function splitPositions(items: SetupReviewPerformance[]): {
 
   open.sort((a, b) => b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol));
   closed.sort((a, b) => {
-    const aFinal = finalizedAt(a) ?? "";
-    const bFinal = finalizedAt(b) ?? "";
+    const aFinal = finalizedAt(a);
+    const bFinal = finalizedAt(b);
+
+    if (!aFinal && !bFinal) {
+      return b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol);
+    }
+
+    if (!aFinal) {
+      return 1;
+    }
+
+    if (!bFinal) {
+      return -1;
+    }
+
     return bFinal.localeCompare(aFinal) || b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol);
   });
 
@@ -114,22 +131,27 @@ function aggregate(items: SetupReviewPerformance[]): {
   let pnlUsd = 0;
 
   for (const perf of items) {
-    const notional = assumedNotionalUsd(perf);
-    if (notional === 0) {
-      continue;
-    }
-
-    const pct = pnlPctFor(perf);
-    if (pct == null || !Number.isFinite(pct)) {
+    const { notional, pnlUsd: rowPnlUsd } = pnlUsdComponents(perf);
+    if (notional === 0 || rowPnlUsd == null) {
       continue;
     }
 
     investedUsd += notional;
-    pnlUsd += (pct / 100) * notional;
+    pnlUsd += rowPnlUsd;
   }
 
   const pnlPct = investedUsd > 0 ? (pnlUsd / investedUsd) * 100 : null;
   return { investedUsd, pnlUsd, pnlPct };
+}
+
+function formatSummaryPnl(agg: { investedUsd: number; pnlUsd: number; pnlPct: number | null }): string {
+  if (agg.investedUsd === 0 || agg.pnlPct == null) {
+    return `-- (--) on $${agg.investedUsd.toFixed(0)}`;
+  }
+
+  const pctLabel = formatSignedPct(agg.pnlPct);
+  const usdLabel = formatSignedUsd(agg.pnlUsd);
+  return `${pctLabel} (${usdLabel}) on $${agg.investedUsd.toFixed(0)}`;
 }
 
 function renderOpenTable(rows: SetupReviewPerformance[]) {
@@ -241,12 +263,13 @@ export default async function PortfolioPage() {
   const closedAgg = aggregate(closed);
   const totalAgg = aggregate([...open, ...closed]);
 
-  const openAggPctLabel = openAgg.pnlPct == null ? "--" : formatSignedPct(openAgg.pnlPct);
-  const openAggUsdLabel = openAgg.investedUsd === 0 ? "--" : formatSignedUsd(openAgg.pnlUsd);
-  const closedAggPctLabel = closedAgg.pnlPct == null ? "--" : formatSignedPct(closedAgg.pnlPct);
-  const closedAggUsdLabel = closedAgg.investedUsd === 0 ? "--" : formatSignedUsd(closedAgg.pnlUsd);
-  const totalAggPctLabel = totalAgg.pnlPct == null ? "--" : formatSignedPct(totalAgg.pnlPct);
-  const totalAggUsdLabel = totalAgg.investedUsd === 0 ? "--" : formatSignedUsd(totalAgg.pnlUsd);
+  const ignoredParts: string[] = [];
+  if (ignored.pending > 0) {
+    ignoredParts.push(`${ignored.pending} pending setup${ignored.pending === 1 ? "" : "s"}`);
+  }
+  if (ignored.notOpened > 0) {
+    ignoredParts.push(`${ignored.notOpened} not-opened setup${ignored.notOpened === 1 ? "" : "s"}`);
+  }
 
   return (
     <>
@@ -267,32 +290,21 @@ export default async function PortfolioPage() {
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Open</div>
           <div className={styles.summaryValue}>{open.length}</div>
-          <div className="report-muted">
-            {openAggPctLabel} ({openAggUsdLabel}) on ${openAgg.investedUsd.toFixed(0)}
-          </div>
+          <div className="report-muted">{formatSummaryPnl(openAgg)}</div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Closed</div>
           <div className={styles.summaryValue}>{closed.length}</div>
-          <div className="report-muted">
-            {closedAggPctLabel} ({closedAggUsdLabel}) on ${closedAgg.investedUsd.toFixed(0)}
-          </div>
+          <div className="report-muted">{formatSummaryPnl(closedAgg)}</div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Total</div>
           <div className={styles.summaryValue}>{open.length + closed.length}</div>
-          <div className="report-muted">
-            {totalAggPctLabel} ({totalAggUsdLabel}) on ${totalAgg.investedUsd.toFixed(0)}
-          </div>
+          <div className="report-muted">{formatSummaryPnl(totalAgg)}</div>
         </div>
       </div>
 
-      {ignored.pending > 0 || ignored.notOpened > 0 ? (
-        <p className="report-muted">
-          Ignoring {ignored.pending} pending setup{ignored.pending === 1 ? "" : "s"} and {ignored.notOpened} not-opened setup
-          {ignored.notOpened === 1 ? "" : "s"}.
-        </p>
-      ) : null}
+      {ignoredParts.length > 0 ? <p className="report-muted">Ignoring {ignoredParts.join(" and ")}.</p> : null}
 
       {open.length > 0 ? (
         <>
