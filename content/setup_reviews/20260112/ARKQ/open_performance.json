@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-12",
+  "symbol": "ARKQ",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 129.95,
+    "stop": 128.01004999999998,
+    "targets": [
+      136.12028635304517,
+      139.20542952956777
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.328Z",
+  "openedAt": "2026-01-13T15:25:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 132.22000122070312,
+  "realizedPct": 0,
+  "unrealizedPct": 1.7468266415568576,
+  "totalPct": 1.7468266415568576,
+  "status": "open",
+  "outcome": "open"
+}

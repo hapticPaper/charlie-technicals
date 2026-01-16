@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-07",
+  "symbol": "MSFT",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 477.27,
+    "stop": 475.92273,
+    "targets": [
+      492.6347117314303,
+      500.31706759714547
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.113Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 456.9100036621094,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

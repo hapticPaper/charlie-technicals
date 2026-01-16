@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-08",
+  "symbol": "RTX",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 194.8,
+    "stop": 191.3052,
+    "targets": [
+      201.94672109574023,
+      205.52008164361033
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.191Z",
+  "openedAt": "2026-01-13T18:40:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 199.8300018310547,
+  "realizedPct": 0,
+  "unrealizedPct": 2.582136463580429,
+  "totalPct": 2.582136463580429,
+  "status": "open",
+  "outcome": "open"
+}

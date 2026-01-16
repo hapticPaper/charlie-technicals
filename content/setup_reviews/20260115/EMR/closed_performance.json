@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-15",
+  "symbol": "EMR",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 150.4,
+    "stop": 148.4696,
+    "targets": [
+      156.4783073063457,
+      159.51746095951853
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.428Z",
+  "openedAt": "2026-01-15T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-01-15T18:55:00.000Z",
+  "currentPrice": 148.00999450683594,
+  "realizedPct": -1.2835106382978667,
+  "unrealizedPct": null,
+  "totalPct": -1.2835106382978667,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

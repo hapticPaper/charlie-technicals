@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-07",
+  "symbol": "SNAP",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 8.79,
+    "stop": 8.76121,
+    "targets": [
+      9.351851089516154,
+      9.632776634274231
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.130Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 7.760000228881836,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

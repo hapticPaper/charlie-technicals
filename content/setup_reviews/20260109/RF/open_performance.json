@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-09",
+  "symbol": "RF",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 28.96,
+    "stop": 28.72104,
+    "targets": [
+      30.065387084724424,
+      30.618080627086634
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.232Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 28.540000915527344,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

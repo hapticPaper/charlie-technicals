@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-07",
+  "symbol": "CMA",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 92,
+    "stop": 90.518,
+    "targets": [
+      95.43968662208503,
+      97.15952993312756
+    ]
+  },
+  "asOfDate": "2026-01-16",
+  "computedAt": "2026-01-16T14:22:56.103Z",
+  "openedAt": "2026-01-09T14:50:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-01-12T14:30:00.000Z",
+  "currentPrice": 91.48999786376953,
+  "realizedPct": -1.6108695652173903,
+  "unrealizedPct": null,
+  "totalPct": -1.6108695652173903,
+  "status": "closed",
+  "outcome": "stopped_out"
+}
