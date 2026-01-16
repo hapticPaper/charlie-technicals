@@ -151,7 +151,24 @@ function splitPositions(items: SetupReviewPerformance[]): {
     }
   }
 
-  open.sort((a, b) => b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol));
+  open.sort((a, b) => {
+    const aTime = toEpochMs(a.openedAt);
+    const bTime = toEpochMs(b.openedAt);
+
+    if (aTime == null && bTime == null) {
+      return a.symbol.localeCompare(b.symbol);
+    }
+
+    if (aTime == null) {
+      return 1;
+    }
+
+    if (bTime == null) {
+      return -1;
+    }
+
+    return bTime - aTime || a.symbol.localeCompare(b.symbol);
+  });
   closed.sort(compareClosedPositions);
 
   return { open, closed, ignored: { pending, notOpened } };
@@ -164,7 +181,14 @@ function compareClosedPositions(a: OpenedSetupReviewPerformance, b: OpenedSetupR
   const bTime = toEpochMs(bFinal);
 
   if (aTime == null && bTime == null) {
-    return b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
+    const aOpenedTime = toEpochMs(a.openedAt);
+    const bOpenedTime = toEpochMs(b.openedAt);
+
+    if (aOpenedTime != null && bOpenedTime != null && bOpenedTime !== aOpenedTime) {
+      return bOpenedTime - aOpenedTime;
+    }
+
+    return a.symbol.localeCompare(b.symbol);
   }
 
   if (aTime == null) {
@@ -179,7 +203,13 @@ function compareClosedPositions(a: OpenedSetupReviewPerformance, b: OpenedSetupR
     return bTime - aTime;
   }
 
-  return b.openedAt.localeCompare(a.openedAt) || a.symbol.localeCompare(b.symbol);
+  const aOpenedTime = toEpochMs(a.openedAt);
+  const bOpenedTime = toEpochMs(b.openedAt);
+  if (aOpenedTime != null && bOpenedTime != null && bOpenedTime !== aOpenedTime) {
+    return bOpenedTime - aOpenedTime;
+  }
+
+  return a.symbol.localeCompare(b.symbol);
 }
 
 function aggregate(items: SetupReviewPerformance[]): {
@@ -251,6 +281,26 @@ function getPnlDisplay(perf: SetupReviewPerformance): { className: string; pctLa
   };
 }
 
+function PositionRow({ perf, includeClosedDate }: { perf: OpenedSetupReviewPerformance; includeClosedDate: boolean }) {
+  const pnl = getPnlDisplay(perf);
+  const closedAt = includeClosedDate ? finalizedAt(perf) : null;
+
+  return (
+    <tr>
+      <td>
+        <Link href={`/reports/${perf.setupDate}`}>
+          <strong>{perf.symbol}</strong>
+        </Link>
+      </td>
+      <td>{perf.trade.side.toUpperCase()}</td>
+      <td>{formatIsoDate(perf.openedAt)}</td>
+      {includeClosedDate ? <td>{formatIsoDate(closedAt)}</td> : null}
+      <td className={pnl.className}>{pnl.pctLabel}</td>
+      <td className={pnl.className}>{pnl.usdLabel}</td>
+    </tr>
+  );
+}
+
 function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
   return (
     <div className={styles.tableWrap}>
@@ -265,23 +315,9 @@ function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((p) => {
-            const pnl = getPnlDisplay(p);
-
-            return (
-              <tr key={`${p.setupDate}-${p.symbol}-${p.openedAt}`}>
-                <td>
-                  <Link href={`/reports/${p.setupDate}`}>
-                    <strong>{p.symbol}</strong>
-                  </Link>
-                </td>
-                <td>{p.trade.side.toUpperCase()}</td>
-                <td>{formatIsoDate(p.openedAt)}</td>
-                <td className={pnl.className}>{pnl.pctLabel}</td>
-                <td className={pnl.className}>{pnl.usdLabel}</td>
-              </tr>
-            );
-          })}
+          {rows.map((p) => (
+            <PositionRow key={`${p.setupDate}-${p.symbol}-${p.openedAt}`} perf={p} includeClosedDate={false} />
+          ))}
         </tbody>
       </table>
     </div>
@@ -303,24 +339,13 @@ function renderClosedTable(rows: OpenedSetupReviewPerformance[]) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((p) => {
-            const pnl = getPnlDisplay(p);
-
-            return (
-              <tr key={`${p.setupDate}-${p.symbol}-${p.openedAt}-${finalizedAt(p) ?? "unknown"}`}>
-                <td>
-                  <Link href={`/reports/${p.setupDate}`}>
-                    <strong>{p.symbol}</strong>
-                  </Link>
-                </td>
-                <td>{p.trade.side.toUpperCase()}</td>
-                <td>{formatIsoDate(p.openedAt)}</td>
-                <td>{formatIsoDate(finalizedAt(p))}</td>
-                <td className={pnl.className}>{pnl.pctLabel}</td>
-                <td className={pnl.className}>{pnl.usdLabel}</td>
-              </tr>
-            );
-          })}
+          {rows.map((p) => (
+            <PositionRow
+              key={`${p.setupDate}-${p.symbol}-${p.openedAt}-${finalizedAt(p) ?? "unknown"}`}
+              perf={p}
+              includeClosedDate={true}
+            />
+          ))}
         </tbody>
       </table>
     </div>
@@ -377,7 +402,9 @@ export default async function PortfolioPage() {
         </div>
       </div>
 
-      {ignoredParts.length > 0 ? <p className="report-muted">Ignoring {joinWithAnd(ignoredParts)}.</p> : null}
+      {ignoredParts.length > 0 ? (
+        <p className="report-muted">Ignoring {joinWithAnd(ignoredParts)} from portfolio stats because they have no open date.</p>
+      ) : null}
 
       {open.length > 0 ? (
         <>
