@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { listSetupReviewPerformances } from "../../market/setupReviewStorage";
 import type { SetupReviewPerformance } from "../../market/types";
+import { formatDateYYYYMMDD } from "../../lib/date";
 
 import styles from "./portfolio.module.css";
 
@@ -13,12 +14,42 @@ function formatSignedPct(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+function formatSignedUsd(value: number): string {
+  if (value < 0) {
+    return `-$${Math.abs(value).toFixed(2)}`;
+  }
+
+  return `+$${value.toFixed(2)}`;
+}
+
+function formatIsoDate(date: string | null): string {
+  if (!date) {
+    return "--";
+  }
+
+  return formatDateYYYYMMDD(new Date(date));
+}
+
 function pnlPctFor(perf: SetupReviewPerformance): number | null {
   if (perf.status === "closed") {
     return perf.realizedPct;
   }
 
   return perf.totalPct;
+}
+
+function pnlUsdFor(perf: SetupReviewPerformance): number | null {
+  const notional = assumedNotionalUsd(perf);
+  if (notional === 0) {
+    return null;
+  }
+
+  const pct = pnlPctFor(perf);
+  if (pct == null || !Number.isFinite(pct)) {
+    return null;
+  }
+
+  return (pct / 100) * notional;
 }
 
 function assumedNotionalUsd(perf: SetupReviewPerformance): number {
@@ -33,18 +64,30 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
   return ASSUMED_SETUP_NOTIONAL_USD;
 }
 
-function hitLabel(hit: boolean): string {
-  return hit ? "Yes" : "No";
+function finalizedAt(perf: SetupReviewPerformance): string | null {
+  return perf.tp2At ?? perf.stopAt;
 }
 
-function splitPerformances(items: SetupReviewPerformance[]): {
+function splitPositions(items: SetupReviewPerformance[]): {
   open: SetupReviewPerformance[];
   closed: SetupReviewPerformance[];
+  ignored: { pending: number; notOpened: number };
 } {
   const open: SetupReviewPerformance[] = [];
   const closed: SetupReviewPerformance[] = [];
+  let pending = 0;
+  let notOpened = 0;
 
   for (const p of items) {
+    if (!p.openedAt) {
+      if (p.status === "open") {
+        pending += 1;
+      } else {
+        notOpened += 1;
+      }
+      continue;
+    }
+
     if (p.status === "closed") {
       closed.push(p);
     } else {
@@ -52,10 +95,14 @@ function splitPerformances(items: SetupReviewPerformance[]): {
     }
   }
 
-  open.sort((a, b) => b.setupDate.localeCompare(a.setupDate) || a.symbol.localeCompare(b.symbol));
-  closed.sort((a, b) => b.setupDate.localeCompare(a.setupDate) || a.symbol.localeCompare(b.symbol));
+  open.sort((a, b) => b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol));
+  closed.sort((a, b) => {
+    const aFinal = finalizedAt(a) ?? "";
+    const bFinal = finalizedAt(b) ?? "";
+    return bFinal.localeCompare(aFinal) || b.openedAt!.localeCompare(a.openedAt!) || a.symbol.localeCompare(b.symbol);
+  });
 
-  return { open, closed };
+  return { open, closed, ignored: { pending, notOpened } };
 }
 
 function aggregate(items: SetupReviewPerformance[]): {
@@ -85,29 +132,23 @@ function aggregate(items: SetupReviewPerformance[]): {
   return { investedUsd, pnlUsd, pnlPct };
 }
 
-function renderTable(rows: SetupReviewPerformance[]) {
+function renderOpenTable(rows: SetupReviewPerformance[]) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>Date</th>
             <th>Symbol</th>
             <th>Side</th>
-            <th>Opened</th>
-            <th>Hit SL</th>
-            <th>Hit TP1</th>
-            <th>Hit both TP</th>
-            <th>Performance</th>
+            <th>Opened on</th>
+            <th>P&amp;L %</th>
+            <th>P&amp;L $</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((p) => {
-            const opened = Boolean(p.openedAt);
-            const hitSl = Boolean(p.stopAt);
-            const hitTp1 = Boolean(p.tp1At);
-            const hitTp2 = Boolean(p.tp2At);
             const pnlPct = pnlPctFor(p);
+            const pnlUsd = pnlUsdFor(p);
 
             const pnlClass =
               pnlPct == null
@@ -118,21 +159,70 @@ function renderTable(rows: SetupReviewPerformance[]) {
                     ? styles.pnlNegative
                     : styles.pnlNeutral;
             const pnlLabel = pnlPct == null ? "--" : formatSignedPct(pnlPct);
+            const pnlUsdLabel = pnlUsd == null ? "--" : formatSignedUsd(pnlUsd);
 
             return (
               <tr key={`${p.setupDate}-${p.symbol}`}>
                 <td>
-                  <Link href={`/reports/${p.setupDate}`}>{p.setupDate}</Link>
-                </td>
-                <td>
-                  <strong>{p.symbol}</strong>
+                  <Link href={`/reports/${p.setupDate}`}>
+                    <strong>{p.symbol}</strong>
+                  </Link>
                 </td>
                 <td>{p.trade.side.toUpperCase()}</td>
-                <td>{hitLabel(opened)}</td>
-                <td>{hitLabel(hitSl)}</td>
-                <td>{hitLabel(hitTp1)}</td>
-                <td>{hitLabel(hitTp1 && hitTp2)}</td>
+                <td>{formatIsoDate(p.openedAt)}</td>
                 <td className={pnlClass}>{pnlLabel}</td>
+                <td className={pnlClass}>{pnlUsdLabel}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function renderClosedTable(rows: SetupReviewPerformance[]) {
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Opened on</th>
+            <th>Closed on</th>
+            <th>P&amp;L %</th>
+            <th>P&amp;L $</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((p) => {
+            const pnlPct = pnlPctFor(p);
+            const pnlUsd = pnlUsdFor(p);
+
+            const pnlClass =
+              pnlPct == null
+                ? styles.pnlNeutral
+                : pnlPct > 0
+                  ? styles.pnlPositive
+                  : pnlPct < 0
+                    ? styles.pnlNegative
+                    : styles.pnlNeutral;
+            const pnlLabel = pnlPct == null ? "--" : formatSignedPct(pnlPct);
+            const pnlUsdLabel = pnlUsd == null ? "--" : formatSignedUsd(pnlUsd);
+
+            return (
+              <tr key={`${p.setupDate}-${p.symbol}`}>
+                <td>
+                  <Link href={`/reports/${p.setupDate}`}>
+                    <strong>{p.symbol}</strong>
+                  </Link>
+                </td>
+                <td>{p.trade.side.toUpperCase()}</td>
+                <td>{formatIsoDate(p.openedAt)}</td>
+                <td>{formatIsoDate(finalizedAt(p))}</td>
+                <td className={pnlClass}>{pnlLabel}</td>
+                <td className={pnlClass}>{pnlUsdLabel}</td>
               </tr>
             );
           })}
@@ -146,10 +236,17 @@ export default async function PortfolioPage() {
   const listed = await listSetupReviewPerformances();
   const all = listed.map((l) => l.performance);
 
-  const { open, closed } = splitPerformances(all);
+  const { open, closed, ignored } = splitPositions(all);
   const openAgg = aggregate(open);
   const closedAgg = aggregate(closed);
   const totalAgg = aggregate([...open, ...closed]);
+
+  const openAggPctLabel = openAgg.pnlPct == null ? "--" : formatSignedPct(openAgg.pnlPct);
+  const openAggUsdLabel = openAgg.investedUsd === 0 ? "--" : formatSignedUsd(openAgg.pnlUsd);
+  const closedAggPctLabel = closedAgg.pnlPct == null ? "--" : formatSignedPct(closedAgg.pnlPct);
+  const closedAggUsdLabel = closedAgg.investedUsd === 0 ? "--" : formatSignedUsd(closedAgg.pnlUsd);
+  const totalAggPctLabel = totalAgg.pnlPct == null ? "--" : formatSignedPct(totalAgg.pnlPct);
+  const totalAggUsdLabel = totalAgg.investedUsd === 0 ? "--" : formatSignedUsd(totalAgg.pnlUsd);
 
   return (
     <>
@@ -171,29 +268,36 @@ export default async function PortfolioPage() {
           <div className={styles.summaryLabel}>Open</div>
           <div className={styles.summaryValue}>{open.length}</div>
           <div className="report-muted">
-            {openAgg.pnlPct == null ? "--" : formatSignedPct(openAgg.pnlPct)} on ${openAgg.investedUsd.toFixed(0)}
+            {openAggPctLabel} ({openAggUsdLabel}) on ${openAgg.investedUsd.toFixed(0)}
           </div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Closed</div>
           <div className={styles.summaryValue}>{closed.length}</div>
           <div className="report-muted">
-            {closedAgg.pnlPct == null ? "--" : formatSignedPct(closedAgg.pnlPct)} on ${closedAgg.investedUsd.toFixed(0)}
+            {closedAggPctLabel} ({closedAggUsdLabel}) on ${closedAgg.investedUsd.toFixed(0)}
           </div>
         </div>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Total</div>
           <div className={styles.summaryValue}>{open.length + closed.length}</div>
           <div className="report-muted">
-            {totalAgg.pnlPct == null ? "--" : formatSignedPct(totalAgg.pnlPct)} on ${totalAgg.investedUsd.toFixed(0)}
+            {totalAggPctLabel} ({totalAggUsdLabel}) on ${totalAgg.investedUsd.toFixed(0)}
           </div>
         </div>
       </div>
 
+      {ignored.pending > 0 || ignored.notOpened > 0 ? (
+        <p className="report-muted">
+          Ignoring {ignored.pending} pending setup{ignored.pending === 1 ? "" : "s"} and {ignored.notOpened} not-opened setup
+          {ignored.notOpened === 1 ? "" : "s"}.
+        </p>
+      ) : null}
+
       {open.length > 0 ? (
         <>
           <h2>Open</h2>
-          {renderTable(open)}
+          {renderOpenTable(open)}
         </>
       ) : (
         <p className="report-muted">No open positions.</p>
@@ -202,7 +306,7 @@ export default async function PortfolioPage() {
       {closed.length > 0 ? (
         <>
           <h2>Closed</h2>
-          {renderTable(closed)}
+          {renderClosedTable(closed)}
         </>
       ) : null}
     </>
