@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-13",
   "symbol": "SYF",
   "setupType": "pick",
@@ -13,15 +13,15 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:49.738Z",
-  "openedAt": null,
-  "tp1At": null,
+  "computedAt": "2026-01-16T08:20:33.130Z",
+  "openedAt": "2026-01-13T14:30:00.000Z",
+  "tp1At": "2026-01-14T16:55:00.000Z",
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 77.82,
-  "realizedPct": 0,
-  "unrealizedPct": null,
-  "totalPct": null,
+  "currentPrice": 77.83000183105469,
+  "realizedPct": 2.7400617595875287,
+  "unrealizedPct": 1.1731481611953043,
+  "totalPct": 3.9132099207828333,
   "status": "open",
-  "outcome": "pending"
+  "outcome": "tp1_open"
 }

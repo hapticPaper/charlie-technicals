@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-13",
   "symbol": "GDX",
   "setupType": "watchlist",
@@ -13,15 +13,15 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:49.717Z",
-  "openedAt": "2026-01-14T14:45:00.000Z",
+  "computedAt": "2026-01-16T08:20:33.100Z",
+  "openedAt": "2026-01-13T14:30:00.000Z",
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 96.86,
+  "currentPrice": 96.88999938964844,
   "realizedPct": 0,
-  "unrealizedPct": 0.08266170696424704,
-  "totalPct": 0.08266170696424704,
+  "unrealizedPct": 0.11365921641706589,
+  "totalPct": 0.11365921641706589,
   "status": "open",
   "outcome": "open"
 }

@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-14",
   "symbol": "TSLA",
   "setupType": "watchlist",
@@ -13,12 +13,12 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:50.477Z",
+  "computedAt": "2026-01-16T08:20:33.179Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": null,
+  "currentPrice": 439.260009765625,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,

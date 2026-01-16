@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-13",
   "symbol": "AIG",
   "setupType": "pick",
@@ -13,15 +13,15 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:49.678Z",
-  "openedAt": "2026-01-14T14:55:00.000Z",
+  "computedAt": "2026-01-16T08:20:33.070Z",
+  "openedAt": "2026-01-13T14:30:00.000Z",
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 73.04,
+  "currentPrice": 73.04000091552734,
   "realizedPct": 0,
-  "unrealizedPct": 1.297297297297289,
-  "totalPct": 1.297297297297289,
+  "unrealizedPct": 1.2972960600981842,
+  "totalPct": 1.2972960600981842,
   "status": "open",
   "outcome": "open"
 }

@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-14",
   "symbol": "NVDA",
   "setupType": "watchlist",
@@ -13,12 +13,12 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:50.468Z",
+  "computedAt": "2026-01-16T08:20:33.171Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": null,
+  "currentPrice": 183.1699981689453,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,

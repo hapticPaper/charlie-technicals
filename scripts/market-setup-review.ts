@@ -38,7 +38,43 @@ type SetupSpec = {
   trade: TradePlan;
 };
 
-function toSetupSpecs(report: MarketReport): SetupSpec[] {
+function almostEqual(a: number, b: number, relEps = 1e-4, absEps = 1e-2): boolean {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    return false;
+  }
+
+  const diff = Math.abs(a - b);
+  const scale = Math.max(Math.abs(a), Math.abs(b), 1);
+  return diff <= Math.max(absEps, scale * relEps);
+}
+
+function tradePlansEqual(a: TradePlan, b: TradePlan): boolean {
+  if (a.side !== b.side) {
+    return false;
+  }
+
+  if (!almostEqual(a.entry, b.entry) || !almostEqual(a.stop, b.stop)) {
+    return false;
+  }
+
+  if (a.targets.length !== b.targets.length) {
+    return false;
+  }
+
+  // Targets are ordered (tp1, tp2).
+  for (let i = 0; i < a.targets.length; i += 1) {
+    if (!almostEqual(a.targets[i], b.targets[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function toSetupSpecs(
+  report: MarketReport,
+  opts: { onTradeMismatch: (args: { date: string; symbol: string }) => void }
+): SetupSpec[] {
   const bySymbol = new Map<string, { pick?: ReportPick; watch?: ReportPick }>();
 
   for (const pick of report.picks) {
@@ -55,6 +91,28 @@ function toSetupSpecs(report: MarketReport): SetupSpec[] {
   for (const [symbol, entry] of bySymbol.entries()) {
     const pick = entry.pick;
     const watch = entry.watch;
+
+    // Invariant: if a symbol is both a pick and a watchlist item for a given date,
+    // it should have a consistent trade plan across both.
+    if (pick && watch && !tradePlansEqual(pick.trade, watch.trade)) {
+      opts.onTradeMismatch({ date: report.date, symbol });
+      console.warn(
+        JSON.stringify(
+          {
+            stage: "setup-review",
+            kind: "trade_mismatch",
+            date: report.date,
+            symbol,
+            picked: "pick",
+            pickTrade: pick.trade,
+            watchTrade: watch.trade
+          },
+          null,
+          2
+        )
+      );
+    }
+
     const setup = pick ?? watch;
     if (!setup) {
       continue;
@@ -67,100 +125,153 @@ function toSetupSpecs(report: MarketReport): SetupSpec[] {
   return setups.sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
 
-const argv = process.argv.slice(2);
-const asOfDate = getDateArg(argv);
-const windowDays = Number(getArg(argv, "windowDays") ?? 40);
-if (!Number.isFinite(windowDays) || windowDays <= 0) {
-  throw new Error(`Invalid --windowDays: ${String(getArg(argv, "windowDays"))}`);
-}
+async function main() {
+  const argv = process.argv.slice(2);
+  const asOfDate = getDateArg(argv);
+  const windowDays = Number(getArg(argv, "windowDays") ?? 40);
+  if (!Number.isFinite(windowDays) || windowDays <= 0) {
+    throw new Error(`Invalid --windowDays: ${String(getArg(argv, "windowDays"))}`);
+  }
 
-const force = getArg(argv, "force") === "true" || argv.includes("--force");
+  const strictTradeMismatch = process.env.SETUP_REVIEW_STRICT_MISMATCH === "true";
+  let hadTradeMismatch = false;
+  const tradeMismatchDetails: Array<{ date: string; symbol: string }> = [];
 
-const minReportDate = addDaysIso(asOfDate, -windowDays);
+  const force = argv.includes("--force") || getArg(argv, "force") === "true";
 
-const dates = (await listReportDates()).filter((d) => d >= minReportDate && d <= asOfDate);
-if (dates.length === 0) {
-  console.log(JSON.stringify({ stage: "setup-review", asOfDate, status: "no_reports" }, null, 2));
-  process.exit(0);
-}
+  const minReportDate = addDaysIso(asOfDate, -windowDays);
 
-await mkdir(getSetupReviewsDir(), { recursive: true });
+  const dates = (await listReportDates()).filter((d) => d >= minReportDate && d <= asOfDate);
+  if (dates.length === 0) {
+    console.log(JSON.stringify({ stage: "setup-review", asOfDate, status: "no_reports" }, null, 2));
+    process.exit(0);
+  }
 
-const rawBarsCache = new Map<string, MarketBar[] | null>();
+  await mkdir(getSetupReviewsDir(), { recursive: true });
 
-const processedDates: Array<{ date: string; setups: number; written: number; skippedClosed: number; mdx: string }> = [];
+  const setupsByDate = await Promise.all(
+    dates.map(async (date) => {
+      const report = await readJson<MarketReport>(getReportJsonPath(date));
+      const setups = toSetupSpecs(report, {
+        onTradeMismatch: (args) => {
+          hadTradeMismatch = true;
+          tradeMismatchDetails.push(args);
+        }
+      });
 
-for (const date of dates) {
-  const report = await readJson<MarketReport>(getReportJsonPath(date));
-  const setups = toSetupSpecs(report);
+      return { date, setups };
+    })
+  );
 
-  let written = 0;
-  let skippedClosed = 0;
-  let openCount = 0;
+  if (strictTradeMismatch && hadTradeMismatch) {
+    console.log(
+      JSON.stringify(
+        {
+          stage: "setup-review",
+          asOfDate,
+          minReportDate,
+          reports: dates.length,
+          tradeMismatch: true,
+          tradeMismatchDetails,
+          status: "trade_mismatch"
+        },
+        null,
+        2
+      )
+    );
+    process.exitCode = 1;
+    return;
+  }
 
-  for (const setup of setups) {
-    const closedPath = getSetupReviewClosedPerformancePath(setup.setupDate, setup.symbol);
-    if (!force && (await fileExists(closedPath))) {
-      skippedClosed += 1;
+  const rawBarsCache = new Map<string, MarketBar[] | null>();
+  const missingBarsDetails: Array<{ date: string; symbol: string }> = [];
+
+  const processedDates: Array<{ date: string; setups: number; written: number; skippedClosed: number; mdx: string }> = [];
+
+  for (const entry of setupsByDate) {
+    const date = entry.date;
+    const setups = entry.setups;
+    if (setups.length === 0) {
       continue;
     }
 
-    const cacheKey = setup.symbol;
-    let bars = rawBarsCache.get(cacheKey);
-    if (bars === undefined) {
-      const raw = await loadRawSeriesWindow(asOfDate, setup.symbol, "5m");
-      bars = raw.status === "ok" ? raw.series.bars : null;
-      rawBarsCache.set(cacheKey, bars);
+    let written = 0;
+    let skippedClosed = 0;
+    let openCount = 0;
+
+    for (const setup of setups) {
+      const closedPath = getSetupReviewClosedPerformancePath(setup.setupDate, setup.symbol);
+      if (!force && (await fileExists(closedPath))) {
+        skippedClosed += 1;
+        continue;
+      }
+
+      const cacheKey = setup.symbol;
+      let bars = rawBarsCache.get(cacheKey);
+      if (bars === undefined) {
+        const raw = await loadRawSeriesWindow(asOfDate, setup.symbol, "5m");
+        bars = raw.status === "ok" ? raw.series.bars : null;
+        rawBarsCache.set(cacheKey, bars);
+      }
+
+      if (!bars) {
+        missingBarsDetails.push({ date, symbol: setup.symbol });
+        continue;
+      }
+
+      const perf = buildSetupReviewPerformance({
+        setupDate: setup.setupDate,
+        symbol: setup.symbol,
+        setupType: setup.setupType,
+        trade: setup.trade,
+        bars,
+        asOfDate
+      });
+
+      await writeSetupReviewPerformance(perf);
+      written += 1;
+      if (perf.status === "open") {
+        openCount += 1;
+      }
     }
 
-    if (!bars) {
-      continue;
+    const mdxPath = getSetupReviewMdxPath(date);
+    if (openCount > 0) {
+      const mdx = `# Setup reviews: ${date}\n\n<SetupReviewDay date="${date}" />\n`;
+      await mkdir(path.dirname(mdxPath), { recursive: true });
+      await writeFile(mdxPath, mdx, "utf8");
+    } else {
+      await rm(mdxPath, { force: true });
     }
 
-    const perf = buildSetupReviewPerformance({
-      setupDate: setup.setupDate,
-      symbol: setup.symbol,
-      setupType: setup.setupType,
-      trade: setup.trade,
-      bars,
-      asOfDate
+    processedDates.push({
+      date,
+      setups: setups.length,
+      written,
+      skippedClosed,
+      mdx: openCount > 0 ? "written" : "removed"
     });
-
-    await writeSetupReviewPerformance(perf);
-    written += 1;
-    if (perf.status === "open") {
-      openCount += 1;
-    }
   }
 
-  const mdxPath = getSetupReviewMdxPath(date);
-  if (openCount > 0) {
-    const mdx = `# Setup reviews: ${date}\n\n<SetupReviewDay date="${date}" />\n`;
-    await mkdir(path.dirname(mdxPath), { recursive: true });
-    await writeFile(mdxPath, mdx, "utf8");
-  } else {
-    await rm(mdxPath, { force: true });
-  }
+  console.log(
+    JSON.stringify(
+      {
+        stage: "setup-review",
+        asOfDate,
+        minReportDate,
+        reports: dates.length,
+        processedDates,
+        tradeMismatch: hadTradeMismatch,
+        tradeMismatchDetails,
+        missingBars: missingBarsDetails.length,
+        missingBarsPreview: missingBarsDetails.slice(0, 20)
+      },
+      null,
+      2
+    )
+  );
 
-  processedDates.push({
-    date,
-    setups: setups.length,
-    written,
-    skippedClosed,
-    mdx: openCount > 0 ? "written" : "removed"
-  });
+  return;
 }
 
-console.log(
-  JSON.stringify(
-    {
-      stage: "setup-review",
-      asOfDate,
-      minReportDate,
-      reports: dates.length,
-      processedDates
-    },
-    null,
-    2
-  )
-);
+await main();

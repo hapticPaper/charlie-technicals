@@ -1,3 +1,4 @@
+import { SETUP_REVIEW_PERFORMANCE_VERSION } from "./types";
 import type {
   MarketBar,
   SetupReviewOutcome,
@@ -48,7 +49,9 @@ function nyDateAndMinutes(iso: string): { ymd: string; minutes: number } | null 
 }
 
 function isMarketHours(minutes: number): boolean {
-  return minutes >= MARKET_OPEN_MINUTES && minutes <= MARKET_CLOSE_MINUTES;
+  // 5m bars are timestamped at bar open in NY time.
+  // NOTE(v2-setup-performance): Regular session is treated as: [09:30, 16:00).
+  return minutes >= MARKET_OPEN_MINUTES && minutes < MARKET_CLOSE_MINUTES;
 }
 
 function tradeReturnFraction(side: TradeSide, entry: number, exit: number): number {
@@ -200,7 +203,11 @@ function simulateTrade(args: {
       continue;
     }
 
-    if (meta.ymd <= args.setupDate || meta.ymd > args.asOfDate) {
+    // NOTE(v2-setup-performance): Assumes setups are published before the NY session open on setupDate.
+    // Therefore we treat the entire setupDate regular session as eligible for fills.
+    // If you change this behavior, update the setup review playbook, bump SETUP_REVIEW_PERFORMANCE_VERSION,
+    // and regenerate stored artifacts.
+    if (meta.ymd < args.setupDate || meta.ymd > args.asOfDate) {
       continue;
     }
 
@@ -347,7 +354,7 @@ export function buildSetupReviewPerformance(args: {
   const unrealizedPct = status === "closed" ? null : sim.unrealizedPct;
 
   return {
-    version: "v1-setup-performance",
+    version: SETUP_REVIEW_PERFORMANCE_VERSION,
     setupDate: args.setupDate,
     symbol: args.symbol,
     setupType: args.setupType,

@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-15",
   "symbol": "QQQ",
   "setupType": "watchlist",
@@ -13,7 +13,7 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:51.011Z",
+  "computedAt": "2026-01-16T08:20:33.205Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,

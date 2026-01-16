@@ -13,10 +13,15 @@ Each setup can only be in one of these states:
 
 ## Assumptions (required)
 
-- Market hours only: 9:30–16:00 America/New_York.
+- Market hours only: 9:30–16:00 America/New_York (close is exclusive; `[09:30, 16:00)`).
 - The trade only exists if the entry price is hit.
   - If price hits TP1/TP2 before the entry price is ever hit, we treat the trade as not opened.
 - The first event is traded (entry → TP/SL sequencing is evaluated from intraday bars).
+- The setup day session is included (a setup can open on the same date it was published).
+- Setups are assumed to be published before the market open (no intraday publication cutoff).
+- Intrabar sequencing is approximated from OHLC bars using a candle-path heuristic:
+  - green bar: `open→high→low→close`
+  - red bar: `open→low→high→close`
 - Exits:
   - 50% at TP1 and the remaining 50% at TP2, or
   - 100% at the stop.

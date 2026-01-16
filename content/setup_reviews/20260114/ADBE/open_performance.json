@@ -1,5 +1,5 @@
 {
-  "version": "v1-setup-performance",
+  "version": "v2-setup-performance",
   "setupDate": "2026-01-14",
   "symbol": "ADBE",
   "setupType": "pick",
@@ -13,15 +13,15 @@
     ]
   },
   "asOfDate": "2026-01-15",
-  "computedAt": "2026-01-15T13:43:50.421Z",
-  "openedAt": null,
+  "computedAt": "2026-01-16T08:20:33.142Z",
+  "openedAt": "2026-01-14T14:30:00.000Z",
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": null,
+  "currentPrice": 304.44000244140625,
   "realizedPct": 0,
-  "unrealizedPct": null,
-  "totalPct": null,
+  "unrealizedPct": 1.6476053364973091,
+  "totalPct": 1.6476053364973091,
   "status": "open",
-  "outcome": "pending"
+  "outcome": "open"
 }

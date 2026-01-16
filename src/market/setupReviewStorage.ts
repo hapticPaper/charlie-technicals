@@ -5,7 +5,69 @@ import path from "node:path";
 import { formatRawDataFileDate } from "./dataConventions";
 import { fileExists } from "./fsUtils";
 import { getContentDir, readJson, writeJson } from "./storage";
-import type { SetupReviewPerformance } from "./types";
+import { SETUP_REVIEW_PERFORMANCE_VERSION, type SetupReviewPerformance } from "./types";
+
+function coerceSetupReviewPerformance(raw: unknown, filePath: string): SetupReviewPerformance | null {
+  if (typeof raw !== "object" || raw === null) {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath });
+    return null;
+  }
+
+  const perf = raw as Record<string, unknown>;
+  const version = perf.version;
+  if (typeof version !== "string") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath });
+    return null;
+  }
+
+  if (version !== SETUP_REVIEW_PERFORMANCE_VERSION) {
+    // NOTE: we only accept the current SETUP_REVIEW_PERFORMANCE_VERSION. Older
+    // versions are ignored and must be regenerated under the current semantics.
+    console.warn("[setup-review] Unsupported setup review performance version", {
+      kind: "unsupported_version",
+      filePath,
+      version
+    });
+    return null;
+  }
+
+  if (typeof perf.setupDate !== "string" || typeof perf.symbol !== "string") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath, version });
+    return null;
+  }
+
+  const trade = perf.trade;
+  const entry =
+    typeof trade === "object" && trade !== null && "entry" in trade ? (trade as { entry?: unknown }).entry : undefined;
+  if (typeof entry !== "number") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath, version });
+    return null;
+  }
+
+  const status = perf.status;
+  if (status !== "open" && status !== "closed") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath, version });
+    return null;
+  }
+
+  if (typeof perf.outcome !== "string") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath, version });
+    return null;
+  }
+
+  if (typeof perf.realizedPct !== "number") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath, version });
+    return null;
+  }
+
+  const totalPct = perf.totalPct;
+  if (totalPct !== null && typeof totalPct !== "number") {
+    console.warn("[setup-review] Malformed setup review performance payload", { kind: "malformed_payload", filePath, version });
+    return null;
+  }
+
+  return raw as SetupReviewPerformance;
+}
 
 function safeSymbol(symbol: string): string {
   return encodeURIComponent(symbol);
@@ -42,12 +104,14 @@ export async function readSetupReviewPerformance(
 ): Promise<SetupReviewPerformance | null> {
   const closedPath = getSetupReviewClosedPerformancePath(setupDate, symbol);
   if (await fileExists(closedPath)) {
-    return readJson<SetupReviewPerformance>(closedPath);
+    const perf = await readJson<unknown>(closedPath);
+    return coerceSetupReviewPerformance(perf, closedPath);
   }
 
   const openPath = getSetupReviewOpenPerformancePath(setupDate, symbol);
   if (await fileExists(openPath)) {
-    return readJson<SetupReviewPerformance>(openPath);
+    const perf = await readJson<unknown>(openPath);
+    return coerceSetupReviewPerformance(perf, openPath);
   }
 
   return null;
@@ -94,6 +158,7 @@ export async function listSetupReviewPerformancesForDate(setupDate: string): Pro
   }
 
   const out: SetupReviewListedPerformance[] = [];
+  let ignoredDueToVersion = 0;
   const symbols = symbolEntries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
   for (const encodedSymbol of symbols) {
     const symbolDir = path.join(rootDir, encodedSymbol);
@@ -101,21 +166,37 @@ export async function listSetupReviewPerformancesForDate(setupDate: string): Pro
     const closedPath = path.join(symbolDir, "closed_performance.json");
 
     if (await fileExists(closedPath)) {
-      out.push({
-        dateDir,
-        fileKind: "closed",
-        performance: await readJson<SetupReviewPerformance>(closedPath)
-      });
+      const perf = await readJson<unknown>(closedPath);
+      const performance = coerceSetupReviewPerformance(perf, closedPath);
+      if (performance) {
+        out.push({
+          dateDir,
+          fileKind: "closed",
+          performance
+        });
+      } else {
+        ignoredDueToVersion += 1;
+      }
       continue;
     }
 
     if (await fileExists(openPath)) {
-      out.push({
-        dateDir,
-        fileKind: "open",
-        performance: await readJson<SetupReviewPerformance>(openPath)
-      });
+      const perf = await readJson<unknown>(openPath);
+      const performance = coerceSetupReviewPerformance(perf, openPath);
+      if (performance) {
+        out.push({
+          dateDir,
+          fileKind: "open",
+          performance
+        });
+      } else {
+        ignoredDueToVersion += 1;
+      }
     }
+  }
+
+  if (ignoredDueToVersion > 0) {
+    console.warn("[setup-review] Ignored performances due to unsupported version", { setupDate, count: ignoredDueToVersion });
   }
 
   return out;
@@ -147,6 +228,7 @@ export async function listSetupReviewPerformances(): Promise<SetupReviewListedPe
     .sort();
 
   const out: SetupReviewListedPerformance[] = [];
+  let ignoredDueToVersion = 0;
 
   for (const dateDir of dateDirs) {
     const dirPath = path.join(root, dateDir);
@@ -164,22 +246,38 @@ export async function listSetupReviewPerformances(): Promise<SetupReviewListedPe
       const closedPath = path.join(symbolDir, "closed_performance.json");
 
       if (await fileExists(closedPath)) {
-        out.push({
-          dateDir,
-          fileKind: "closed",
-          performance: await readJson<SetupReviewPerformance>(closedPath)
-        });
+        const perf = await readJson<unknown>(closedPath);
+        const performance = coerceSetupReviewPerformance(perf, closedPath);
+        if (performance) {
+          out.push({
+            dateDir,
+            fileKind: "closed",
+            performance
+          });
+        } else {
+          ignoredDueToVersion += 1;
+        }
         continue;
       }
 
       if (await fileExists(openPath)) {
-        out.push({
-          dateDir,
-          fileKind: "open",
-          performance: await readJson<SetupReviewPerformance>(openPath)
-        });
+        const perf = await readJson<unknown>(openPath);
+        const performance = coerceSetupReviewPerformance(perf, openPath);
+        if (performance) {
+          out.push({
+            dateDir,
+            fileKind: "open",
+            performance
+          });
+        } else {
+          ignoredDueToVersion += 1;
+        }
       }
     }
+  }
+
+  if (ignoredDueToVersion > 0) {
+    console.warn("[setup-review] Ignored performances due to unsupported version", { count: ignoredDueToVersion });
   }
 
   return out;

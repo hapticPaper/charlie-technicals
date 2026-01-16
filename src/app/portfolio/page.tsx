@@ -5,6 +5,9 @@ import type { SetupReviewPerformance } from "../../market/types";
 
 import styles from "./portfolio.module.css";
 
+// Normalized notional used for aggregating setup performance. This is not the actual traded size.
+const ASSUMED_SETUP_NOTIONAL_USD = 1000;
+
 function formatSignedPct(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
@@ -23,12 +26,11 @@ function assumedNotionalUsd(perf: SetupReviewPerformance): number {
     return 0;
   }
 
-  const entry = perf.trade.entry;
-  if (!Number.isFinite(entry) || entry <= 0) {
+  if (!Number.isFinite(perf.trade.entry) || perf.trade.entry <= 0) {
     return 0;
   }
 
-  return Math.max(1000, entry);
+  return ASSUMED_SETUP_NOTIONAL_USD;
 }
 
 function hitLabel(hit: boolean): string {
@@ -154,7 +156,10 @@ export default async function PortfolioPage() {
       <div className={styles.header}>
         <div>
           <h1>Portfolio</h1>
-          <p className="report-muted">Running + final performance for tracked setups.</p>
+          <p className="report-muted">
+            Running + final performance for tracked setups (assumes a normalized ${"$" + ASSUMED_SETUP_NOTIONAL_USD.toFixed(0)} notional per
+            opened setup).
+          </p>
         </div>
         <Link className={styles.homeLink} href="/">
           Home

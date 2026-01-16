@@ -29,7 +29,7 @@ import {
   type ReportIntervalSeries,
   type SetupReviewPerformance
 } from "../../../market/types";
-import { readSetupReviewPerformance } from "../../../market/setupReviewStorage";
+import { listSetupReviewPerformancesForDate } from "../../../market/setupReviewStorage";
 
 const MARKET_INTERVAL_SET: ReadonlySet<string> = new Set(MARKET_INTERVALS);
 
@@ -193,17 +193,22 @@ export default async function ReportPage(props: ReportPageProps) {
     ...report.picks.map((p) => p.symbol),
     ...(report.watchlist?.map((p) => p.symbol) ?? [])
   ]);
-  const performanceEntries = await Promise.all(
-    Array.from(setupSymbols).map(async (symbol) => ({
-      symbol,
-      performance: await readSetupReviewPerformance(date, symbol)
-    }))
-  );
   const performanceBySymbol = new Map<string, SetupReviewPerformance>();
-  for (const entry of performanceEntries) {
-    if (entry.performance) {
-      performanceBySymbol.set(entry.symbol, entry.performance);
+  for (const entry of await listSetupReviewPerformancesForDate(date)) {
+    if (setupSymbols.has(entry.performance.symbol)) {
+      performanceBySymbol.set(entry.performance.symbol, entry.performance);
     }
+  }
+
+  const missingPerformance: string[] = [];
+  for (const symbol of setupSymbols) {
+    if (!performanceBySymbol.has(symbol)) {
+      missingPerformance.push(symbol);
+    }
+  }
+
+  if (missingPerformance.length > 0 && process.env.NODE_ENV !== "production") {
+    console.warn("[reports] Setup review performance missing for some symbols", { date, symbols: missingPerformance });
   }
 
   try {
