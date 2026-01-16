@@ -278,9 +278,10 @@ export function CnbcTopicTrendWidgetClient(props: {
       const rawByChartKey: Array<{ chartKey: string; raw: number }> = [];
       let total = 0;
       for (const { topic, chartKey } of chartTopics) {
-        const raw = row.values[topic] ?? 0;
-        rawByChartKey.push({ chartKey, raw });
-        total += raw;
+        const raw = row.values[topic];
+        const safeRaw = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 0;
+        rawByChartKey.push({ chartKey, raw: safeRaw });
+        total += safeRaw;
       }
 
       // In log2 mode, we want the stacked total height for a day to be log2(total + 1) while
@@ -305,16 +306,21 @@ export function CnbcTopicTrendWidgetClient(props: {
     for (const row of props.data) {
       let total = 0;
       for (const { topic } of chartTopics) {
-        total += row.values[topic] ?? 0;
+        const raw = row.values[topic];
+        total += typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 0;
       }
       maxTotal = Math.max(maxTotal, total);
     }
 
+    if (maxTotal <= 0) {
+      return [0, 1];
+    }
+
     const maxTick = Math.ceil(Math.log2(maxTotal + 1));
-    return Array.from({ length: maxTick + 1 }, (_, idx) => idx);
+    return Array.from({ length: Math.max(2, maxTick + 1) }, (_, idx) => idx);
   }, [chartTopics, props.data, yAxisMode]);
 
-  const log2DomainMax = log2Ticks ? log2Ticks[log2Ticks.length - 1] ?? 0 : 0;
+  const log2DomainMax = log2Ticks ? log2Ticks[log2Ticks.length - 1] ?? 1 : 1;
 
   const selectedDate = pinned.date ?? preview.date;
   const selectedTopic = pinned.topic ?? preview.topic;
