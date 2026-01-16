@@ -11,6 +11,19 @@ const ASSUMED_SETUP_NOTIONAL_USD = 1000;
 
 type OpenedSetupReviewPerformance = SetupReviewPerformance & { openedAt: string };
 
+function hasOpenedAt(perf: SetupReviewPerformance): perf is OpenedSetupReviewPerformance {
+  if (typeof perf.openedAt !== "string") {
+    return false;
+  }
+
+  const openedAt = perf.openedAt.trim();
+  if (openedAt.length === 0) {
+    return false;
+  }
+
+  return !Number.isNaN(Date.parse(openedAt));
+}
+
 function formatSignedPct(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
@@ -29,7 +42,12 @@ function formatIsoDate(date: string | null): string {
     return "--";
   }
 
-  return formatDateYYYYMMDD(new Date(date));
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return "--";
+  }
+
+  return formatDateYYYYMMDD(parsed);
 }
 
 function pnlPctFor(perf: SetupReviewPerformance): number | null {
@@ -70,16 +88,20 @@ function pnlUsdComponents(perf: SetupReviewPerformance): { notional: number; pnl
   return { notional, pnlUsd: (pct / 100) * notional };
 }
 
+function laterDate(a: string | null, b: string | null): string | null {
+  if (!a) {
+    return b;
+  }
+
+  if (!b) {
+    return a;
+  }
+
+  return a > b ? a : b;
+}
+
 function finalizedAt(perf: SetupReviewPerformance): string | null {
-  if (!perf.tp2At) {
-    return perf.stopAt;
-  }
-
-  if (!perf.stopAt) {
-    return perf.tp2At;
-  }
-
-  return perf.tp2At > perf.stopAt ? perf.tp2At : perf.stopAt;
+  return laterDate(perf.tp2At, perf.stopAt);
 }
 
 function splitPositions(items: SetupReviewPerformance[]): {
@@ -93,7 +115,7 @@ function splitPositions(items: SetupReviewPerformance[]): {
   let notOpened = 0;
 
   for (const p of items) {
-    if (!p.openedAt) {
+    if (!hasOpenedAt(p)) {
       if (p.status === "open") {
         pending += 1;
       } else {
@@ -102,11 +124,10 @@ function splitPositions(items: SetupReviewPerformance[]): {
       continue;
     }
 
-    const openedPerf = p as OpenedSetupReviewPerformance;
-    if (openedPerf.status === "closed") {
-      closed.push(openedPerf);
+    if (p.status === "closed") {
+      closed.push(p);
     } else {
-      open.push(openedPerf);
+      open.push(p);
     }
   }
 
@@ -168,8 +189,12 @@ function formatSummaryPnl(agg: { investedUsd: number; pnlUsd: number; pnlPct: nu
 }
 
 function joinWithAnd(parts: string[]): string {
-  if (parts.length <= 1) {
-    return parts[0] ?? "";
+  if (parts.length === 0) {
+    return "";
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
   }
 
   if (parts.length === 2) {
@@ -177,6 +202,26 @@ function joinWithAnd(parts: string[]): string {
   }
 
   return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+function getPnlDisplay(perf: SetupReviewPerformance): { className: string; pctLabel: string; usdLabel: string } {
+  const pnlPct = pnlPctFor(perf);
+  const pnlUsd = pnlUsdFor(perf);
+
+  const className =
+    pnlPct == null
+      ? styles.pnlNeutral
+      : pnlPct > 0
+        ? styles.pnlPositive
+        : pnlPct < 0
+          ? styles.pnlNegative
+          : styles.pnlNeutral;
+
+  return {
+    className,
+    pctLabel: pnlPct == null ? "--" : formatSignedPct(pnlPct),
+    usdLabel: pnlUsd == null ? "--" : formatSignedUsd(pnlUsd)
+  };
 }
 
 function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
@@ -194,19 +239,7 @@ function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
         </thead>
         <tbody>
           {rows.map((p) => {
-            const pnlPct = pnlPctFor(p);
-            const pnlUsd = pnlUsdFor(p);
-
-            const pnlClass =
-              pnlPct == null
-                ? styles.pnlNeutral
-                : pnlPct > 0
-                  ? styles.pnlPositive
-                  : pnlPct < 0
-                    ? styles.pnlNegative
-                    : styles.pnlNeutral;
-            const pnlLabel = pnlPct == null ? "--" : formatSignedPct(pnlPct);
-            const pnlUsdLabel = pnlUsd == null ? "--" : formatSignedUsd(pnlUsd);
+            const pnl = getPnlDisplay(p);
 
             return (
               <tr key={`${p.setupDate}-${p.symbol}`}>
@@ -217,8 +250,8 @@ function renderOpenTable(rows: OpenedSetupReviewPerformance[]) {
                 </td>
                 <td>{p.trade.side.toUpperCase()}</td>
                 <td>{formatIsoDate(p.openedAt)}</td>
-                <td className={pnlClass}>{pnlLabel}</td>
-                <td className={pnlClass}>{pnlUsdLabel}</td>
+                <td className={pnl.className}>{pnl.pctLabel}</td>
+                <td className={pnl.className}>{pnl.usdLabel}</td>
               </tr>
             );
           })}
@@ -244,19 +277,7 @@ function renderClosedTable(rows: OpenedSetupReviewPerformance[]) {
         </thead>
         <tbody>
           {rows.map((p) => {
-            const pnlPct = pnlPctFor(p);
-            const pnlUsd = pnlUsdFor(p);
-
-            const pnlClass =
-              pnlPct == null
-                ? styles.pnlNeutral
-                : pnlPct > 0
-                  ? styles.pnlPositive
-                  : pnlPct < 0
-                    ? styles.pnlNegative
-                    : styles.pnlNeutral;
-            const pnlLabel = pnlPct == null ? "--" : formatSignedPct(pnlPct);
-            const pnlUsdLabel = pnlUsd == null ? "--" : formatSignedUsd(pnlUsd);
+            const pnl = getPnlDisplay(p);
 
             return (
               <tr key={`${p.setupDate}-${p.symbol}`}>
@@ -268,8 +289,8 @@ function renderClosedTable(rows: OpenedSetupReviewPerformance[]) {
                 <td>{p.trade.side.toUpperCase()}</td>
                 <td>{formatIsoDate(p.openedAt)}</td>
                 <td>{formatIsoDate(finalizedAt(p))}</td>
-                <td className={pnlClass}>{pnlLabel}</td>
-                <td className={pnlClass}>{pnlUsdLabel}</td>
+                <td className={pnl.className}>{pnl.pctLabel}</td>
+                <td className={pnl.className}>{pnl.usdLabel}</td>
               </tr>
             );
           })}
