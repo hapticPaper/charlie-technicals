@@ -37,8 +37,8 @@ function toChartTopicKey(topic: string): string {
 }
 
 function toRawChartKey(chartKey: string): string {
-  // Reserved suffix used for tooltip counts.
-  return `${chartKey}__raw`;
+  // Reserved prefix used for tooltip counts.
+  return `raw_${chartKey}`;
 }
 
 const SERIES_COLORS = [
