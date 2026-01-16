@@ -188,7 +188,10 @@ type AggregatedPosition = {
   };
 };
 
-function aggregateOpenPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): AggregatedPosition[] {
+function aggregatePositionsBySymbol(
+  rows: OpenedSetupReviewPerformance[],
+  getLastTradeAt: (perf: OpenedSetupReviewPerformance) => string | null,
+): AggregatedPosition[] {
   const bySymbol = new Map<string, OpenedSetupReviewPerformance[]>();
 
   for (const perf of rows) {
@@ -214,7 +217,7 @@ function aggregateOpenPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): A
 
       quantity += assumedQuantity(item);
       firstTradeAt = earlierDate(firstTradeAt, item.openedAt);
-      lastTradeAt = laterDate(lastTradeAt, item.openedAt);
+      lastTradeAt = laterDate(lastTradeAt, getLastTradeAt(item));
     }
 
     aggregated.push({ symbol, reportDate, quantity, firstTradeAt, lastTradeAt, pnl: aggregate(items) });
@@ -242,58 +245,12 @@ function aggregateOpenPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): A
   return aggregated;
 }
 
+function aggregateOpenPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): AggregatedPosition[] {
+  return aggregatePositionsBySymbol(rows, (perf) => perf.openedAt);
+}
+
 function aggregateClosedPositionsBySymbol(rows: OpenedSetupReviewPerformance[]): AggregatedPosition[] {
-  const bySymbol = new Map<string, OpenedSetupReviewPerformance[]>();
-
-  for (const perf of rows) {
-    const existing = bySymbol.get(perf.symbol);
-    if (existing) {
-      existing.push(perf);
-    } else {
-      bySymbol.set(perf.symbol, [perf]);
-    }
-  }
-
-  const aggregated: AggregatedPosition[] = [];
-  for (const [symbol, items] of bySymbol) {
-    let reportDate = items[0].setupDate;
-    let quantity = 0;
-    let firstTradeAt: string | null = null;
-    let lastTradeAt: string | null = null;
-
-    for (const item of items) {
-      if (item.setupDate > reportDate) {
-        reportDate = item.setupDate;
-      }
-
-      quantity += assumedQuantity(item);
-      firstTradeAt = earlierDate(firstTradeAt, item.openedAt);
-      lastTradeAt = laterDate(lastTradeAt, finalizedAt(item));
-    }
-
-    aggregated.push({ symbol, reportDate, quantity, firstTradeAt, lastTradeAt, pnl: aggregate(items) });
-  }
-
-  aggregated.sort((a, b) => {
-    const aTime = toEpochMs(a.lastTradeAt);
-    const bTime = toEpochMs(b.lastTradeAt);
-
-    if (aTime == null && bTime == null) {
-      return a.symbol.localeCompare(b.symbol);
-    }
-
-    if (aTime == null) {
-      return 1;
-    }
-
-    if (bTime == null) {
-      return -1;
-    }
-
-    return bTime - aTime || a.symbol.localeCompare(b.symbol);
-  });
-
-  return aggregated;
+  return aggregatePositionsBySymbol(rows, (perf) => finalizedAt(perf));
 }
 
 function splitPositions(items: SetupReviewPerformance[]): {
@@ -489,7 +446,7 @@ function renderOpenTable(rows: AggregatedPosition[]) {
         </thead>
         <tbody>
           {rows.map((p) => (
-            <AggregatedPositionRow key={p.symbol} position={p} />
+            <AggregatedPositionRow key={`open-${p.symbol}-${p.reportDate}`} position={p} />
           ))}
         </tbody>
       </table>
@@ -513,7 +470,7 @@ function renderClosedTable(rows: AggregatedPosition[]) {
         </thead>
         <tbody>
           {rows.map((p) => (
-            <AggregatedPositionRow key={p.symbol} position={p} />
+            <AggregatedPositionRow key={`closed-${p.symbol}-${p.reportDate}`} position={p} />
           ))}
         </tbody>
       </table>
@@ -559,17 +516,17 @@ export default async function PortfolioPage() {
 
       <div className={styles.summaryGrid}>
         <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Open</div>
+          <div className={styles.summaryLabel}>Open tickers</div>
           <div className={styles.summaryValue}>{openPositions.length}</div>
           <div className="report-muted">{formatSummaryPnl(openAgg)}</div>
         </div>
         <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Closed</div>
+          <div className={styles.summaryLabel}>Closed tickers</div>
           <div className={styles.summaryValue}>{closedPositions.length}</div>
           <div className="report-muted">{formatSummaryPnl(closedAgg)}</div>
         </div>
         <div className={styles.summaryCard}>
-          <div className={styles.summaryLabel}>Total</div>
+          <div className={styles.summaryLabel}>Total tickers</div>
           <div className={styles.summaryValue}>{totalTickers}</div>
           <div className="report-muted">{formatSummaryPnl(totalAgg)}</div>
         </div>
