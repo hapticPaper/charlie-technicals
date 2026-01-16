@@ -28,6 +28,8 @@ type CnbcTopicTrendChartRow = Record<string, number | string>;
 
 type YAxisMode = "log2" | "linear";
 
+// The server intentionally sends a larger topic pool so we can still fill this chart
+// when excluding "markets".
 const MAX_VISIBLE_TOPICS = 8;
 
 function toChartTopicKey(topic: string): string {
@@ -35,6 +37,7 @@ function toChartTopicKey(topic: string): string {
 }
 
 function toRawChartKey(chartKey: string): string {
+  // Reserved suffix used for tooltip counts.
   return `${chartKey}__raw`;
 }
 
@@ -109,6 +112,7 @@ function TopicTooltip(props: {
   active?: boolean;
   label?: unknown;
   payload?: readonly TooltipEntry[];
+  yAxisMode: YAxisMode;
   selectedTopic: string | null;
   pinnedTopic: string | null;
   onSelect: (args: { date: string; topic: string }) => void;
@@ -126,8 +130,12 @@ function TopicTooltip(props: {
         const chartKey = typeof entry.dataKey === "string" ? entry.dataKey : null;
         const row = typeof entry.payload === "object" && entry.payload !== null ? (entry.payload as Record<string, unknown>) : null;
         const raw = chartKey && row ? row[toRawChartKey(chartKey)] : undefined;
+        const hasRaw = typeof raw === "number" && Number.isFinite(raw);
+        if (props.yAxisMode === "log2" && !hasRaw) {
+          return null;
+        }
 
-        const count = parseTooltipCount(raw ?? entry.value);
+        const count = parseTooltipCount(hasRaw ? raw : entry.value);
         return {
           topic,
           count,
@@ -276,6 +284,7 @@ export function CnbcTopicTrendWidgetClient(props: {
         chartRow[rawKey] = raw;
       }
 
+      // In log2 mode, scale each day's stacked values so the total height is log2(total + 1).
       const logScale = total > 0 ? Math.log2(total + 1) / total : 0;
 
       for (const { rawKey, chartKey } of chartTopics) {
@@ -429,6 +438,7 @@ export function CnbcTopicTrendWidgetClient(props: {
                       active={tooltipProps.active}
                       label={tooltipProps.label}
                       payload={tooltipProps.payload as unknown as readonly TooltipEntry[] | undefined}
+                      yAxisMode={yAxisMode}
                       selectedTopic={selectedTopic}
                       pinnedTopic={pinned.topic}
                       onSelect={({ date, topic }) => {
