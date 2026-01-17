@@ -361,7 +361,7 @@ a:focus-visible {
 
 @supports (background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2))) {
   .rpNavLink:hover {
-    border-color: color-mix(in srgb, var(--rp-text) 12%, transparent);
+    border-color: color-mix(in srgb, var(--rp-text) 12%, var(--rp-border));
     background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
   }
 }
