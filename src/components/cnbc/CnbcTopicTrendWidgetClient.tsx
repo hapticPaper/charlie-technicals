@@ -37,6 +37,7 @@ function toChartTopicKey(topic: string): string {
 }
 
 const SERIES_COLORS = [
+  // Recharts stroke/fill values should be concrete colors (avoid CSS vars here).
   "#38bdf8",
   "#a78bfa",
   "#34d399",
