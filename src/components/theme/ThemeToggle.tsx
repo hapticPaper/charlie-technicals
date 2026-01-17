@@ -101,16 +101,12 @@ function nextSetting(setting: ThemeSetting): ThemeSetting {
   return "system";
 }
 
-function labelFor(setting: ThemeSetting): string {
+function settingLabel(setting: ThemeSetting): string {
   if (setting === "system") {
-    return "Theme: system (click to force dark mode)";
+    return "system theme";
   }
 
-  if (setting === "dark") {
-    return "Theme: dark (click to switch to light mode)";
-  }
-
-  return "Theme: light (click to use system theme)";
+  return `${setting} mode`;
 }
 
 export function ThemeToggle() {
@@ -122,7 +118,7 @@ export function ThemeToggle() {
 
   const displaySetting = setting ?? "system";
   const nextSettingForToggle = nextSetting(displaySetting);
-  const label = labelFor(displaySetting);
+  const label = `Theme: ${settingLabel(displaySetting)} (click to switch to ${settingLabel(nextSettingForToggle)})`;
 
   return (
     <button
@@ -137,7 +133,7 @@ export function ThemeToggle() {
         setSetting(updated);
       }}
     >
-      {setting === null ? null : <Icon name={nextSettingForToggle} />}
+      {setting === null ? null : <Icon name={displaySetting} />}
     </button>
   );
 }
