@@ -19,9 +19,8 @@ body {
   --rp-link: #2563eb;
 
   --rp-topbar-bg: rgba(247, 248, 251, 0.92);
-  --rp-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --rp-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   --rp-shadow-strong: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.08);
-  --rp-shadow: var(--rp-shadow-soft);
   --rp-bg-image: radial-gradient(900px 500px at 14% -10%, rgba(37, 99, 235, 0.08), transparent 62%),
     radial-gradient(1000px 520px at 90% 0%, rgba(15, 23, 42, 0.04), transparent 68%),
     linear-gradient(180deg, #f7f8fb 0%, #f1f5f9 100%);
@@ -41,7 +40,7 @@ body {
   --rp-squeeze-off: rgba(34, 197, 94, 0.1);
   --rp-grid: rgba(15, 23, 42, 0.12);
 
-  --rp-content-max: 1400px;
+  --rp-content-max: 1600px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -50,16 +49,15 @@ body {
 
     --rp-bg: #0b1020;
     --rp-surface: #0f172a;
-    --rp-surface-2: #111c33;
+    --rp-surface-2: #101a2e;
     --rp-border: rgba(255, 255, 255, 0.12);
     --rp-text: #e5e7eb;
     --rp-muted: #a1a1aa;
     --rp-link: #60a5fa;
 
     --rp-topbar-bg: rgba(11, 16, 32, 0.92);
-    --rp-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
-    --rp-shadow: var(--rp-shadow-soft);
+    --rp-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+    --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.34);
     --rp-bg-image: radial-gradient(900px 520px at 14% 0%, rgba(96, 165, 250, 0.12), transparent 64%),
       radial-gradient(950px 520px at 92% 12%, rgba(99, 102, 241, 0.08), transparent 70%),
       linear-gradient(180deg, #0b1020 0%, #070a14 100%);
@@ -75,16 +73,15 @@ body {
 
   --rp-bg: #0b1020;
   --rp-surface: #0f172a;
-  --rp-surface-2: #111c33;
+  --rp-surface-2: #101a2e;
   --rp-border: rgba(255, 255, 255, 0.12);
   --rp-text: #e5e7eb;
   --rp-muted: #a1a1aa;
   --rp-link: #60a5fa;
 
   --rp-topbar-bg: rgba(11, 16, 32, 0.92);
-  --rp-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
-  --rp-shadow: var(--rp-shadow-soft);
+  --rp-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.34);
   --rp-bg-image: radial-gradient(900px 520px at 14% 0%, rgba(96, 165, 250, 0.12), transparent 64%),
     radial-gradient(950px 520px at 92% 12%, rgba(99, 102, 241, 0.08), transparent 70%),
     linear-gradient(180deg, #0b1020 0%, #070a14 100%);
@@ -150,7 +147,6 @@ body {
   border-radius: 14px;
   border: 1px solid var(--rp-border);
   background: var(--rp-surface);
-  box-shadow: var(--rp-shadow-soft);
 }
 
 .rpPanelSurface {
@@ -164,6 +160,7 @@ body {
 
 .rpPanelSurfaceSide {
   padding: 14px;
+  box-shadow: var(--rp-shadow-strong);
 }
 
 .rpToolbar {
@@ -292,12 +289,13 @@ a:focus-visible {
   z-index: 20;
   border-bottom: 1px solid var(--rp-border);
   background: var(--rp-topbar-bg);
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+  box-shadow: var(--rp-shadow);
 }
 
-@supports (backdrop-filter: blur(1px)) {
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .rpTopBar {
-    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
   }
 }
 
@@ -341,12 +339,6 @@ a:focus-visible {
   border-radius: 12px;
   text-decoration: none;
   color: var(--rp-muted);
-}
-
-@supports (color: color-mix(in srgb, var(--rp-text) 70%, var(--rp-muted))) {
-  .rpNavLink {
-    color: color-mix(in srgb, var(--rp-text) 82%, var(--rp-muted));
-  }
 }
 
 .rpNavLink[aria-current="page"] {
