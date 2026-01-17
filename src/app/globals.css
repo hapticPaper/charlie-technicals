@@ -18,10 +18,13 @@ body {
   --rp-muted: #475569;
   --rp-link: #2563eb;
 
-  --rp-topbar-bg: #f7f8fb;
+  --rp-topbar-bg: rgba(247, 248, 251, 0.92);
   --rp-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06);
   --rp-shadow-strong: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.08);
-  --rp-bg-image: none;
+  --rp-shadow: var(--rp-shadow-soft);
+  --rp-bg-image: radial-gradient(900px 500px at 14% -10%, rgba(37, 99, 235, 0.08), transparent 62%),
+    radial-gradient(1000px 520px at 90% 0%, rgba(15, 23, 42, 0.04), transparent 68%),
+    linear-gradient(180deg, #f7f8fb 0%, #f1f5f9 100%);
 
   --rp-bull: #22c55e;
   --rp-bear: #fb7185;
@@ -38,7 +41,7 @@ body {
   --rp-squeeze-off: rgba(34, 197, 94, 0.1);
   --rp-grid: rgba(15, 23, 42, 0.12);
 
-  --rp-content-max: 1240px;
+  --rp-content-max: 1400px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -53,10 +56,13 @@ body {
     --rp-muted: #a1a1aa;
     --rp-link: #60a5fa;
 
-    --rp-topbar-bg: #0b1020;
+    --rp-topbar-bg: rgba(11, 16, 32, 0.92);
     --rp-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
     --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
-    --rp-bg-image: none;
+    --rp-shadow: var(--rp-shadow-soft);
+    --rp-bg-image: radial-gradient(900px 520px at 14% 0%, rgba(96, 165, 250, 0.12), transparent 64%),
+      radial-gradient(950px 520px at 92% 12%, rgba(99, 102, 241, 0.08), transparent 70%),
+      linear-gradient(180deg, #0b1020 0%, #070a14 100%);
 
     --rp-squeeze-on: rgba(245, 158, 11, 0.12);
     --rp-squeeze-off: rgba(34, 197, 94, 0.12);
@@ -75,10 +81,13 @@ body {
   --rp-muted: #a1a1aa;
   --rp-link: #60a5fa;
 
-  --rp-topbar-bg: #0b1020;
+  --rp-topbar-bg: rgba(11, 16, 32, 0.92);
   --rp-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
   --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
-  --rp-bg-image: none;
+  --rp-shadow: var(--rp-shadow-soft);
+  --rp-bg-image: radial-gradient(900px 520px at 14% 0%, rgba(96, 165, 250, 0.12), transparent 64%),
+    radial-gradient(950px 520px at 92% 12%, rgba(99, 102, 241, 0.08), transparent 70%),
+    linear-gradient(180deg, #0b1020 0%, #070a14 100%);
 
   --rp-squeeze-on: rgba(245, 158, 11, 0.12);
   --rp-squeeze-off: rgba(34, 197, 94, 0.12);
@@ -94,7 +103,6 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 15px;
 }
 
 .rpAppShell {
@@ -287,6 +295,12 @@ a:focus-visible {
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
 }
 
+@supports (backdrop-filter: blur(1px)) {
+  .rpTopBar {
+    backdrop-filter: saturate(180%) blur(10px);
+  }
+}
+
 .rpTopBarInner {
   display: flex;
   align-items: center;
@@ -331,7 +345,7 @@ a:focus-visible {
 
 @supports (color: color-mix(in srgb, var(--rp-text) 70%, var(--rp-muted))) {
   .rpNavLink {
-    color: color-mix(in srgb, var(--rp-text) 70%, var(--rp-muted));
+    color: color-mix(in srgb, var(--rp-text) 82%, var(--rp-muted));
   }
 }
 
@@ -348,6 +362,7 @@ a:focus-visible {
 }
 
 .rpNavLink:hover {
+  border-color: var(--rp-border);
   background: var(--rp-surface-2);
   color: var(--rp-text);
 }

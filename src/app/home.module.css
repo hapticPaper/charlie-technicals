@@ -30,10 +30,15 @@
 .card:hover {
   border-color: var(--rp-border);
   background: var(--rp-surface-2);
-  border-color: color-mix(in srgb, var(--rp-text) 18%, var(--rp-border));
-  background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
   box-shadow: var(--rp-shadow-strong);
   transform: translateY(-1px);
+}
+
+@supports (background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2))) {
+  .card:hover {
+    border-color: color-mix(in srgb, var(--rp-text) 18%, var(--rp-border));
+    background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
+  }
 }
 
 .card:focus-visible {
