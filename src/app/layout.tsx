@@ -6,6 +6,7 @@ import Script from "next/script";
 import "./globals.css";
 import { NavLink } from "../components/nav/NavLink";
 import { ThemeToggle } from "../components/theme/ThemeToggle";
+import { THEME_STORAGE_KEY } from "../components/theme/themeConstants";
 
 const GTM_ID = "GTM-NG943PNQ";
 
@@ -13,7 +14,7 @@ const GTM_BOOTSTRAP_SCRIPT = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm
 
 const GTM_NO_SCRIPT = `<iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`;
 
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('rp-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var k='${THEME_STORAGE_KEY}';var t=localStorage.getItem(k);if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}else{delete document.documentElement.dataset.theme;if(t&&t!=='system'){localStorage.removeItem(k);}}}catch(e){}})();`;
 
 export const metadata = {
   title: "Charlie technicals",

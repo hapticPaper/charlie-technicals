@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-type ThemeName = "light" | "dark";
-
-const STORAGE_KEY = "rp-theme";
+import {
+  THEME_STORAGE_KEY,
+  isThemeSetting,
+  type ThemeOverride,
+  type ThemeSetting
+} from "./themeConstants";
 
 function mediaPrefersDark(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) {
@@ -14,33 +17,54 @@ function mediaPrefersDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-function getEffectiveTheme(): ThemeName {
+function getEffectiveTheme(setting: ThemeSetting, prefersDark: boolean): ThemeOverride {
   if (typeof document === "undefined") {
     return "light";
   }
 
-  const attr = document.documentElement.dataset.theme;
-  if (attr === "light" || attr === "dark") {
-    return attr;
+  if (setting === "system") {
+    return prefersDark ? "dark" : "light";
   }
-  return mediaPrefersDark() ? "dark" : "light";
+
+  return setting;
 }
 
-function applyTheme(theme: ThemeName) {
+function getStoredSetting(): ThemeSetting {
+  try {
+    const value = localStorage.getItem(THEME_STORAGE_KEY);
+    if (isThemeSetting(value)) {
+      return value;
+    }
+  } catch {
+    // Ignore storage read failures.
+  }
+
+  return "system";
+}
+
+function applySetting(setting: ThemeSetting) {
   if (typeof document === "undefined") {
     return;
   }
 
-  document.documentElement.dataset.theme = theme;
+  if (setting === "system") {
+    delete document.documentElement.dataset.theme;
+  } else {
+    document.documentElement.dataset.theme = setting;
+  }
 
   try {
-    localStorage.setItem(STORAGE_KEY, theme);
+    if (setting === "system") {
+      localStorage.removeItem(THEME_STORAGE_KEY);
+    } else {
+      localStorage.setItem(THEME_STORAGE_KEY, setting);
+    }
   } catch {
     // Ignore storage write failures.
   }
 }
 
-function Icon(props: { name: ThemeName }) {
+function Icon(props: { name: ThemeSetting }) {
   const stroke = "currentColor";
   const common = {
     fill: "none",
@@ -49,6 +73,16 @@ function Icon(props: { name: ThemeName }) {
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const
   };
+
+  if (props.name === "system") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+        <rect {...common} x="4" y="5" width="16" height="12" rx="2" />
+        <path {...common} d="M8 21h8" />
+        <path {...common} d="M12 17v4" />
+      </svg>
+    );
+  }
 
   if (props.name === "dark") {
     return (
@@ -72,11 +106,37 @@ function Icon(props: { name: ThemeName }) {
   );
 }
 
+function nextSetting(setting: ThemeSetting): ThemeSetting {
+  if (setting === "system") {
+    return "dark";
+  }
+
+  if (setting === "dark") {
+    return "light";
+  }
+
+  return "system";
+}
+
+function labelFor(setting: ThemeSetting): string {
+  if (setting === "system") {
+    return "Theme: system (click to force dark mode)";
+  }
+
+  if (setting === "dark") {
+    return "Theme: dark (click to switch to light mode)";
+  }
+
+  return "Theme: light (click to use system theme)";
+}
+
 export function ThemeToggle() {
-  const [theme, setThemeState] = useState<ThemeName | null>(null);
+  const [setting, setSetting] = useState<ThemeSetting | null>(null);
+  const [prefersDark, setPrefersDark] = useState(false);
 
   useEffect(() => {
-    setThemeState(getEffectiveTheme());
+    setSetting(getStoredSetting());
+    setPrefersDark(mediaPrefersDark());
 
     if (!window.matchMedia) {
       return;
@@ -84,10 +144,7 @@ export function ThemeToggle() {
 
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (_event: MediaQueryListEvent) => {
-      if (document.documentElement.dataset.theme) {
-        return;
-      }
-      setThemeState(getEffectiveTheme());
+      setPrefersDark(media.matches);
     };
 
     if (media.addEventListener) {
@@ -99,7 +156,10 @@ export function ThemeToggle() {
     return () => media.removeListener?.(onChange);
   }, []);
 
-  const label = theme === "dark" ? "Switch to light mode" : theme === "light" ? "Switch to dark mode" : "Toggle theme";
+  const currentSetting = setting ?? "system";
+  const effectiveTheme = setting ? getEffectiveTheme(setting, prefersDark) : null;
+  const updatedSetting = nextSetting(currentSetting);
+  const label = labelFor(currentSetting);
 
   return (
     <button
@@ -108,13 +168,13 @@ export function ThemeToggle() {
       aria-label={label}
       title={label}
       onClick={() => {
-        const current = theme ?? getEffectiveTheme();
-        const updated = current === "dark" ? "light" : "dark";
-        applyTheme(updated);
-        setThemeState(updated);
+        const current = setting ?? getStoredSetting();
+        const updated = nextSetting(current);
+        applySetting(updated);
+        setSetting(updated);
       }}
     >
-      {theme ? <Icon name={theme === "dark" ? "light" : "dark"} /> : null}
+      {effectiveTheme ? <Icon name={updatedSetting} /> : null}
     </button>
   );
 }

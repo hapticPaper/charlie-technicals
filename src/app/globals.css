@@ -174,8 +174,6 @@ body {
 }
 
 .rpToolbarButton:hover {
-  border-color: var(--rp-border);
-  background: var(--rp-surface);
   border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
   background: color-mix(in srgb, var(--rp-surface-2) 82%, var(--rp-surface));
 }
@@ -326,8 +324,6 @@ a:focus-visible {
 }
 
 .rpNavLink:hover {
-  border-color: var(--rp-border);
-  background: var(--rp-surface-2);
   border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
   background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
 }

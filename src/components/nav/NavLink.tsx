@@ -6,10 +6,12 @@ import type { ReactNode } from "react";
 
 export function NavLink(props: { href: string; children: ReactNode; exact?: boolean }) {
   const pathname = usePathname();
-  const isActive = props.exact ? pathname === props.href : pathname.startsWith(props.href);
+  const href = props.href;
+  const hrefPrefix = href.endsWith("/") ? href : `${href}/`;
+  const isActive = props.exact ? pathname === href : pathname === href || pathname.startsWith(hrefPrefix);
 
   return (
-    <Link className="rpNavLink" href={props.href} aria-current={isActive ? "page" : undefined}>
+    <Link className="rpNavLink" href={href} aria-current={isActive ? "page" : undefined}>
       {props.children}
     </Link>
   );
