@@ -18,6 +18,7 @@
   border: 1px solid var(--rp-border);
   border-radius: 14px;
   padding: 14px;
+  box-shadow: var(--rp-shadow-strong);
 }
 
 .summaryLabel {
@@ -35,6 +36,7 @@
   border-radius: 14px;
   border: 1px solid var(--rp-border);
   background: var(--rp-surface);
+  box-shadow: var(--rp-shadow-strong);
 }
 
 .table {
@@ -55,6 +57,18 @@
 .table th {
   color: var(--rp-muted);
   font-weight: 600;
+}
+
+.table tbody tr:hover td,
+.table tbody tr:focus-within td {
+  background: var(--rp-surface-2);
+}
+
+@supports (background: color-mix(in srgb, var(--rp-surface) 80%, var(--rp-surface-2))) {
+  .table tbody tr:hover td,
+  .table tbody tr:focus-within td {
+    background: color-mix(in srgb, var(--rp-surface) 82%, var(--rp-surface-2));
+  }
 }
 
 .pnlPositive {

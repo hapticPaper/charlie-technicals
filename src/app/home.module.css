@@ -19,17 +19,25 @@
   display: block;
   border: 1px solid var(--rp-border);
   background: var(--rp-surface);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 14px 14px 12px;
+  box-shadow: var(--rp-shadow);
   text-decoration: none;
   color: var(--rp-text);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .card:hover {
   border-color: var(--rp-border);
   background: var(--rp-surface-2);
-  border-color: color-mix(in srgb, var(--rp-text) 18%, var(--rp-border));
-  background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
+  box-shadow: var(--rp-shadow-strong);
+}
+
+@supports (background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2))) {
+  .card:hover {
+    border-color: color-mix(in srgb, var(--rp-text) 18%, var(--rp-border));
+    background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
+  }
 }
 
 .card:focus-visible {
