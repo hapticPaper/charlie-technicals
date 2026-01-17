@@ -6,7 +6,7 @@ export type ThemeOverride = (typeof THEME_OVERRIDES)[number];
 export type ThemeSetting = ThemeOverride | "system";
 
 function isThemeOverride(value: unknown): value is ThemeOverride {
-  return typeof value === "string" && (THEME_OVERRIDES as readonly string[]).includes(value);
+  return typeof value === "string" && THEME_OVERRIDES.includes(value as ThemeOverride);
 }
 
 export function isThemeSetting(value: unknown): value is ThemeSetting {

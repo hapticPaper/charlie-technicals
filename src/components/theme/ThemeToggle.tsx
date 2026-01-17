@@ -14,6 +14,10 @@ function getStoredSetting(): ThemeSetting {
     if (isThemeSetting(value)) {
       return value;
     }
+
+    if (value) {
+      localStorage.removeItem(THEME_STORAGE_KEY);
+    }
   } catch {
     // Ignore storage read failures.
   }

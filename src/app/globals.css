@@ -178,7 +178,8 @@ body {
   background: var(--rp-surface);
 }
 
-@supports (background: color-mix(in srgb, white, black)) {
+/* Use color-mix blends when supported. */
+@supports (background: color-mix(in srgb, var(--rp-surface-2) 82%, var(--rp-surface))) {
   .rpToolbarButton:hover {
     border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
     background: color-mix(in srgb, var(--rp-surface-2) 82%, var(--rp-surface));
@@ -335,7 +336,7 @@ a:focus-visible {
   background: var(--rp-surface-2);
 }
 
-@supports (background: color-mix(in srgb, white, black)) {
+@supports (background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2))) {
   .rpNavLink:hover {
     border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
     background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
