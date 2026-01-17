@@ -44,7 +44,8 @@ const SERIES_COLORS = [
   "#60a5fa",
   "#f472b6",
   "#22c55e",
-  "#fb7185"
+  "#fb7185",
+  "#94a3b8"
 ];
 
 function formatDateTick(value: unknown): string {

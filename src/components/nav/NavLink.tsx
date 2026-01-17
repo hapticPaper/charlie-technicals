@@ -7,8 +7,14 @@ import type { ReactNode } from "react";
 export function NavLink(props: { href: string; children: ReactNode; exact?: boolean }) {
   const pathname = usePathname();
   const href = props.href;
-  const hrefPrefix = href.endsWith("/") ? href : `${href}/`;
-  const isActive = props.exact ? pathname === href : pathname === href || pathname.startsWith(hrefPrefix);
+
+  let isActive: boolean;
+  if (props.exact || href === "/") {
+    isActive = pathname === href;
+  } else {
+    const hrefPrefix = href.endsWith("/") ? href : `${href}/`;
+    isActive = pathname === href || pathname.startsWith(hrefPrefix);
+  }
 
   return (
     <Link className="rpNavLink" href={href} aria-current={isActive ? "page" : undefined}>

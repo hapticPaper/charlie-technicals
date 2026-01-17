@@ -14,7 +14,7 @@ const GTM_BOOTSTRAP_SCRIPT = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm
 
 const GTM_NO_SCRIPT = `<iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`;
 
-const THEME_INIT_SCRIPT = `(function(){try{var k='${THEME_STORAGE_KEY}';var t=localStorage.getItem(k);if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}else{delete document.documentElement.dataset.theme;if(t&&t!=='system'){localStorage.removeItem(k);}}}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var storageKey='${THEME_STORAGE_KEY}';var stored=localStorage.getItem(storageKey);if(stored==='light'||stored==='dark'){document.documentElement.dataset.theme=stored;}else{delete document.documentElement.dataset.theme;if(stored&&stored!=='system'){localStorage.removeItem(storageKey);}}}catch(e){}})();`;
 
 export const metadata = {
   title: "Charlie technicals",

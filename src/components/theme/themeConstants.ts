@@ -5,7 +5,7 @@ export type ThemeOverride = (typeof THEME_OVERRIDES)[number];
 
 export type ThemeSetting = ThemeOverride | "system";
 
-export function isThemeOverride(value: unknown): value is ThemeOverride {
+function isThemeOverride(value: unknown): value is ThemeOverride {
   return value === "light" || value === "dark";
 }
 

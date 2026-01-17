@@ -5,29 +5,8 @@ import { useEffect, useState } from "react";
 import {
   THEME_STORAGE_KEY,
   isThemeSetting,
-  type ThemeOverride,
   type ThemeSetting
 } from "./themeConstants";
-
-function mediaPrefersDark(): boolean {
-  if (typeof window === "undefined" || !window.matchMedia) {
-    return false;
-  }
-
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function getEffectiveTheme(setting: ThemeSetting, prefersDark: boolean): ThemeOverride {
-  if (typeof document === "undefined") {
-    return "light";
-  }
-
-  if (setting === "system") {
-    return prefersDark ? "dark" : "light";
-  }
-
-  return setting;
-}
 
 function getStoredSetting(): ThemeSetting {
   try {
@@ -132,34 +111,14 @@ function labelFor(setting: ThemeSetting): string {
 
 export function ThemeToggle() {
   const [setting, setSetting] = useState<ThemeSetting | null>(null);
-  const [prefersDark, setPrefersDark] = useState(false);
 
   useEffect(() => {
     setSetting(getStoredSetting());
-    setPrefersDark(mediaPrefersDark());
-
-    if (!window.matchMedia) {
-      return;
-    }
-
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = (_event: MediaQueryListEvent) => {
-      setPrefersDark(media.matches);
-    };
-
-    if (media.addEventListener) {
-      media.addEventListener("change", onChange);
-      return () => media.removeEventListener("change", onChange);
-    }
-
-    media.addListener?.(onChange);
-    return () => media.removeListener?.(onChange);
   }, []);
 
-  const currentSetting = setting ?? "system";
-  const effectiveTheme = setting ? getEffectiveTheme(setting, prefersDark) : null;
-  const updatedSetting = nextSetting(currentSetting);
-  const label = labelFor(currentSetting);
+  const displaySetting = setting ?? "system";
+  const nextSettingForToggle = nextSetting(displaySetting);
+  const label = labelFor(displaySetting);
 
   return (
     <button
@@ -168,13 +127,13 @@ export function ThemeToggle() {
       aria-label={label}
       title={label}
       onClick={() => {
-        const current = setting ?? getStoredSetting();
+        const current = setting ?? "system";
         const updated = nextSetting(current);
         applySetting(updated);
         setSetting(updated);
       }}
     >
-      {effectiveTheme ? <Icon name={updatedSetting} /> : null}
+      {setting === null ? null : <Icon name={nextSettingForToggle} />}
     </button>
   );
 }
