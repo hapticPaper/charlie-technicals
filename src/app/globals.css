@@ -10,26 +10,25 @@ body {
 :root {
   color-scheme: light;
 
-  --rp-bg: #f6f7fc;
-  --rp-surface: rgba(255, 255, 255, 0.78);
-  --rp-surface-2: rgba(255, 255, 255, 0.92);
+  --rp-bg: #f7f8fb;
+  --rp-surface: #ffffff;
+  --rp-surface-2: #f1f5f9;
   --rp-border: rgba(15, 23, 42, 0.12);
   --rp-text: #0f172a;
   --rp-muted: #475569;
-  --rp-link: #0284c7;
+  --rp-link: #2563eb;
 
-  --rp-topbar-bg: rgba(246, 247, 252, 0.75);
-  --rp-shadow: 0 12px 32px rgba(2, 6, 23, 0.08);
-  --rp-bg-image: radial-gradient(900px 500px at 18% 0%, rgba(56, 189, 248, 0.24), transparent 70%),
-    radial-gradient(900px 520px at 86% 10%, rgba(167, 139, 250, 0.22), transparent 70%),
-    linear-gradient(180deg, #f6f7fc 0%, #eff2fb 100%);
+  --rp-topbar-bg: #f7f8fb;
+  --rp-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --rp-shadow-strong: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.08);
+  --rp-bg-image: none;
 
   --rp-bull: #22c55e;
   --rp-bear: #fb7185;
   --rp-warn: #f59e0b;
-  --rp-target: #38bdf8;
+  --rp-target: #2563eb;
 
-  --rp-price: #e5e7eb;
+  --rp-price: #94a3b8;
   --rp-sma: #38bdf8;
   --rp-ema: #a78bfa;
   --rp-rsi: #34d399;
@@ -39,7 +38,7 @@ body {
   --rp-squeeze-off: rgba(34, 197, 94, 0.1);
   --rp-grid: rgba(15, 23, 42, 0.12);
 
-  --rp-content-max: 1600px;
+  --rp-content-max: 1240px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,22 +46,21 @@ body {
     color-scheme: dark;
 
     --rp-bg: #0b1020;
-    --rp-surface: rgba(255, 255, 255, 0.06);
-    --rp-surface-2: rgba(255, 255, 255, 0.09);
+    --rp-surface: #0f172a;
+    --rp-surface-2: #111c33;
     --rp-border: rgba(255, 255, 255, 0.12);
     --rp-text: #e5e7eb;
     --rp-muted: #a1a1aa;
-    --rp-link: #38bdf8;
+    --rp-link: #60a5fa;
 
-    --rp-topbar-bg: rgba(11, 16, 32, 0.72);
-    --rp-shadow: 0 16px 42px rgba(0, 0, 0, 0.25);
-    --rp-bg-image: radial-gradient(800px 400px at 18% 0%, rgba(124, 58, 237, 0.16), transparent 70%),
-      radial-gradient(900px 480px at 86% 12%, rgba(34, 197, 94, 0.12), transparent 70%),
-      linear-gradient(180deg, #0b1020 0%, #080b17 100%);
+    --rp-topbar-bg: #0b1020;
+    --rp-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
+    --rp-bg-image: none;
 
     --rp-squeeze-on: rgba(245, 158, 11, 0.12);
     --rp-squeeze-off: rgba(34, 197, 94, 0.12);
-    --rp-grid: rgba(255, 255, 255, 0.08);
+    --rp-grid: rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -70,22 +68,21 @@ body {
   color-scheme: dark;
 
   --rp-bg: #0b1020;
-  --rp-surface: rgba(255, 255, 255, 0.06);
-  --rp-surface-2: rgba(255, 255, 255, 0.09);
+  --rp-surface: #0f172a;
+  --rp-surface-2: #111c33;
   --rp-border: rgba(255, 255, 255, 0.12);
   --rp-text: #e5e7eb;
   --rp-muted: #a1a1aa;
-  --rp-link: #38bdf8;
+  --rp-link: #60a5fa;
 
-  --rp-topbar-bg: rgba(11, 16, 32, 0.72);
-  --rp-shadow: 0 16px 42px rgba(0, 0, 0, 0.25);
-  --rp-bg-image: radial-gradient(800px 400px at 18% 0%, rgba(124, 58, 237, 0.16), transparent 70%),
-    radial-gradient(900px 480px at 86% 12%, rgba(34, 197, 94, 0.12), transparent 70%),
-    linear-gradient(180deg, #0b1020 0%, #080b17 100%);
+  --rp-topbar-bg: #0b1020;
+  --rp-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --rp-shadow-strong: 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 46px rgba(0, 0, 0, 0.45);
+  --rp-bg-image: none;
 
   --rp-squeeze-on: rgba(245, 158, 11, 0.12);
   --rp-squeeze-off: rgba(34, 197, 94, 0.12);
-  --rp-grid: rgba(255, 255, 255, 0.08);
+  --rp-grid: rgba(255, 255, 255, 0.1);
 }
 
 body {
@@ -97,6 +94,7 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
 }
 
 .rpAppShell {
@@ -141,14 +139,19 @@ body {
 .rpPanelSurface,
 .rpPanelSkeleton {
   width: 100%;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 1px solid var(--rp-border);
   background: var(--rp-surface);
-  box-shadow: var(--rp-shadow);
+  box-shadow: var(--rp-shadow-soft);
 }
 
 .rpPanelSurface {
   padding: 12px;
+  box-shadow: var(--rp-shadow-strong);
+}
+
+.rpPanelSkeleton {
+  box-shadow: none;
 }
 
 .rpPanelSurfaceSide {
@@ -281,7 +284,7 @@ a:focus-visible {
   z-index: 20;
   border-bottom: 1px solid var(--rp-border);
   background: var(--rp-topbar-bg);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
 }
 
 .rpTopBarInner {
@@ -318,27 +321,40 @@ a:focus-visible {
 }
 
 .rpNavLink {
-  border: 1px solid var(--rp-border);
-  background: var(--rp-surface);
-  padding: 6px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 7px 10px;
   border-radius: 12px;
   text-decoration: none;
-  color: var(--rp-text);
+  color: var(--rp-muted);
+}
+
+@supports (color: color-mix(in srgb, var(--rp-text) 70%, var(--rp-muted))) {
+  .rpNavLink {
+    color: color-mix(in srgb, var(--rp-text) 70%, var(--rp-muted));
+  }
 }
 
 .rpNavLink[aria-current="page"] {
   border-color: var(--rp-target);
   background: var(--rp-surface-2);
+  color: var(--rp-text);
+}
+
+@supports (border-color: color-mix(in srgb, var(--rp-target) 55%, var(--rp-border))) {
+  .rpNavLink[aria-current="page"] {
+    border-color: color-mix(in srgb, var(--rp-target) 55%, var(--rp-border));
+  }
 }
 
 .rpNavLink:hover {
-  border-color: var(--rp-border);
   background: var(--rp-surface-2);
+  color: var(--rp-text);
 }
 
 @supports (background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2))) {
   .rpNavLink:hover {
-    border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
+    border-color: color-mix(in srgb, var(--rp-text) 12%, transparent);
     background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
   }
 }

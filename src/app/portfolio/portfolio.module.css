@@ -18,6 +18,7 @@
   border: 1px solid var(--rp-border);
   border-radius: 14px;
   padding: 14px;
+  box-shadow: var(--rp-shadow-strong);
 }
 
 .summaryLabel {
@@ -35,6 +36,7 @@
   border-radius: 14px;
   border: 1px solid var(--rp-border);
   background: var(--rp-surface);
+  box-shadow: var(--rp-shadow-soft);
 }
 
 .table {
