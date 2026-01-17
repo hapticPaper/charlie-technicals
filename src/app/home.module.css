@@ -22,11 +22,12 @@
   border-radius: 16px;
   padding: 14px 14px 12px;
   text-decoration: none;
+  color: var(--rp-text);
 }
 
 .card:hover {
-  border-color: color-mix(in srgb, #fff 20%, var(--rp-border));
-  background: color-mix(in srgb, var(--rp-surface) 70%, rgba(255, 255, 255, 0.08));
+  border-color: color-mix(in srgb, var(--rp-text) 18%, var(--rp-border));
+  background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
 }
 
 .cardHeader {

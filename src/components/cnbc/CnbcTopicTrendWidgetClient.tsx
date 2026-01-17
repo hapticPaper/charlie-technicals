@@ -45,7 +45,7 @@ const SERIES_COLORS = [
   "#f472b6",
   "#22c55e",
   "#fb7185",
-  "rgba(255, 255, 255, 0.35)"
+  "var(--rp-muted)"
 ];
 
 function formatDateTick(value: unknown): string {

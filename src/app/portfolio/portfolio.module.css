@@ -6,14 +6,6 @@
   margin-bottom: 12px;
 }
 
-.homeLink {
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--rp-border);
-  background: var(--rp-surface-2);
-  text-decoration: none;
-}
-
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
