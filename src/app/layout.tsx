@@ -4,6 +4,7 @@ import Link from "next/link";
 import Script from "next/script";
 
 import "./globals.css";
+import { NavLink } from "../components/nav/NavLink";
 import { ThemeToggle } from "../components/theme/ThemeToggle";
 
 const GTM_ID = "GTM-NG943PNQ";
@@ -41,9 +42,9 @@ export default function RootLayout(props: { children: ReactNode }) {
               <span className="rpBrandTagline">Daily market reports, setups, and portfolio</span>
             </Link>
             <div className="rpNav">
-              <Link className="rpNavLink" href="/portfolio">
+              <NavLink href="/portfolio" exact>
                 Portfolio
-              </Link>
+              </NavLink>
               <ThemeToggle />
             </div>
           </div>

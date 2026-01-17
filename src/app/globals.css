@@ -5,10 +5,6 @@ body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
     "Segoe UI Emoji";
-  line-height: 1.45;
-  text-rendering: geometricPrecision;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 :root {
@@ -97,6 +93,10 @@ body {
   background-color: var(--rp-bg);
   background-image: var(--rp-bg-image);
   background-repeat: no-repeat;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .rpAppShell {
@@ -174,6 +174,8 @@ body {
 }
 
 .rpToolbarButton:hover {
+  border-color: var(--rp-border);
+  background: var(--rp-surface);
   border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
   background: color-mix(in srgb, var(--rp-surface-2) 82%, var(--rp-surface));
 }
@@ -244,10 +246,13 @@ pre {
 
 a {
   color: var(--rp-link);
+  text-decoration-color: currentColor;
   text-decoration-color: color-mix(in srgb, var(--rp-link) 30%, transparent);
+  text-underline-offset: 0.16em;
 }
 
 a:hover {
+  text-decoration-color: currentColor;
   text-decoration-color: color-mix(in srgb, var(--rp-link) 65%, transparent);
 }
 
@@ -315,7 +320,14 @@ a:focus-visible {
   color: var(--rp-text);
 }
 
+.rpNavLink[aria-current="page"] {
+  border-color: var(--rp-target);
+  background: var(--rp-surface-2);
+}
+
 .rpNavLink:hover {
+  border-color: var(--rp-border);
+  background: var(--rp-surface-2);
   border-color: color-mix(in srgb, var(--rp-text) 16%, var(--rp-border));
   background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
 }

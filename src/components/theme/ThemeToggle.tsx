@@ -7,10 +7,18 @@ type ThemeName = "light" | "dark";
 const STORAGE_KEY = "rp-theme";
 
 function mediaPrefersDark(): boolean {
-  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (typeof window === "undefined" || !window.matchMedia) {
+    return false;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 function getEffectiveTheme(): ThemeName {
+  if (typeof document === "undefined") {
+    return "light";
+  }
+
   const attr = document.documentElement.dataset.theme;
   if (attr === "light" || attr === "dark") {
     return attr;
@@ -19,8 +27,17 @@ function getEffectiveTheme(): ThemeName {
 }
 
 function applyTheme(theme: ThemeName) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem(STORAGE_KEY, theme);
+
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // Ignore storage write failures.
+  }
 }
 
 function Icon(props: { name: ThemeName }) {
@@ -61,16 +78,25 @@ export function ThemeToggle() {
   useEffect(() => {
     setThemeState(getEffectiveTheme());
 
+    if (!window.matchMedia) {
+      return;
+    }
+
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
+    const onChange = (_event: MediaQueryListEvent) => {
       if (document.documentElement.dataset.theme) {
         return;
       }
       setThemeState(getEffectiveTheme());
     };
 
-    media.addEventListener?.("change", onChange);
-    return () => media.removeEventListener?.("change", onChange);
+    if (media.addEventListener) {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    }
+
+    media.addListener?.(onChange);
+    return () => media.removeListener?.(onChange);
   }, []);
 
   const label = theme === "dark" ? "Switch to light mode" : theme === "light" ? "Switch to dark mode" : "Toggle theme";

@@ -129,7 +129,7 @@ export default async function HomePage() {
   if (dates.length === 0) {
     return (
       <>
-        <h1>Daily highlights</h1>
+        <h1>Charlie technicals — Daily highlights</h1>
         <p>
           No reports yet. Run <code>bun run market:run</code> to generate today&apos;s report.
         </p>
@@ -162,7 +162,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <h1>Daily highlights</h1>
+      <h1>Charlie technicals — Daily highlights</h1>
       <p className="report-muted">Daily highlights. Click a day for the full rundown.</p>
 
       {latestCard ? (

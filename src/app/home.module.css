@@ -26,8 +26,15 @@
 }
 
 .card:hover {
+  border-color: var(--rp-border);
+  background: var(--rp-surface-2);
   border-color: color-mix(in srgb, var(--rp-text) 18%, var(--rp-border));
   background: color-mix(in srgb, var(--rp-surface) 70%, var(--rp-surface-2));
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--rp-target);
+  outline-offset: 3px;
 }
 
 .cardHeader {
