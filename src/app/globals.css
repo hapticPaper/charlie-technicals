@@ -12,6 +12,8 @@ body {
 }
 
 :root {
+  color-scheme: light;
+
   --rp-bg: #f6f7fc;
   --rp-surface: rgba(255, 255, 255, 0.78);
   --rp-surface-2: rgba(255, 255, 255, 0.92);
@@ -46,6 +48,8 @@ body {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
+    color-scheme: dark;
+
     --rp-bg: #0b1020;
     --rp-surface: rgba(255, 255, 255, 0.06);
     --rp-surface-2: rgba(255, 255, 255, 0.09);
@@ -67,6 +71,8 @@ body {
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   --rp-bg: #0b1020;
   --rp-surface: rgba(255, 255, 255, 0.06);
   --rp-surface-2: rgba(255, 255, 255, 0.09);

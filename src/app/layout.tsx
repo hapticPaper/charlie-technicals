@@ -12,7 +12,7 @@ const GTM_BOOTSTRAP_SCRIPT = `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm
 
 const GTM_NO_SCRIPT = `<iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`;
 
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('rp-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;}}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('rp-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}}catch(e){}})();`;
 
 export const metadata = {
   title: "Charlie technicals",

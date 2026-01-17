@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ThemeName = "light" | "dark";
 
@@ -18,9 +18,8 @@ function getEffectiveTheme(): ThemeName {
   return mediaPrefersDark() ? "dark" : "light";
 }
 
-function setTheme(theme: ThemeName) {
+function applyTheme(theme: ThemeName) {
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
   localStorage.setItem(STORAGE_KEY, theme);
 }
 
@@ -58,10 +57,8 @@ function Icon(props: { name: ThemeName }) {
 
 export function ThemeToggle() {
   const [theme, setThemeState] = useState<ThemeName | null>(null);
-  const [isMounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     setThemeState(getEffectiveTheme());
 
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -76,15 +73,7 @@ export function ThemeToggle() {
     return () => media.removeEventListener?.("change", onChange);
   }, []);
 
-  const label = useMemo(() => {
-    if (!theme) {
-      return "Toggle theme";
-    }
-
-    return theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
-  }, [theme]);
-
-  const nextTheme = theme === "dark" ? "light" : "dark";
+  const label = theme === "dark" ? "Switch to light mode" : theme === "light" ? "Switch to dark mode" : "Toggle theme";
 
   return (
     <button
@@ -93,13 +82,13 @@ export function ThemeToggle() {
       aria-label={label}
       title={label}
       onClick={() => {
-        const current = getEffectiveTheme();
+        const current = theme ?? getEffectiveTheme();
         const updated = current === "dark" ? "light" : "dark";
-        setTheme(updated);
+        applyTheme(updated);
         setThemeState(updated);
       }}
     >
-      {isMounted ? <Icon name={nextTheme} /> : null}
+      {theme ? <Icon name={theme === "dark" ? "light" : "dark"} /> : null}
     </button>
   );
 }
