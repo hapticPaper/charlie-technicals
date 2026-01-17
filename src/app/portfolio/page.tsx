@@ -534,9 +534,6 @@ export default async function PortfolioPage() {
             notional per setup. Links go to the latest report date that includes the symbol.
           </p>
         </div>
-        <Link className={styles.homeLink} href="/">
-          Home
-        </Link>
       </div>
 
       <div className={styles.summaryGrid}>

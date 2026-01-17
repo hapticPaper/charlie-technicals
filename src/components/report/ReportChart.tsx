@@ -743,10 +743,10 @@ export function ReportChart(props: {
       const watermarkSvg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="170">` +
         `<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}</style>` +
-        `<text x="100%" y="68" text-anchor="end" font-size="72" font-weight="700" fill="#ffffff">${escapeSvgText(
+        `<text x="100%" y="68" text-anchor="end" font-size="72" font-weight="700" fill="${muted}">${escapeSvgText(
           series.symbol
         )}</text>` +
-        `<text x="100%" y="140" text-anchor="end" font-size="46" font-weight="700" fill="#ffffff">${escapeSvgText(
+        `<text x="100%" y="140" text-anchor="end" font-size="46" font-weight="700" fill="${muted}">${escapeSvgText(
           series.interval
         )}</text>` +
         `</svg>`;

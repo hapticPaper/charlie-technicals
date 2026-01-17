@@ -37,6 +37,7 @@ function toChartTopicKey(topic: string): string {
 }
 
 const SERIES_COLORS = [
+  // Recharts stroke/fill values should be concrete colors (avoid CSS vars here; last entry approximates muted).
   "#38bdf8",
   "#a78bfa",
   "#34d399",
@@ -45,7 +46,7 @@ const SERIES_COLORS = [
   "#f472b6",
   "#22c55e",
   "#fb7185",
-  "rgba(255, 255, 255, 0.35)"
+  "#94a3b8"
 ];
 
 function formatDateTick(value: unknown): string {
