@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-16",
+  "symbol": "GS",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 969.8957,
+    "stop": 967.0901042999999,
+    "targets": [
+      1015.2726631707694,
+      1037.961144756154
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.630Z",
+  "openedAt": "2026-01-22T17:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-01-22T18:05:00.000Z",
+  "currentPrice": 924.5399780273438,
+  "realizedPct": -0.2892677738441504,
+  "unrealizedPct": null,
+  "totalPct": -0.2892677738441504,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

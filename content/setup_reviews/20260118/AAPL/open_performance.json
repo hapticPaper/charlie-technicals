@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-18",
+  "symbol": "AAPL",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 255.25,
+    "stop": 256.72775366210936,
+    "targets": [
+      246.57175994355975,
+      242.23263991533963
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.710Z",
+  "openedAt": "2026-01-26T15:35:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 255.05999755859375,
+  "realizedPct": 0,
+  "unrealizedPct": 0.07443778311704212,
+  "totalPct": 0.07443778311704212,
+  "status": "open",
+  "outcome": "open"
+}
