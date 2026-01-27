@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-18",
+  "symbol": "TSLA",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 437.4,
+    "stop": 460.7452,
+    "targets": [
+      390.7095999999999,
+      367.3643999999999
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.744Z",
+  "openedAt": "2026-01-21T19:45:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 438.989990234375,
+  "realizedPct": 0,
+  "unrealizedPct": -0.36350942715478346,
+  "totalPct": -0.36350942715478346,
+  "status": "open",
+  "outcome": "open"
+}

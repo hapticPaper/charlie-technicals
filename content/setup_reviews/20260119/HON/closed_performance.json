@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-19",
+  "symbol": "HON",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 219,
+    "stop": 217.7044,
+    "targets": [
+      226.99036283621857,
+      230.98554425432786
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.761Z",
+  "openedAt": "2026-01-21T15:10:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-01-21T16:55:00.000Z",
+  "currentPrice": 220.13499450683594,
+  "realizedPct": -0.5915981735159851,
+  "unrealizedPct": null,
+  "totalPct": -0.5915981735159851,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

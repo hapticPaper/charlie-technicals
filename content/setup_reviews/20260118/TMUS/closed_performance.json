@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-18",
+  "symbol": "TMUS",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 185.9998,
+    "stop": 187.08599369648437,
+    "targets": [
+      177.51177932686377,
+      173.26776899029568
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.742Z",
+  "openedAt": "2026-01-22T16:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-01-26T14:30:00.000Z",
+  "currentPrice": 187.9102020263672,
+  "realizedPct": -0.5839757335676555,
+  "unrealizedPct": null,
+  "totalPct": -0.5839757335676555,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

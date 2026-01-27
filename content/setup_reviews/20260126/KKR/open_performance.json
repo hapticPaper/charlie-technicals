@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-26",
+  "symbol": "KKR",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 117.8499984741211,
+    "stop": 123.27844999847413,
+    "targets": [
+      106.99309542541502,
+      101.56464390106198
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.794Z",
+  "openedAt": "2026-01-26T15:55:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 117.8499984741211,
+  "realizedPct": 0,
+  "unrealizedPct": 0,
+  "totalPct": 0,
+  "status": "open",
+  "outcome": "open"
+}

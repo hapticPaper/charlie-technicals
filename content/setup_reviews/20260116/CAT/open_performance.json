@@ -12,13 +12,13 @@
       703.9901253162985
     ]
   },
-  "asOfDate": "2026-01-16",
-  "computedAt": "2026-01-16T14:22:56.454Z",
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.606Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": null,
+  "currentPrice": 623.9149780273438,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,

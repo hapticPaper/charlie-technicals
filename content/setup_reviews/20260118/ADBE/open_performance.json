@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-18",
+  "symbol": "ADBE",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 296.565,
+    "stop": 311.839365,
+    "targets": [
+      266.01627,
+      250.74190500000003
+    ]
+  },
+  "asOfDate": "2026-01-26",
+  "computedAt": "2026-01-26T16:24:29.713Z",
+  "openedAt": "2026-01-22T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 304.2149963378906,
+  "realizedPct": 0,
+  "unrealizedPct": -2.5795344487348904,
+  "totalPct": -2.5795344487348904,
+  "status": "open",
+  "outcome": "open"
+}
