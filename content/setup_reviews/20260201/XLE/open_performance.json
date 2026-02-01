@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-01",
+  "symbol": "XLE",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 51.15,
+    "stop": 50.34885,
+    "targets": [
+      53.005927731966004,
+      53.93389159794901
+    ]
+  },
+  "asOfDate": "2026-02-01",
+  "computedAt": "2026-02-01T06:40:20.620Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
