@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-01",
+  "symbol": "ROKU",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 94.75,
+    "stop": 96.11474664306641,
+    "targets": [
+      86.3489766561411,
+      82.14846498421166
+    ]
+  },
+  "asOfDate": "2026-02-01",
+  "computedAt": "2026-02-01T06:40:20.599Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

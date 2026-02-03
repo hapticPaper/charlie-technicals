@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-01",
+  "symbol": "SCHD",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 29.7998,
+    "stop": 29.63030113688965,
+    "targets": [
+      30.406530109919967,
+      30.709895164879953
+    ]
+  },
+  "asOfDate": "2026-02-01",
+  "computedAt": "2026-02-01T06:40:20.602Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
