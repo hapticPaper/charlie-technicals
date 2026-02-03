@@ -1,24 +1,24 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-01",
-  "symbol": "SHOP",
+  "setupDate": "2026-02-03",
+  "symbol": "CSCO",
   "setupType": "pick",
   "trade": {
-    "side": "sell",
-    "entry": 130.8234,
-    "stop": 132.01581790683593,
+    "side": "buy",
+    "entry": 83.39,
+    "stop": 81.75910877929688,
     "targets": [
-      117.54439422512195,
-      110.90489133768293
+      86.69461587836823,
+      88.34692381755234
     ]
   },
-  "asOfDate": "2026-02-01",
-  "computedAt": "2026-02-01T06:40:20.605Z",
+  "asOfDate": "2026-02-03",
+  "computedAt": "2026-02-03T23:04:38.046Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": null,
+  "currentPrice": 83.12000274658203,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,

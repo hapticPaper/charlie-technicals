@@ -1,27 +1,27 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-01",
+  "setupDate": "2026-02-03",
   "symbol": "QQQ",
   "setupType": "watchlist",
   "trade": {
     "side": "sell",
-    "entry": 620.25,
-    "stop": 653.73125,
+    "entry": 615.06,
+    "stop": 619.39086,
     "targets": [
-      553.2874999999999,
-      519.8062499999999
+      596.4219390269674,
+      587.1029085404512
     ]
   },
   "asOfDate": "2026-02-03",
-  "computedAt": "2026-02-03T23:04:38.014Z",
-  "openedAt": "2026-02-03T15:00:00.000Z",
+  "computedAt": "2026-02-03T23:04:38.070Z",
+  "openedAt": "2026-02-03T17:30:00.000Z",
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
   "currentPrice": 616.4500122070312,
   "realizedPct": 0,
-  "unrealizedPct": 0.6126542189389359,
-  "totalPct": 0.6126542189389359,
+  "unrealizedPct": -0.22599619663631268,
+  "totalPct": -0.22599619663631268,
   "status": "open",
   "outcome": "open"
 }

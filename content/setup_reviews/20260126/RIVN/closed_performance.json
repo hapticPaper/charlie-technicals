@@ -12,16 +12,16 @@
       12.810455679529884
     ]
   },
-  "asOfDate": "2026-02-01",
-  "computedAt": "2026-02-01T06:40:20.569Z",
+  "asOfDate": "2026-02-03",
+  "computedAt": "2026-02-03T23:04:37.989Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 14.75,
+  "currentPrice": 14.414999961853027,
   "realizedPct": 0,
   "unrealizedPct": null,
-  "totalPct": null,
-  "status": "open",
-  "outcome": "pending"
+  "totalPct": 0,
+  "status": "closed",
+  "outcome": "not_opened"
 }

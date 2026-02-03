@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-03",
+  "symbol": "MRK",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 115.6,
+    "stop": 114.9044,
+    "targets": [
+      121.33463666123637,
+      124.20195499185455
+    ]
+  },
+  "asOfDate": "2026-02-03",
+  "computedAt": "2026-02-03T23:04:38.061Z",
+  "openedAt": "2026-02-03T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-02-03T14:30:00.000Z",
+  "currentPrice": 115.83999633789062,
+  "realizedPct": -0.6017301038062275,
+  "unrealizedPct": null,
+  "totalPct": -0.6017301038062275,
+  "status": "closed",
+  "outcome": "stopped_out"
+}
