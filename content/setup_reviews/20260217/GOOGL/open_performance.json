@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-17",
+  "symbol": "GOOGL",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 303.03,
+    "stop": 306.87302999999997,
+    "targets": [
+      283.38345805847956,
+      273.5601870877193
+    ]
+  },
+  "asOfDate": "2026-02-17",
+  "computedAt": "2026-02-17T09:31:42.113Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
