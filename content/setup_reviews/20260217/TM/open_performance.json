@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-17",
+  "symbol": "TM",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 243.39,
+    "stop": 241.81661,
+    "targets": [
+      253.41032174073524,
+      258.4204826111029
+    ]
+  },
+  "asOfDate": "2026-02-17",
+  "computedAt": "2026-02-17T09:31:42.133Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
