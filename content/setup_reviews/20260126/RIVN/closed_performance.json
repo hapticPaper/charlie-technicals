@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-26",
+  "symbol": "RIVN",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 15.694999694824219,
+    "stop": 15.965694999694824,
+    "targets": [
+      13.771970351294662,
+      12.810455679529884
+    ]
+  },
+  "asOfDate": "2026-02-03",
+  "computedAt": "2026-02-03T23:04:37.989Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 14.414999961853027,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": 0,
+  "status": "closed",
+  "outcome": "not_opened"
+}

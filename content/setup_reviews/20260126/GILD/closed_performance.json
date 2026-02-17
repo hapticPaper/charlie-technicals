@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-01-26",
+  "symbol": "GILD",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 136.97000122070312,
+    "stop": 133.55303244018555,
+    "targets": [
+      144.25525767603588,
+      147.89788590370225
+    ]
+  },
+  "asOfDate": "2026-02-03",
+  "computedAt": "2026-02-03T23:04:37.968Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 143.25999450683594,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": 0,
+  "status": "closed",
+  "outcome": "not_opened"
+}

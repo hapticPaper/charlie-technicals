@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-03",
+  "symbol": "SPY",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 688.95,
+    "stop": 696.08915,
+    "targets": [
+      674.6717000000001,
+      667.5325500000001
+    ]
+  },
+  "asOfDate": "2026-02-03",
+  "computedAt": "2026-02-03T23:04:38.076Z",
+  "openedAt": "2026-02-03T17:10:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 689.4600219726562,
+  "realizedPct": 0,
+  "unrealizedPct": -0.0740288805655279,
+  "totalPct": -0.0740288805655279,
+  "status": "open",
+  "outcome": "open"
+}
