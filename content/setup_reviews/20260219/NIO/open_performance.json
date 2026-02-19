@@ -1,19 +1,19 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-17",
-  "symbol": "SPY",
+  "setupDate": "2026-02-19",
+  "symbol": "NIO",
   "setupType": "watchlist",
   "trade": {
-    "side": "sell",
-    "entry": 679.96,
-    "stop": 683.4199600000001,
+    "side": "buy",
+    "entry": 4.8998,
+    "stop": 4.8851002,
     "targets": [
-      663.4667401988212,
-      655.2201102982317
+      5.357827274463829,
+      5.586840911695743
     ]
   },
-  "asOfDate": "2026-02-17",
-  "computedAt": "2026-02-17T09:31:42.129Z",
+  "asOfDate": "2026-02-19",
+  "computedAt": "2026-02-19T14:40:56.364Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,

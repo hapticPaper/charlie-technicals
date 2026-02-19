@@ -1,19 +1,19 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-17",
-  "symbol": "RIVN",
+  "setupDate": "2026-02-19",
+  "symbol": "CMA",
   "setupType": "pick",
   "trade": {
     "side": "buy",
-    "entry": 17.48,
-    "stop": 17.2178,
+    "entry": 92.8499984741211,
+    "stop": 91.38715000152588,
     "targets": [
-      19.71112816879381,
-      20.826692253190714
+      97.87814158472253,
+      100.39221314002324
     ]
   },
-  "asOfDate": "2026-02-17",
-  "computedAt": "2026-02-17T09:31:42.126Z",
+  "asOfDate": "2026-02-19",
+  "computedAt": "2026-02-19T14:40:56.351Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,

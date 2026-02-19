@@ -1,24 +1,24 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-17",
-  "symbol": "DB",
-  "setupType": "pick",
+  "setupDate": "2026-02-19",
+  "symbol": "AMZN",
+  "setupType": "watchlist",
   "trade": {
     "side": "sell",
-    "entry": 35.37,
-    "stop": 35.47537,
+    "entry": 203.99,
+    "stop": 206.35399,
     "targets": [
-      33.31664104450914,
-      32.289961566763715
+      189.87614577647284,
+      182.81921866470927
     ]
   },
   "asOfDate": "2026-02-19",
-  "computedAt": "2026-02-19T14:40:56.300Z",
+  "computedAt": "2026-02-19T14:40:56.347Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 36.26499938964844,
+  "currentPrice": null,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,

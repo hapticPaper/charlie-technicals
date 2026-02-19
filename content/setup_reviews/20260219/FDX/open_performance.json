@@ -1,24 +1,24 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-17",
-  "symbol": "DB",
-  "setupType": "pick",
+  "setupDate": "2026-02-19",
+  "symbol": "FDX",
+  "setupType": "watchlist",
   "trade": {
-    "side": "sell",
-    "entry": 35.37,
-    "stop": 35.47537,
+    "side": "buy",
+    "entry": 381.5,
+    "stop": 379.5718,
     "targets": [
-      33.31664104450914,
-      32.289961566763715
+      399.8052576959891,
+      408.95788654398365
     ]
   },
   "asOfDate": "2026-02-19",
-  "computedAt": "2026-02-19T14:40:56.300Z",
+  "computedAt": "2026-02-19T14:40:56.354Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 36.26499938964844,
+  "currentPrice": null,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,

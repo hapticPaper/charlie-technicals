@@ -1,19 +1,19 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-17",
-  "symbol": "QQQ",
+  "setupDate": "2026-02-19",
+  "symbol": "TSLA",
   "setupType": "watchlist",
   "trade": {
     "side": "sell",
-    "entry": 597.97,
-    "stop": 602.98807,
+    "entry": 407.34,
+    "stop": 413.01734,
     "targets": [
-      577.1790494331037,
-      566.7835741496557
+      376.3429699072135,
+      360.8444548608203
     ]
   },
-  "asOfDate": "2026-02-17",
-  "computedAt": "2026-02-17T09:31:42.122Z",
+  "asOfDate": "2026-02-19",
+  "computedAt": "2026-02-19T14:40:56.374Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,

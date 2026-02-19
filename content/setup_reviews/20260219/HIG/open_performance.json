@@ -1,24 +1,24 @@
 {
   "version": "v2-setup-performance",
-  "setupDate": "2026-02-17",
-  "symbol": "DB",
-  "setupType": "pick",
+  "setupDate": "2026-02-19",
+  "symbol": "HIG",
+  "setupType": "watchlist",
   "trade": {
-    "side": "sell",
-    "entry": 35.37,
-    "stop": 35.47537,
+    "side": "buy",
+    "entry": 141.89,
+    "stop": 141.11811,
     "targets": [
-      33.31664104450914,
-      32.289961566763715
+      147.3109674499504,
+      150.02145117492557
     ]
   },
   "asOfDate": "2026-02-19",
-  "computedAt": "2026-02-19T14:40:56.300Z",
+  "computedAt": "2026-02-19T14:40:56.360Z",
   "openedAt": null,
   "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 36.26499938964844,
+  "currentPrice": null,
   "realizedPct": 0,
   "unrealizedPct": null,
   "totalPct": null,
