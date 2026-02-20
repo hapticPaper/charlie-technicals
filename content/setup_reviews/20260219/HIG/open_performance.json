@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-19",
+  "symbol": "HIG",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 141.89,
+    "stop": 141.11811,
+    "targets": [
+      147.3109674499504,
+      150.02145117492557
+    ]
+  },
+  "asOfDate": "2026-02-19",
+  "computedAt": "2026-02-19T14:40:56.360Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

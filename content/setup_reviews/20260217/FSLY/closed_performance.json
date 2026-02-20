@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-17",
+  "symbol": "FSLY",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 18.16,
+    "stop": 18.05184,
+    "targets": [
+      20.66420383302123,
+      21.916305749531844
+    ]
+  },
+  "asOfDate": "2026-02-19",
+  "computedAt": "2026-02-19T14:40:56.304Z",
+  "openedAt": "2026-02-17T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-02-17T14:30:00.000Z",
+  "currentPrice": 18.829999923706055,
+  "realizedPct": -0.5955947136563964,
+  "unrealizedPct": null,
+  "totalPct": -0.5955947136563964,
+  "status": "closed",
+  "outcome": "stopped_out"
+}
