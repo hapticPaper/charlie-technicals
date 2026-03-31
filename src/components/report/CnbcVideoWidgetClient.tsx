@@ -78,25 +78,66 @@ export function CnbcVideoWidgetClient(props: { data: CnbcTopicHypeDatum[] }) {
   }, [activeTopic, props.data]);
 
   if (!mounted) {
+    const fallbackSortedData = [...props.data].sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+
+      if (b.avgHype !== a.avgHype) {
+        return b.avgHype - a.avgHype;
+      }
+
+      return a.topic.localeCompare(b.topic);
+    });
+
+    const topDatum = fallbackSortedData[0] ?? null;
+
     return (
       <div className="rpSplitLayout">
         <div className="rpSplitMain">
-          <div
-            aria-busy="true"
-            aria-label="Loading CNBC video topics chart"
-            role="status"
-            className="rpPanelSkeleton"
-            style={{ height: 260 }}
-          />
+          <div className="rpPanelSurface">
+            <p className="report-muted" style={{ marginTop: 0 }}>
+              Topics summary
+            </p>
+            {props.data.length > 0 ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {fallbackSortedData.map((datum) => (
+                  <div
+                    key={datum.topic}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "baseline",
+                      justifyContent: "space-between"
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{datum.topic}</span>
+                    <span className="report-muted" style={{ whiteSpace: "nowrap" }}>
+                      {datum.count} · avg hype {datum.avgHype}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="report-muted">No topics.</p>
+            )}
+          </div>
         </div>
         <div className="rpSplitSide">
-          <div
-            aria-busy="true"
-            aria-label="Loading CNBC video topics"
-            role="status"
-            className="rpPanelSkeleton"
-            style={{ height: 260 }}
-          />
+          <div className="rpPanelSurface rpPanelSurfaceSide">
+            {topDatum ? (
+              <>
+                <p className="report-muted" style={{ marginTop: 0 }}>
+                  <strong>Top topic:</strong> {topDatum.topic} ({topDatum.videos.length} videos shown)
+                </p>
+                <CnbcVideoCards videos={topDatum.videos} />
+              </>
+            ) : (
+              <p className="report-muted" style={{ marginTop: 0 }}>
+                No topic data.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );

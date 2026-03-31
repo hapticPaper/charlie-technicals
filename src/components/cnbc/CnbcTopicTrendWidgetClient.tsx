@@ -16,7 +16,7 @@ import type { TooltipContentProps } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
 import { CnbcVideoCards } from "./CnbcVideoCards";
-import type { CnbcVideosByDate } from "./types";
+import type { CnbcVideoCard, CnbcVideosByDate } from "./types";
 import { getRechartsInitialDimension } from "../report/rechartsConfig";
 
 export type CnbcTopicTrendDatum = {
@@ -360,25 +360,93 @@ export function CnbcTopicTrendWidgetClient(props: {
   }, [activeVideos.length, selectedTotal]);
 
   if (!mounted) {
+    const totalsMap = new Map<string, number>();
+
+    for (const row of props.data) {
+      for (const [topic, raw] of Object.entries(row.values)) {
+        if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) {
+          continue;
+        }
+        totalsMap.set(topic, (totalsMap.get(topic) ?? 0) + raw);
+      }
+    }
+
+    const fallbackTopicTotals = Array.from(totalsMap.entries())
+      .map(([topic, total]) => ({ topic, total }))
+      .sort((a, b) => b.total - a.total || a.topic.localeCompare(b.topic))
+      .slice(0, MAX_VISIBLE_TOPICS);
+
+    const latestRow = props.data.length > 0 ? props.data[props.data.length - 1] : null;
+
+    let bestTopic: string | null = null;
+    let bestTotal = 0;
+    if (latestRow) {
+      for (const [topic, raw] of Object.entries(latestRow.values)) {
+        if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) {
+          continue;
+        }
+        if (raw > bestTotal) {
+          bestTotal = raw;
+          bestTopic = topic;
+        }
+      }
+    }
+
+    const selectionDate = latestRow?.date ?? null;
+    const selectionTopic = bestTopic;
+    const selectionVideos: CnbcVideoCard[] =
+      selectionDate && selectionTopic ? props.videosByDate[selectionDate]?.[selectionTopic] ?? [] : [];
+
     return (
       <div className="rpSplitLayout">
         <div className="rpSplitMain">
-          <div
-            aria-busy="true"
-            aria-label="Loading CNBC topic trend chart"
-            role="status"
-            className="rpPanelSkeleton"
-            style={{ height: 320 }}
-          />
+          <div className="rpPanelSurface">
+            <p className="report-muted" style={{ marginTop: 0 }}>
+              Topic totals (all days)
+            </p>
+            {fallbackTopicTotals.length > 0 ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {fallbackTopicTotals.map((entry) => (
+                  <div
+                    key={entry.topic}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "baseline",
+                      justifyContent: "space-between"
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{entry.topic}</span>
+                    <span className="report-muted" style={{ whiteSpace: "nowrap" }}>
+                      {entry.total}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="report-muted">No topic totals.</p>
+            )}
+          </div>
         </div>
         <div className="rpSplitSide">
-          <div
-            aria-busy="true"
-            aria-label="Loading CNBC topic videos"
-            role="status"
-            className="rpPanelSkeleton"
-            style={{ height: 320 }}
-          />
+          <div className="rpPanelSurface rpPanelSurfaceSide">
+            {selectionDate && selectionTopic ? (
+              <>
+                <p className="report-muted" style={{ marginTop: 0 }}>
+                  <strong>Latest:</strong> {selectionDate} · {selectionTopic} ({selectionVideos.length} videos)
+                </p>
+                {selectionVideos.length > 0 ? (
+                  <CnbcVideoCards videos={selectionVideos} />
+                ) : (
+                  <p className="report-muted">No videos.</p>
+                )}
+              </>
+            ) : (
+              <p className="report-muted" style={{ marginTop: 0 }}>
+                No topic data.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );
