@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-17",
+  "symbol": "MSTR",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 164.0500030517578,
+    "stop": 149.84594999694824,
+    "targets": [
+      192.45810916137697,
+      206.66216221618654
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.656Z",
+  "openedAt": "2026-04-20T14:40:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 179.25,
+  "realizedPct": 0,
+  "unrealizedPct": 9.265465812546548,
+  "totalPct": 9.265465812546548,
+  "status": "open",
+  "outcome": "open"
+}

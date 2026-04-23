@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-22",
+  "symbol": "AMD",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 302.48,
+    "stop": 282.65702,
+    "targets": [
+      342.1259600000001,
+      361.9489400000001
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.682Z",
+  "openedAt": "2026-04-22T18:50:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 303.44000244140625,
+  "realizedPct": 0,
+  "unrealizedPct": 0.3173771625913223,
+  "totalPct": 0.3173771625913223,
+  "status": "open",
+  "outcome": "open"
+}

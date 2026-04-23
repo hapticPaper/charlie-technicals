@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-22",
+  "symbol": "GEV",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 1125.3063,
+    "stop": 1111.153746434375,
+    "targets": [
+      1211.6888757611257,
+      1254.8801636416888
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.686Z",
+  "openedAt": "2026-04-22T13:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-04-22T13:30:00.000Z",
+  "currentPrice": 1126.1600341796875,
+  "realizedPct": -1.2576623418552697,
+  "unrealizedPct": null,
+  "totalPct": -1.2576623418552697,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

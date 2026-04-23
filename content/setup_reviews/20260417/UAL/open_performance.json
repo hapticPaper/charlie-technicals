@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-17",
+  "symbol": "UAL",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 104.4000015258789,
+    "stop": 94.92559999847413,
+    "targets": [
+      123.34880458068847,
+      132.82320610809325
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.668Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 91.69999694824219,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

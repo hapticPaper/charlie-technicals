@@ -1,0 +1,17 @@
+{
+  "id": "cnbc:20260422:bitcoin-closes-in-on-80k",
+  "title": "Bitcoin closes in on $80k",
+  "url": "https://www.cnbc.com/video/2026/04/22/bitcoin-closes-in-on-80k.html",
+  "thumbnailUrl": "https://image.cnbcfm.com/api/v1/image/108295619-1776882985370-1776882858-45440390396-hd.jpg?v=1776882971",
+  "publisher": "CNBC",
+  "publishedAt": "2026-04-22T18:43:52.000Z",
+  "relatedTickers": [],
+  "topic": "bitcoin",
+  "hype": 5,
+  "mainIdea": "Bitcoin closes in on $80k",
+  "summary": "CNBC: Bitcoin closes in on $80k.",
+  "symbol": null,
+  "provider": "cnbc",
+  "fetchedAt": "2026-04-23T00:04:26.751Z",
+  "asOfDate": "2026-04-22"
+}

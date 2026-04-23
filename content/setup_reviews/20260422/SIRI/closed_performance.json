@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-22",
+  "symbol": "SIRI",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 27.8852,
+    "stop": 27.7721148,
+    "targets": [
+      29.54454415125565,
+      30.374216226883476
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.701Z",
+  "openedAt": "2026-04-22T15:15:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-04-22T16:05:00.000Z",
+  "currentPrice": 28.05500030517578,
+  "realizedPct": -0.405538421815158,
+  "unrealizedPct": null,
+  "totalPct": -0.405538421815158,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

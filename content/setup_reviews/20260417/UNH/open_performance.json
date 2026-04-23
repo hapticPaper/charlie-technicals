@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-17",
+  "symbol": "UNH",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 323.07000732421875,
+    "stop": 316.0769299926758,
+    "targets": [
+      339.65959378875755,
+      347.9543870210269
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.670Z",
+  "openedAt": "2026-04-20T13:55:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 353.4100036621094,
+  "realizedPct": 0,
+  "unrealizedPct": 9.391152273520317,
+  "totalPct": 9.391152273520317,
+  "status": "open",
+  "outcome": "open"
+}
