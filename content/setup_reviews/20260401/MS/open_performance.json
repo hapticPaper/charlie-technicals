@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-01",
+  "symbol": "MS",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 164.27499389648438,
+    "stop": 163.038727935791,
+    "targets": [
+      175.22349102905218,
+      180.6977395953361
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.586Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 190.97999572753906,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

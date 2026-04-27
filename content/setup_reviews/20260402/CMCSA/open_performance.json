@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-02",
+  "symbol": "CMCSA",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 27.684999465942383,
+    "stop": 28.185285402297975,
+    "targets": [
+      26.124112974815553,
+      25.343669729252134
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.614Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 29.329999923706055,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

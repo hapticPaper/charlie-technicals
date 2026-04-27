@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-17",
+  "symbol": "VTI",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 349.8800048828125,
+    "stop": 345.68011999511714,
+    "targets": [
+      359.0443996789099,
+      363.6265970769586
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.675Z",
+  "openedAt": "2026-04-20T13:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 351.1700134277344,
+  "realizedPct": 0,
+  "unrealizedPct": 0.368700276357303,
+  "totalPct": 0.368700276357303,
+  "status": "open",
+  "outcome": "open"
+}

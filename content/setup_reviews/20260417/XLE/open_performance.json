@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-17",
+  "symbol": "XLE",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 54.009498596191406,
+    "stop": 56.6440094985962,
+    "targets": [
+      48.74047679138182,
+      46.10596588897703
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.678Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 56.540000915527344,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

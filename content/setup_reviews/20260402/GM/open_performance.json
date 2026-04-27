@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-02",
+  "symbol": "GM",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 71.91000366210938,
+    "stop": 75.52691000366211,
+    "targets": [
+      64.6761909790039,
+      61.05928463745117
+    ]
+  },
+  "asOfDate": "2026-04-22",
+  "computedAt": "2026-04-23T00:05:29.616Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 78.9800033569336,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
