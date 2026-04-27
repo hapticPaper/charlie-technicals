@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-03",
+  "symbol": "HMC",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 28.31,
+    "stop": 28.77831,
+    "targets": [
+      26.89095920794521,
+      26.181438811917822
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.656Z",
+  "openedAt": "2026-03-03T19:45:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 28.28499984741211,
+  "realizedPct": 0,
+  "unrealizedPct": 0.08830855735743323,
+  "totalPct": 0.08830855735743323,
+  "status": "open",
+  "outcome": "open"
+}

@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-03",
+  "symbol": "DOCU",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 46.03,
+    "stop": 46.316030457763674,
+    "targets": [
+      40.77295236108696,
+      38.14442854163044
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.506Z",
+  "openedAt": "2026-03-02T18:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-03-02T19:15:00.000Z",
+  "currentPrice": 46.7400016784668,
+  "realizedPct": -0.621400082041435,
+  "unrealizedPct": null,
+  "totalPct": -0.621400082041435,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

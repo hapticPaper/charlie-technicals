@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-03",
+  "symbol": "BABA",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 135.56,
+    "stop": 144.73436,
+    "targets": [
+      117.21127999999999,
+      108.03691999999998
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.650Z",
+  "openedAt": "2026-03-03T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 135.61000061035156,
+  "realizedPct": 0,
+  "unrealizedPct": -0.03688448683354988,
+  "totalPct": -0.03688448683354988,
+  "status": "open",
+  "outcome": "open"
+}

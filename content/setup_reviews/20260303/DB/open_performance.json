@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-03",
+  "symbol": "DB",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 33.09,
+    "stop": 33.373090000000005,
+    "targets": [
+      30.82407971556948,
+      29.691119573354214
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.652Z",
+  "openedAt": "2026-03-03T18:40:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 33.07899856567383,
+  "realizedPct": 0,
+  "unrealizedPct": 0.0332470061232254,
+  "totalPct": 0.0332470061232254,
+  "status": "open",
+  "outcome": "open"
+}

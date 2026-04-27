@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-02",
+  "symbol": "XLI",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 179.52,
+    "stop": 177.98048366210938,
+    "targets": [
+      184.83368086886847,
+      187.4905213033027
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.648Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 175.42999267578125,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-01",
+  "symbol": "GDX",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 116.25,
+    "stop": 114.65374664306641,
+    "targets": [
+      125.33463447263077,
+      129.87695170894617
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.610Z",
+  "openedAt": "2026-03-02T14:30:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-03-02T14:30:00.000Z",
+  "currentPrice": 105.25,
+  "realizedPct": -1.3731211672546988,
+  "unrealizedPct": null,
+  "totalPct": -1.3731211672546988,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

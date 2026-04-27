@@ -12,16 +12,16 @@
       125.71276829421271
     ]
   },
-  "asOfDate": "2026-02-03",
-  "computedAt": "2026-02-03T23:04:38.001Z",
-  "openedAt": "2026-02-02T19:00:00.000Z",
-  "tp1At": "2026-02-03T18:10:00.000Z",
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.475Z",
+  "openedAt": null,
+  "tp1At": null,
   "tp2At": null,
   "stopAt": null,
-  "currentPrice": 130.89999389648438,
-  "realizedPct": 2.512315314746326,
-  "unrealizedPct": 1.8608436685479672,
-  "totalPct": 4.373158983294293,
+  "currentPrice": 125.55999755859375,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
   "status": "open",
-  "outcome": "tp1_open"
+  "outcome": "pending"
 }

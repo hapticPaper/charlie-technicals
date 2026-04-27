@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-02-27",
+  "symbol": "NFLX",
+  "setupType": "pick",
+  "trade": {
+    "side": "buy",
+    "entry": 95.31,
+    "stop": 94.92969152587891,
+    "targets": [
+      102.31909813573557,
+      105.82364720360334
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.572Z",
+  "openedAt": "2026-02-27T18:20:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-02-27T18:25:00.000Z",
+  "currentPrice": 97.70999908447266,
+  "realizedPct": -0.3990226357371669,
+  "unrealizedPct": null,
+  "totalPct": -0.3990226357371669,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

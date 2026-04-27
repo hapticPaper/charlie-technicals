@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-02",
+  "symbol": "AXP",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 307.4,
+    "stop": 310.5173914550781,
+    "targets": [
+      285.01594564428694,
+      273.8239184664304
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.628Z",
+  "openedAt": "2026-03-02T15:15:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 308.0799865722656,
+  "realizedPct": 0,
+  "unrealizedPct": -0.22120578147874032,
+  "totalPct": -0.22120578147874032,
+  "status": "open",
+  "outcome": "open"
+}

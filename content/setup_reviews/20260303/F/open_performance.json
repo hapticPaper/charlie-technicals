@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-03-03",
+  "symbol": "F",
+  "setupType": "pick",
+  "trade": {
+    "side": "sell",
+    "entry": 12.7098,
+    "stop": 12.932709876293945,
+    "targets": [
+      11.858840649749709,
+      11.433360974624565
+    ]
+  },
+  "asOfDate": "2026-03-03",
+  "computedAt": "2026-04-27T01:14:03.654Z",
+  "openedAt": "2026-03-03T20:50:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": 12.71500015258789,
+  "realizedPct": 0,
+  "unrealizedPct": -0.04091451154141751,
+  "totalPct": -0.04091451154141751,
+  "status": "open",
+  "outcome": "open"
+}
