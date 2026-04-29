@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-22",
+  "symbol": "ABT",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 91.73,
+    "stop": 92.06672847412109,
+    "targets": [
+      86.64274643786322,
+      84.09911965679484
+    ]
+  },
+  "asOfDate": "2026-04-29",
+  "computedAt": "2026-04-29T11:32:15.923Z",
+  "openedAt": "2026-04-24T15:45:00.000Z",
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": "2026-04-27T13:30:00.000Z",
+  "currentPrice": 93.8550033569336,
+  "realizedPct": -0.3670865301657997,
+  "unrealizedPct": null,
+  "totalPct": -0.3670865301657997,
+  "status": "closed",
+  "outcome": "stopped_out"
+}

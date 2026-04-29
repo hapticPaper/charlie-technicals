@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-29",
+  "symbol": "HCA",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 433.5,
+    "stop": 440.4335,
+    "targets": [
+      400.82325634658577,
+      384.4848845198786
+    ]
+  },
+  "asOfDate": "2026-04-29",
+  "computedAt": "2026-04-29T11:45:16.722Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}

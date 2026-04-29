@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-29",
+  "symbol": "LCID",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "sell",
+    "entry": 5.89,
+    "stop": 5.94589,
+    "targets": [
+      4.7042908356818725,
+      4.111436253522809
+    ]
+  },
+  "asOfDate": "2026-04-29",
+  "computedAt": "2026-04-29T11:45:16.724Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
