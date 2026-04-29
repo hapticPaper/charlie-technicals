@@ -1,0 +1,27 @@
+{
+  "version": "v2-setup-performance",
+  "setupDate": "2026-04-29",
+  "symbol": "NVDA",
+  "setupType": "watchlist",
+  "trade": {
+    "side": "buy",
+    "entry": 214.16,
+    "stop": 208.01884,
+    "targets": [
+      226.44231999999997,
+      232.58347999999995
+    ]
+  },
+  "asOfDate": "2026-04-29",
+  "computedAt": "2026-04-29T11:45:16.728Z",
+  "openedAt": null,
+  "tp1At": null,
+  "tp2At": null,
+  "stopAt": null,
+  "currentPrice": null,
+  "realizedPct": 0,
+  "unrealizedPct": null,
+  "totalPct": null,
+  "status": "open",
+  "outcome": "pending"
+}
